@@ -5,14 +5,14 @@
 - many of the scripts are work in progress
 
 # CATEGORIES
-- UI = user interface displays using custom gumps
-- RITUAL = place items in world creating patterns
-- ITEM = item and container management
-- MISC = miscellaneous interaction
-- SPELL = spell casting
-- TRAIN = training skills
-- GATHER = gather items from the world
-- DEV = Development tools
+- [UI](#UI) = user interface displays using custom gumps
+- [RITUAL](#RITUAL) = place items in world creating patterns
+- [ITEM](#ITEM) = item and container management
+- [MISC](#MISC) = miscellaneous interaction
+- [SPELL](#SPELL) = spell casting
+- [TRAIN](#TRAIN) = training skills
+- [GATHER](#GATHER) = gather items from the world
+- [DEV](#DEV) = Development tools
 
 # SCRIPTS
 
@@ -23,7 +23,7 @@
 
 ## RITUAL
 ritual magic 
-| <a href="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/docs/ultima_ritual_of_rejuvenation_01.jpg?raw=true"> <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/docs/ultima_ritual_of_rejuvenation_01.jpg?raw=true" width="140" height="140" /> </a>| <a href="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/docs/ultima_ritual_of_andaria_gate_01.jpg?raw=true"> <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/docs/ultima_ritual_of_andaria_gate_01.jpg?raw=true" width="140" height="140" /> </a> | <a href="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/docs/ultima_ritual_of_compassion_01.jpg?raw=true"> <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/docs/ultima_ritual_of_compassion_01.jpg?raw=true" width="140" height="140" /> </a>  | <a href="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/docs/ultima_ritual_of_luna_01.jpg?raw=true"> <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/docs/ultima_ritual_of_luna_01.jpg?raw=true" width="140" height="140" /> </a>  |
+| <a href="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_rejuvenation_01.jpg?raw=true"> <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_rejuvenation_01.jpg?raw=true" width="140" height="140" /> </a>| <a href="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_andaria_gate_01.jpg?raw=true"> <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_andaria_gate_01.jpg?raw=true" width="140" height="140" /> </a> | <a href="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_compassion_01.jpg?raw=true"> <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_compassion_01.jpg?raw=true" width="140" height="140" /> </a>  | <a href="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_luna_01.jpg?raw=true"> <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_luna_01.jpg?raw=true" width="140" height="140" /> </a>  |
 | :---: | :---: | :---: | :---: |
 
 - [RITUAL_circles_expanded_uor_brit.py](scripts/RITUAL_circles_expanded_uor_brit.py) – Places a mandala  with multiple circles, gems, lanterns
@@ -69,9 +69,9 @@ ritual magic
 
 
 # THANKS
-many thanks to the ultima online custom shard community , 
-many thanks to the creators of razor, razor enhanced and the wiki
-https://github.com/razorenhanced/razorenhanced
+- many thanks to the ultima online custom shard community , 
+- many thanks to the creators of razor, razor enhanced and the wiki
+- https://github.com/razorenhanced/razorenhanced
 
 # LICENSE
 free to all , [creative commons zero CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)  , free to redistribute , attribution not required
