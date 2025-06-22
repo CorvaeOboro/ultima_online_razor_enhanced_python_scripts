@@ -1,0 +1,246 @@
+"""
+Food Eater Script - a Razor Enhanced Python Script for Ultima Online
+
+Automatically finds and eats food items from the backpack.
+- Hunger monitoring via journal
+- Continuous eating until satisfied
+
+VERSION::20250621
+"""
+
+import time
+from System.Collections.Generic import List
+from System import Int32
+
+# Food Categories with their properties
+FOOD_ITEMS = {
+    "FRUITS": {
+        "items": [
+            {"name": "Peach", "id": 0x09D2},
+            {"name": "Apple", "id": 0x09D0},
+            {"name": "Grapes", "id": 0x09D1},
+            {"name": "Pear", "id": 0x0994},
+            {"name": "Banana", "id": 0x171F}
+        ]
+    },
+    "BAKED_GOODS": {
+        "items": [
+            {"name": "Muffins", "id": 0x09EB},
+            {"name": "Bread Loaf", "id": 0x103B}
+        ]
+    },
+    "MEATS": {
+        "items": [
+            {"name": "Cheese", "id": 0x097D},
+            {"name": "Sausage", "id": 0x09C0},
+            {"name": "Cooked Bird", "id": 0x09B7},
+            {"name": "Cut of Ribs", "id": 0x09F2},
+            {"name": "Ham", "id": 0x09C9},
+            {"name": "Leg of Lamb", "id": 0x160A},
+            {"name": "Chicken Leg", "id": 0x1608},
+            {"name": "Fish Steak", "id": 0x097A},
+            {"name": "Fish Steak 2", "id": 0x097B}
+        ]
+    }
+}
+
+class FoodEater:
+    def __init__(self):
+        self.debug_color = 67  # Light blue for messages
+        self.error_color = 33  # Red for errors
+        self.success_color = 68  # Green for success
+        self.last_eat_time = 0
+        self.eat_delay = 1500  # 1.5 seconds between eating attempts
+        
+        # Hunger status tracking
+        self.is_hungry = True
+        self.last_hunger_check = 0
+        self.hunger_check_delay = 20000  # Check hunger every 20 seconds
+        
+        # Fullness tracking
+        self.quite_full_count = 0
+        self.max_quite_full = 2  # Stop after this many "quite full" messages
+        
+        # Failure tracking
+        self.consecutive_failures = 0
+        self.max_failures = 3
+        
+        # Stats tracking
+        self.items_eaten = {}
+        
+        # Clear journal at start
+        Journal.Clear()
+        
+    def debug(self, message, color=None):
+        """Send a debug message to the game client"""
+        if color is None:
+            color = self.debug_color
+        Misc.SendMessage(f"[Food] {message}", color)
+
+    def find_food_in_backpack(self):
+        """Find all food items in the backpack"""
+        found_items = []
+        
+        for category, group in FOOD_ITEMS.items():
+            for item in group["items"]:
+                items = Items.FindByID(item["id"], -1, Player.Backpack.Serial)
+                if items:
+                    if not isinstance(items, list):
+                        items = [items]
+                    for food in items:
+                        found_items.append({
+                            "item": food,
+                            "name": item["name"],
+                            "category": category
+                        })
+        
+        return found_items
+
+    def can_eat(self):
+        """Check if enough time has passed since last eat"""
+        current_time = time.time() * 1000
+        return (current_time - self.last_eat_time) >= self.eat_delay
+
+    def check_hunger_status(self):
+        """Check journal for hunger status"""
+        current_time = time.time() * 1000
+        if (current_time - self.last_hunger_check) >= self.hunger_check_delay:
+            self.last_hunger_check = current_time
+            
+            # Check for satiated/full messages
+            full_messages = [
+                "You feel much less hungry",
+                "You are simply too full to eat any more",
+                "You do not feel hungry",
+                "You feel full",
+                "You are stuffed!",
+                "You manage to eat the food, but you are stuffed!"
+            ]
+            
+            # Check for "quite full" message
+            if Journal.Search("You feel quite full after consuming the food"):
+                self.quite_full_count += 1
+                self.debug(f"Quite full count: {self.quite_full_count}/{self.max_quite_full}")
+                if self.quite_full_count >= self.max_quite_full:
+                    self.is_hungry = False
+                    self.debug("Reached maximum fullness level!", self.success_color)
+                    return False
+            
+            for msg in full_messages:
+                if Journal.Search(msg):
+                    self.is_hungry = False
+                    self.debug("No longer hungry!", self.success_color)
+                    return False
+                
+            # These messages indicate still hungry
+            hunger_messages = [
+                "You feel extremely hungry",
+                "You feel hungry",
+                "You could use a bite to eat",
+                "Your stomach grumbles"
+            ]
+            
+            for msg in hunger_messages:
+                if Journal.Search(msg):
+                    self.is_hungry = True
+                    self.debug(f"Status: {msg}", self.debug_color)
+                    Journal.Clear()  # Clear to prevent re-reading same message
+                    return True
+                    
+        return self.is_hungry
+
+    def eat_item(self, food_info):
+        """Attempt to eat a food item"""
+        try:
+            if not self.can_eat():
+                return False
+                
+            food = food_info["item"]
+            name = food_info["name"]
+            
+            # Verify item is still in backpack
+            if food.Container != Player.Backpack.Serial:
+                return False
+                
+            # Use the item (eat it)
+            Items.UseItem(food)
+            self.last_eat_time = time.time() * 1000
+            
+            # Track statistics
+            if name not in self.items_eaten:
+                self.items_eaten[name] = 0
+            self.items_eaten[name] += 1
+            
+            self.debug(f"Eating {name}", self.success_color)
+            
+            # Reset failure counter on successful eat
+            self.consecutive_failures = 0
+            return True
+            
+        except Exception as e:
+            self.debug(f"Error eating {name}: {str(e)}", self.error_color)
+            self.consecutive_failures += 1
+            return False
+
+    def eat_all_food(self):
+        """Find and eat food items until no longer hungry"""
+        self.debug("Starting auto-eat...")
+        
+        while self.is_hungry and Player.Connected:
+            # Check hunger status
+            if not self.check_hunger_status():
+                break
+                
+            # Check failure threshold
+            if self.consecutive_failures >= self.max_failures:
+                self.debug("Too many consecutive failures, stopping", self.error_color)
+                break
+                
+            # Find available food
+            food_items = self.find_food_in_backpack()
+            
+            if not food_items:
+                self.debug("No food found in backpack", self.error_color)
+                self.consecutive_failures += 1
+                break
+                
+            # Sort by category priority (fruits first, then baked goods)
+            food_items.sort(key=lambda x: list(FOOD_ITEMS.keys()).index(x["category"]))
+            
+            # Check for 'too full' message after each loop (case-insensitive)
+            if Journal.Search('you are simply too full to eat any more!', "regexp"):
+                self.is_hungry = False
+                self.debug("Too full to eat any more! (detected after eat attempt)", self.success_color)
+                break
+            
+            # Try to eat something
+            ate_something = False
+            for food_info in food_items:
+                if self.eat_item(food_info):
+                    ate_something = True
+                    Misc.Pause(1000)  # Pause between items
+                    break
+                    
+            if not ate_something:
+                self.debug("Failed to eat anything", self.error_color)
+                self.consecutive_failures += 1
+                
+            Misc.Pause(500)  # Slow down loop
+            
+        # Show summary
+        self.debug(f"Finished eating session", self.success_color)
+        if self.items_eaten:
+            self.debug("Items consumed:")
+            for name, count in self.items_eaten.items():
+                self.debug(f"- {name}: {count}")
+
+def main():
+    try:
+        Misc.SendMessage("Starting Food Eater...", 67)
+        eater = FoodEater()
+        eater.eat_all_food()
+    except Exception as e:
+        Misc.SendMessage(f"Error in Food Eater: {str(e)}", 33)
+
+if __name__ == "__main__":
+    main()
