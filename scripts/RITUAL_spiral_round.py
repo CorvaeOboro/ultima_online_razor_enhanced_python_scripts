@@ -1,20 +1,22 @@
 """
 Ritual of the Spiral - a Razor Enhanced Python Script for Ultima Online
 
-Places a 45-degree rotated spiral pattern with smooth corners using black pearls.
+Places a 45-degree rotated spiral pattern with smooth corners ..
 2 tiles spacing between rings
+
+Current Items = Black pearl (0x0F7A)
 
 VERSION::20250621
 """
 
-import sys
-import math
-import time
-from System.Collections.Generic import List
+# Item IDs
+PLACE_ITEM_ID = 0x0F7A  # Black pearl for spiral pattern
 
-# Constants for ritual patterns
-SPIRAL_RADIUS = 7  # Maximum radius of spiral
-SPIRAL_POINTS = [  # Pre-calculated spiral points relative to center
+"""
+# Toggle to select spiral generation method
+USE_ARCHIMEDES_SPIRAL = True  # True = use Archimedean spiral, False = use manual SPIRAL_POINTS
+
+EXAMPLE_MANUAL_SPIRAL_POINTS = [  # Pre-calculated spiral points relative to center
     (0, 0),     # Center
     (1, -1),    # First diagonal step
     (2, -2),    # Northeast corner
@@ -61,57 +63,83 @@ SPIRAL_POINTS = [  # Pre-calculated spiral points relative to center
     (3, -3),    # Return to start of ring
     (4, -4)     # Complete second ring
 ]
+"""
+
+# Constants for ritual patterns
+SPIRAL_RADIUS = 8  # Maximum radius of spiral (increased for larger spiral)
+# Spiral generation parameters
+SPIRAL_SPACING = 2  # Distance between spiral arms (tiles)
+SPIRAL_TURNS = 2    # Number of full turns the spiral makes (increased for more coils)
+
+# Generate a smooth, rounded spiral using the Archimedean spiral formula
+import math
+
+def generate_spiral_points(center_x, center_y, max_radius, spacing=SPIRAL_SPACING, turns=SPIRAL_TURNS):
+    """Generate spiral points using the selected method."""
+    if USE_ARCHIMEDES_SPIRAL:
+        points = []
+        a = 0  # Start at center
+        b = spacing / (2 * math.pi)  # Controls the distance between spiral arms
+        theta = 0
+        theta_max = turns * 2 * math.pi
+        last_point = None
+        while True:
+            r = a + b * theta
+            if r > max_radius:
+                break
+            x = int(round(center_x + r * math.cos(theta)))
+            y = int(round(center_y + r * math.sin(theta)))
+            if last_point != (x, y):
+                points.append((x, y))
+                last_point = (x, y)
+            theta += 0.25  # Smaller values = smoother spiral
+        return points
+    else:
+        # Manual points, shifted to center
+        return [(center_x + dx, center_y + dy) for (dx, dy) in EXAMPLE_MANUAL_SPIRAL_POINTS]
 
 # Movement and timing constants
 MAX_DISTANCE = 2  # Maximum distance for placement
 PATHFINDING_RETRY = 3  # Number of retries for movement
 PAUSE_DURATION = 800  # Standard pause between actions
 
-# Item IDs
-BLACKPEARL_ID = 0x0F7A  # Black pearl for spiral pattern
-
 # Feature flags
 PLACE_SPIRAL = True
 COMPLETE_RITUAL = True
 
-def gotoLocation(x, y, max_retries=PATHFINDING_RETRY):
-    """Attempt to move to location with retries."""
-    attempts = 0
-    while attempts < max_retries:
-        coords = PathFinding.Route()
-        coords.X = x
-        coords.Y = y
-        coords.MaxRetry = 3
-        PathFinding.Go(coords)
-        Misc.Pause(PAUSE_DURATION)  # Wait for movement
-        
-        # Check if we're close enough
-        if abs(Player.Position.X - x) <= MAX_DISTANCE and abs(Player.Position.Y - y) <= MAX_DISTANCE:
-            return True
-        
-        attempts += 1
-        if attempts < max_retries:
-            Misc.SendMessage(f"Retrying movement to ({x}, {y}), attempt {attempts + 1}/{max_retries}", 33)
-            Misc.Pause(PAUSE_DURATION)  # Wait before retry
-    
-    return False
+def get_direction(from_x, from_y, to_x, to_y):
+    """Calculate direction from one point to another"""
+    dx = to_x - from_x
+    dy = to_y - from_y
+    if dx == 0:
+        if dy < 0: return 0  # North
+        return 4  # South
+    elif dy == 0:
+        if dx > 0: return 2  # East
+        return 6  # West
+    elif dx > 0:
+        if dy < 0: return 1  # Northeast
+        return 3  # Southeast
+    else:
+        if dy < 0: return 7  # Northwest
+        return 5  # Southwest
 
-def generate_spiral_points(center_x, center_y, max_radius):
-    """Generate points for an inward spiral pattern.
-    Uses pre-calculated points to create a rotated square spiral with rounded corners."""
-    points = []
-    
-    # Convert relative points to absolute coordinates
-    for dx, dy in SPIRAL_POINTS:
-        # Skip points outside max radius
-        if abs(dx) > max_radius or abs(dy) > max_radius:
-            continue
-            
-        x = center_x + dx
-        y = center_y + dy
-        points.append((x, y))
-    
-    return points
+def goto_location_with_wiggle(x, y, max_retries=3):
+    """Move to within placement range"""
+    target_x = float(x)
+    target_y = float(y)
+    for _ in range(max_retries):
+        if (abs(Player.Position.X - target_x) <= MAX_DISTANCE and 
+            abs(Player.Position.Y - target_y) <= MAX_DISTANCE):
+            return True
+        Player.PathFindTo(int(target_x), int(target_y), Player.Position.Z)
+        Misc.Pause(500)
+        if not (abs(Player.Position.X - target_x) <= MAX_DISTANCE and 
+                abs(Player.Position.Y - target_y) <= MAX_DISTANCE):
+            direction = get_direction(Player.Position.X, Player.Position.Y, target_x, target_y)
+            Player.Walk(direction)
+            Misc.Pause(200)
+    return False
 
 def place_items_at_points(points, center_x, center_y, placed_positions=None, item_id=None):
     """Place items at specified coordinates, avoiding duplicates."""
@@ -133,12 +161,11 @@ def place_items_at_points(points, center_x, center_y, placed_positions=None, ite
         if (x, y) in placed_positions:
             continue
         
-        # Move to position if needed
-        if not Player.InRangeItem(item, MAX_DISTANCE):
-            if not gotoLocation(x, y):
+        # Move to position if needed (check player vs. target tile)
+        if abs(Player.Position.X - x) > MAX_DISTANCE or abs(Player.Position.Y - y) > MAX_DISTANCE:
+            if not goto_location_with_wiggle(float(x), float(y)):
                 Misc.SendMessage(f"Failed to reach position ({x}, {y})", 33)
                 continue
-        
         # Place item
         Items.MoveOnGround(item.Serial, 1, x, y, Player.Position.Z)
         Misc.Pause(PAUSE_DURATION)
@@ -149,7 +176,7 @@ def place_items_at_points(points, center_x, center_y, placed_positions=None, ite
 def complete_ritual(center_x, center_y):
     """Complete the ritual by returning to center."""
     # Return to center
-    if gotoLocation(center_x, center_y):
+    if goto_location_with_wiggle(center_x, center_y):
         # Use Spirit Speak at center
         Player.UseSkill("Spirit Speak")
         Misc.Pause(PAUSE_DURATION)
@@ -177,7 +204,7 @@ def main():
         # Place points in order from outside in
         total_points = len(spiral_points)
         for i, point in enumerate(spiral_points, 1):
-            place_items_at_points([point], center_x, center_y, placed_positions, BLACKPEARL_ID)
+            place_items_at_points([point], center_x, center_y, placed_positions, PLACE_ITEM_ID)
             
             # Show progress every 10 points
             if i % 10 == 0 or i == total_points:

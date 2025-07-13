@@ -9,12 +9,6 @@ Creates a pentagram ritual pattern with multiple layers:
    - Secondary Circles: Small circles at each pentagram point
    - Candle Circle: Outer circle of candles
 
-2. Additional Features:
-   - pathfinding retries
-   - Error handling and recovery
-   - Progress messages
-   - Layer toggles
-
 Current Items 
 Black pearl , bloodmoss 
 

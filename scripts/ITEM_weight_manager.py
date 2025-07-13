@@ -18,6 +18,9 @@ import sys
 from System.Collections.Generic import List
 import time
 
+# Global debug mode switch
+DEBUG_MODE = False  # Set to True to enable debug/info messages
+
 # Configuration
 MAX_REAGENT_COUNT = 200  # Maximum number of reagents to keep
 
@@ -196,6 +199,11 @@ MANAGED_ITEMS = [
     {"name": "Strength Potion", "id": 0x0F09, "min_count": 5},
 ]
 
+def debug_message(message, color=67):
+    """Send a message if DEBUG_MODE is enabled"""
+    if DEBUG_MODE:
+        Misc.SendMessage(f"[WeightMgr] {message}", color)
+
 def get_nearby_tiles():
     """Get a list of nearby tile offsets in a spiral pattern."""
     # Spiral pattern offsets from closest to furthest
@@ -225,7 +233,7 @@ def find_ground_tile(x_offset, y_offset, player_pos):
     tiles = Statics.GetStaticsTileInfo(world_x, world_y, player_pos['map'])
     if tiles and len(tiles) > 0:
         # Use the Z of the highest walkable tile
-        walkable_tiles = [t for t in tiles if t.StaticID < 0x4000]  # Adjust ID range as needed
+        walkable_tiles = [t for t in tiles]  
         if walkable_tiles:
             world_z = max(t.StaticZ for t in walkable_tiles)
         else:
@@ -260,7 +268,7 @@ def try_drop_items(item, amount_to_drop):
         
         # Count this as a successful drop and move on
         amount_dropped += drop_amount
-        Misc.SendMessage(f"Dropped {drop_amount} {item.Name} at ({x}, {y}, {z})", 67)
+        debug_message(f"Dropped {drop_amount} {item.Name} at ({x}, {y}, {z})", 67)
     
     return amount_dropped
 
@@ -293,12 +301,12 @@ def find_existing_items():
 
 def manage_all_items():
     """Main function to manage all item counts."""
-    Misc.SendMessage("Starting item count management...", 67)
+    debug_message("Starting item count management...", 67)
     
     # First do a bulk check of all items
     existing_items = find_existing_items()
     if not existing_items:
-        Misc.SendMessage("No items to manage!", 67)
+        debug_message("No items to manage!", 67)
         return
     
     # Handle disposable items that exist
@@ -316,7 +324,7 @@ def manage_all_items():
             manage_item_count(item_info)
             Misc.Pause(100)
     
-    Misc.SendMessage("Item count management complete!", 67)
+    debug_message("Item count management complete!", 67)
 
 def drop_all_items(item_info):
     """Drop all instances of an item."""
@@ -339,7 +347,7 @@ def drop_all_items(item_info):
     else:
         count = Items.ContainerCount(Player.Backpack.Serial, item_info["id"], -1)
     
-    Misc.SendMessage(f"Dropping {count} {item_info['name']}", 67)
+    debug_message(f"Dropping {count} {item_info['name']}", 67)
     try_drop_items(items[0], count)
 
 def manage_item_count(item_info):
@@ -357,7 +365,7 @@ def manage_item_count(item_info):
     amount_to_drop = total_count - item_info["min_count"]
     
     if amount_to_drop > 0:
-        Misc.SendMessage(f"Need to drop {amount_to_drop} {item_info['name']}", 67)
+        debug_message(f"Need to drop {amount_to_drop} {item_info['name']}", 67)
         amount_dropped = try_drop_items(items[0], amount_to_drop)
         
         # If we couldn't drop all items, wait and try again

@@ -1,10 +1,9 @@
 """
 ITEM Organizer Junk Salvager - a Razor Enhanced Python Script for Ultima Online
 
-- Moves low tier items to a junk backpack based on tier configuration
-- Salvages items in the junk backpack ( unchained )
-- Configurable tier reservations
-- Debug information and statistics
+- Moves low tier items to a junk backpack based on Tier configuration
+- Salvages items in the "junk" (red) backpack ( unchained )
+- Configurable Tier reservations by their properties ( Vanquishing , Greater Slaying , Invulnerable )
 
 Requirements:
 - Any configured salvage tool in player's backpack ( tinker tools , or sewing kit )
@@ -17,13 +16,21 @@ import sys
 import time
 from System.Collections.Generic import List
 
-# Global Configuration
-JUNK_BACKPACK_SERIAL = 0  # Will be auto-set by find_junk_backpack()
+# Global debug mode switch
+DEBUG_MODE = False  # Set to True to enable debug/info messages
 AUTO_SALVAGE = True      # Set to False to skip auto-salvaging (for debugging)
 
+# Tier Reservation Configuration = DEFAULT is only saving TEIR 1 affixes
+RESERVE_TIERS = {
+    'TIER1': True,      # Set to True to reserve Tier 1 items
+    'TIER2': False,      # Set to True to reserve Tier 2 items
+    'MAGICAL': False    # Set to True to reserve other magical items
+}
+
 # Junk Backpack Configuration
-JUNK_BACKPACK_ID = 0x0E75
+JUNK_BACKPACK_ID = 0x0E75 # a backpack 
 JUNK_BACKPACK_HUES = [0x0021, 0x0026, 0x002B]  # Range of red hues that are acceptable
+JUNK_BACKPACK_SERIAL = 0  # Will be auto-set by find_junk_backpack()
 
 # Item Type Configuration
 WEAPON_TYPES = [
@@ -194,6 +201,7 @@ ARMOR_TYPES = [
     0x1B72,  # Bone Armor
     0x1B7B,  # Bone Legs
     0x1B73,  # Bone Arms
+    0x144E,  # Bone Arms
     0x1B7A,  # Bone Gloves
     0x1B79,  # Bone Helmet
     0x1450,  # Bone Gloves (Alternate)
@@ -227,13 +235,6 @@ ARMOR_TYPES = [
     0x1C02,  # StuddedArmorF
 ]
 
-# Tier Reservation Configuration
-RESERVE_TIERS = {
-    'TIER1': True,      # Set to True to reserve Tier 1 items
-    'TIER2': False,      # Set to True to reserve Tier 2 items
-    'MAGICAL': False    # Set to True to reserve other magical items
-}
-
 # Timing Configuration
 MOVE_DELAY = 1000      # Delay between moving items (in milliseconds)
 SCAN_DELAY = 100       # Delay between scanning items (in milliseconds)
@@ -262,6 +263,11 @@ SALVAGE_TOOLS = {
         'priority': 2
     }
 }
+
+def debug_message(message, color=68):
+    """Send a debug/info message if DEBUG_MODE is enabled"""
+    if DEBUG_MODE:
+        Misc.SendMessage(f"[JunkSalvager] {message}", color)
 
 class JunkSalvager:
     def __init__(self):
@@ -302,18 +308,18 @@ class JunkSalvager:
         
     def show_config(self):
         """Display current configuration settings"""
-        self.debug("=== Configuration ===", 'config')
-        self.debug(f"Reserve Tier 1 items: {'Yes' if RESERVE_TIERS['TIER1'] else 'No'}", 'config')
-        self.debug(f"Reserve Tier 2 items: {'Yes' if RESERVE_TIERS['TIER2'] else 'No'}", 'config')
-        self.debug(f"Reserve magical items: {'Yes' if RESERVE_TIERS['MAGICAL'] else 'No'}", 'config')
-        self.debug(f"Move delay: {str(MOVE_DELAY)}ms", 'config')
-        self.debug(f"Auto-salvage: {'Yes' if AUTO_SALVAGE else 'No'}", 'config')
-        self.debug(f"Junk backpack serial: 0x{JUNK_BACKPACK_SERIAL:X}", 'config')
-        self.debug("==================", 'config')
+        debug_message("=== Configuration ===", self.colors['config'])
+        debug_message(f"Reserve Tier 1 items: {'Yes' if RESERVE_TIERS['TIER1'] else 'No'}", self.colors['config'])
+        debug_message(f"Reserve Tier 2 items: {'Yes' if RESERVE_TIERS['TIER2'] else 'No'}", self.colors['config'])
+        debug_message(f"Reserve magical items: {'Yes' if RESERVE_TIERS['MAGICAL'] else 'No'}", self.colors['config'])
+        debug_message(f"Move delay: {str(MOVE_DELAY)}ms", self.colors['config'])
+        debug_message(f"Auto-salvage: {'Yes' if AUTO_SALVAGE else 'No'}", self.colors['config'])
+        debug_message(f"Junk backpack serial: 0x{JUNK_BACKPACK_SERIAL:X}", self.colors['config'])
+        debug_message("==================", self.colors['config'])
         
     def debug(self, message, color='info'):
-        """Send debug message to client"""
-        Misc.SendMessage(f"[JunkSalvager] {str(message)}", self.colors[color])
+        """Send debug message to client (deprecated, use debug_message instead)"""
+        debug_message(str(message), self.colors[color] if isinstance(color, str) else color)
     
     def get_item_properties(self, item):
         """Get item properties using multiple methods"""

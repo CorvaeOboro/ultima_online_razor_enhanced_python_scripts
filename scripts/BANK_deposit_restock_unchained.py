@@ -1,25 +1,26 @@
 """
 BANK Auto Deposit and Restock -  A Razor Enhanced Python script for Ultima Online
 
-move specific items from backpack to bank 
-restock reagents
-this is similar to using an "Organizer" Agent in Razor  
+move specific items from backpack to bank ( gems , supplies , special items )
+restock reagents placing excessive and maintaing a "loadout" 
+"resources" for crafting or imbueing are placed in a specific sub container inside the bank  
+
+this script is similar to using an "Organizer" Agent in Razor , this script is slower but has more control 
 current item dictionaries are based on UO Unchained , modify as needed
 
-VERSION::20250621
+VERSION::20250708
 """
-
-MOVE_GEMS = True
-MOVE_SUPPLIES = True
-REAGENT_RESTOCK = True
-SHOW_DEBUG = True
 BANK_PHRASE = "bank"
-MOVE_RESOURCES = True  # Set to True to enable moving resources to sub-container
-RESOURCE_CONTAINER_SERIAL = 0x468092DD  # Set to the serial of your resource container (inside the bank box)
-
-# Reagent RESTOCK
+DEBUG_MODE = False # Set to True to enable debug/info messages
+MOVE_GEMS = True # Set to True to enable moving gems to bank
+MOVE_SUPPLIES = True # Set to True to enable moving supplies to bank
+# Reagent RESTOCK 
+REAGENT_RESTOCK = True # Set to True to enable reagent restocking
 REAGENT_MIN = 100  # Minimum amount to keep in backpack
 REAGENT_MAX = 200  # Amount above which to move to bank
+# RESOURCES - crafting or imbue materials 
+MOVE_RESOURCES = True  # Set to True to enable moving resources to sub-container
+RESOURCE_CONTAINER_SERIAL = 0x468092DD  # Set to the serial of your resource container (inside the bank box)
 
 # Dictionary of items to deposit: Name -> ItemID
 items_to_deposit = {
@@ -152,7 +153,7 @@ reagentIDs_to_name = {v: k for k, v in reagents_to_manage.items()}
 
 def debug_message(msg, color=67):
     """Send a debug/status message if SHOW_DEBUG is enabled."""
-    if SHOW_DEBUG:
+    if DEBUG_MODE:
         Misc.SendMessage(msg, color)
 
 def manage_reagents(bankBox):

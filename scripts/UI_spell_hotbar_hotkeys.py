@@ -1,10 +1,92 @@
 """
 UI Spell Hotbar Hotkeys - a Razor Enhanced Python Script for Ultima Online
 
-Creates a gump of spell icons , a modern hotbar with cooldown and hotkey symbols
-this is a copy of the example with some aditions 
+Creates a gump of spell icons, a modern hotbar with cooldown and hotkey symbols.
+This is a copy of the example with some additions.
 
-VERSION::20250621
+VERSION::20250707
+
+Ultima Online Spell Icon IDs Reference:
+Circle 1:
+  - Clumsy         2190
+  - Create Food    2241
+  - Feeblemind     2242
+  - Heal           2243
+  - Magic Arrow    2244
+  - Night Sight    2245
+  - Reactive Armor 2246
+  - Weaken         2247
+
+Circle 2:
+  - Agility        2248
+  - Cunning        2249
+  - Cure           2250
+  - Harm           2251
+  - Magic Trap     2252
+  - Magic Untrap   2253
+  - Protection     2254
+  - Strength       2255
+
+Circle 3:
+  - Bless          2256
+  - Fireball       2257
+  - Magic Lock     2258
+  - Poison         2259
+  - Telekinesis    2260
+  - Teleport       2261
+  - Unlock         2262
+  - Wall of Stone  2263
+
+Circle 4:
+  - Arch Cure      2264
+  - Arch Protection 2265
+  - Curse          2266
+  - Fire Field     2267
+  - Greater Heal   2268
+  - Lightning      2269
+  - Mana Drain     2270
+  - Recall         2271
+
+Circle 5:
+  - Blade Spirits  2272
+  - Dispel Field   2273
+  - Incognito      2274
+  - Magic Reflection 2275
+  - Mind Blast     2276
+  - Paralyze       2277
+  - Poison Field   2278
+  - Summon Creature 2279
+
+Circle 6:
+  - Dispel         2280
+  - Energy Bolt    2281
+  - Explosion      2282
+  - Invisibility   2283
+  - Mark           2284
+  - Mass Curse     2285
+  - Paralyze Field 2286
+  - Reveal         2287
+
+Circle 7:
+  - Chain Lightning 2288
+  - Energy Field   2289
+  - Flamestrike    2290
+  - Gate Travel    2291
+  - Mana Vampire   2292
+  - Mass Dispel    2293
+  - Meteor Swarm   2294
+  - Polymorph      2295
+
+Circle 8:
+  - Earthquake     2296
+  - Energy Vortex  2297
+  - Resurrection   2298
+  - Air Elemental  2299
+  - Summon Daemon  2300
+  - Earth Elemental 2301
+  - Fire Elemental 2302
+  - Water Elemental 2303
+
 """
 import time
 
@@ -27,29 +109,28 @@ flash_duration = 300      # Flash lasts 300 ms
 
 # Spell definitions: (spell name, unpressed image ID, pressed image ID)
 spell_buttons = [
-    ("Create Food",   2241, 2241),
-    ("Protection",    2254, 2254),
-    ("Teleport",      2261, 2261),
-    ("Lightning",     2269, 2269),
-    ("Recall",        2271, 2271),
-    ("Energy Bolt",   2281, 2281),
-    ("Invisibility",  2283, 2283),
-    ("Mark",          2284, 2284),
-    ("Reveal",        2287, 2287),
-    ("Gate Travel",   2291, 2291)
+    ("Energy Bolt",        2281, 2281),      # 2281
+    ("Invisibility",       2283, 2283),      # 2283
+    ("Greater Heal",       2268, 2268),      # 2268
+    ("Summon Water Elemental", 2303, 2303), # 2303
+    ("Poison",             2259, 2259),      # 2259
+    ("Magic Trap",         2252, 2252),      # 2252
+    ("Teleport",           2261, 2261),      # 2261
+    ("Cure",               2250, 2250),      # 2250
+    ("Arch Cure",          2264, 2264)       # 2264
 ]
 
 # Hotkey labels for each spell button
 hotkeys = {
-    1: "F",
-    2: "2",
-    3: "3",
-    4: "4",
-    5: "5",
-    6: "6",
-    7: "7",
-    8: "8",
-    9: "9",
+    1: "Q",
+    2: "W",
+    3: "E",
+    4: "R",
+    5: "S",
+    6: "D",
+    7: "F",
+    8: "G",
+    9: "H",
     10:"0"
 }
 
@@ -57,12 +138,27 @@ hotkeys = {
 button_width = 44
 button_height = 44
 
-# Placeholder directional arrow image IDs.
-# We'll use the "pressed" art for all directional buttons.
-arrow_art_up    = 5001
-arrow_art_down  = 5003
-arrow_art_left  = 5005
-arrow_art_right = 5007
+# directional arrow image IDs for gump UI (Ultima Online art).
+arrow_art_up    = 5540  # Up arrow
+arrow_art_down  = 5541  # Down arrow
+arrow_art_left  = 5539  # Left arrow
+arrow_art_right = 5542  # Right arrow
+
+
+def cleanup_gumps():
+    """Close any gumps created by this script."""
+    try:
+        Gumps.CloseGump(GUMP_ID)
+    except Exception:
+        pass
+    try:
+        Gumps.CloseGump(GUMP_ID_dynamic)
+    except Exception:
+        pass
+
+# Register cleanup on script exit (Razor Enhanced runs top-level code, so use finally block if you have a main loop)
+import atexit
+atexit.register(cleanup_gumps)
 
 def sendStaticGump():
     """Build and send the static UI elements (unchanging layer)."""

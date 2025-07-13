@@ -1,12 +1,12 @@
 """
 ITEM Organize Backpack - a Razor Enhanced Python Script for Ultima Online
 
-Organizes items in the backpack with precise positioning and directional spacing control:
+Organizes items in the backpack with specific positioning and directional spacing control:
 - Reagents: Lower left, left-to-right sorting, combines reagents
 - Potions: Above reagents, left-to-right sorting with offset spacing
 - Gems: Upper middle, vertical sorting top-to-bottom with offset spacing
 - Books: Top left, horizontal sorting left-to-right with offset spacing
-- Trap pouches: Bottom right, right-to-left sorting, NO stacking
+- Trap pouches: Bottom right, vertical spacing offset, NO stacking
 - Runes: Top right, vertical sorting top-to-bottom with offset stacking
 - Bandages: Top right middle, horizontal right-to-left with offset stacking
 
@@ -17,8 +17,9 @@ import time
 from System.Collections.Generic import List
 from System import Int32
 
-# Configuration
-STACK_OFFSET = 5  # Pixels to offset each stack
+# Global
+DEBUG_MODE = False  # Set to True to enable debug/info messages
+SPACING_OFFSET = 5  # Pixels to offset spacing
 MAX_STACK_SIZE = 55  # Maximum items to stack in one location
 
 # Item Categories with their properties
@@ -90,6 +91,11 @@ ITEM_GROUPS = {
     }
 }
 
+def debug_message(message, color=68):
+    """Send a message if DEBUG_MODE is enabled"""
+    if DEBUG_MODE:
+        Misc.SendMessage(f"[BackpackOrg] {message}", color)
+
 def find_items_by_id(item_id, sort_by_hue=False):
     """Find all items with matching ID in backpack."""
     items = []
@@ -141,7 +147,7 @@ def move_spellbooks(items, base_x, base_y):
             Misc.Pause(600)
             
             if i > 0 and i % books_per_row == books_per_row - 1:
-                Misc.SendMessage(f"Placed {i+1} spellbooks of hue {hue}", 65)
+                debug_message(f"Placed {i+1} spellbooks of hue {hue}", 65)
         
         # Move to next group position
         current_x += book_spacing * books_per_row + 10
@@ -180,12 +186,12 @@ def move_items(items, target_x, target_y, group_config):
                 stack_count += 1
                 if stack_count >= MAX_STACK_SIZE:
                     # Start a new stack
-                    current_x += STACK_OFFSET * MAX_STACK_SIZE
+                    current_x += SPACING_OFFSET * MAX_STACK_SIZE
                     stack_count = 0
                 else:
                     # Offset within current stack
-                    current_x += STACK_OFFSET
-                    current_y += STACK_OFFSET
+                    current_x += SPACING_OFFSET
+                    current_y += SPACING_OFFSET
     else:
         # Regular item stacking
         stack_count = 0
@@ -199,34 +205,34 @@ def move_items(items, target_x, target_y, group_config):
             stack_count += 1
             if stack_count >= MAX_STACK_SIZE:
                 # Start a new stack
-                current_x += STACK_OFFSET * MAX_STACK_SIZE
+                current_x += SPACING_OFFSET * MAX_STACK_SIZE
                 stack_count = 0
             else:
                 # Offset within current stack
-                current_x += STACK_OFFSET
-                current_y += STACK_OFFSET
+                current_x += SPACING_OFFSET
+                current_y += SPACING_OFFSET
 
 def organize_backpack():
     """Organize items in backpack by type."""
-    Misc.SendMessage("Starting backpack organization...", 65)
+    debug_message("Starting backpack organization...", 65)
     
     for group_name, group_config in ITEM_GROUPS.items():
-        Misc.SendMessage(f"Processing {group_name}...", 65)
+        debug_message(f"Processing {group_name}...", 65)
         total_items = 0
         
         for item_def in group_config["items"]:
             items = find_items_by_id(item_def["id"], sort_by_hue=True)
             if items:
                 total_items += len(items)
-                Misc.SendMessage(f"Found {len(items)} {item_def['name']}...", 65)
+                debug_message(f"Found {len(items)} {item_def['name']}...", 65)
                 move_items(items, item_def["x"], item_def["y"], group_config)
                 
         if total_items > 0:
-            Misc.SendMessage(f"Finished {group_name}: {total_items} items organized", 65)
+            debug_message(f"Finished {group_name}: {total_items} items organized", 65)
         else:
-            Misc.SendMessage(f"No {group_name} found to organize", 65)
+            debug_message(f"No {group_name} found to organize", 65)
     
-    Misc.SendMessage("Backpack organization complete!", 65)
+    debug_message("Backpack organization complete!", 65)
 
 def main():
     organize_backpack()

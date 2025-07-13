@@ -1,17 +1,20 @@
 """
 UI Summon Health Monitor - a Razor Enhanced Python Script for Ultima Online
 
- tracks and displays health monitors for summoned creatures.
-this is attempt at consistent follower healthbars , especially for temporary 
+tracks and displays health monitors for summoned creatures.
+this is attempt at consistent follower healthbars , especially for temporary summons
 
-VERSION :: 20250502
+VERSION :: 20250707
 """
-DEBUG_ON = False  # Set to False to disable debug messages
 import sys
 from datetime import datetime
 
+DEBUG_MODE = False  # Set to False to disable debug messages
 # gump ID= 4294967295  = the max value , randomly select a high number gump so its unique
 GUMP_ID =  3229191321
+
+# Global toggle for showing health numbers on the gump
+SHOW_HEALTH_NUMBERS = False
 
 class SummonMonitor:
     def __init__(self):
@@ -56,12 +59,12 @@ class SummonMonitor:
             'debug': 0x03B2,      # Light blue
             'text': 0x0481        # Bright white
         }
-        if DEBUG_ON:
+        if DEBUG_MODE:
             Misc.SendMessage("SummonMonitor initialized", self.colors['debug'])
 
     def debug_message(self, msg):
         """Send a debug message to the game client"""
-        if DEBUG_ON:
+        if DEBUG_MODE:
             Misc.SendMessage("[Debug] " + str(msg), self.colors['debug'])
 
     def clean_name(self, name):
@@ -206,7 +209,7 @@ class SummonMonitor:
             
             # Close gump if we have no summons
             if len(self.summons) == 0:
-                self.debug_message("No summons found, closing gump")
+                self.debug_message("No summons found, closing gump but will check again in 5 seconds")
                 Gumps.CloseGump(self.gump_id)
         
         except Exception as e:
@@ -294,8 +297,9 @@ class SummonMonitor:
             for i in range(filled_segments):
                 Gumps.AddImage(gd, bar_x + i * MOBA_SEGMENT_WIDTH, bar_y, MOBA_BAR_ART, color)
             Gumps.AddLabel(gd, 5, y_offset + 2, color, true_name)
-            health_text = f"{current_hits}/{max_hits}"
-            Gumps.AddLabel(gd, bar_x + MOBA_BAR_WIDTH + 8, y_offset + 2, color, health_text)
+            if SHOW_HEALTH_NUMBERS:
+                health_text = f"{current_hits}/{max_hits}"
+                Gumps.AddLabel(gd, bar_x + MOBA_BAR_WIDTH + 8, y_offset + 2, color, health_text)
             y_offset += MOBA_SEGMENT_HEIGHT
         Gumps.SendGump(self.gump_id + 1, Player.Serial, 700, 700, gd.gumpDefinition, gd.gumpStrings)
 
@@ -342,7 +346,9 @@ def main():
         monitor.update()
         while True:
             monitor.update()
-            Misc.Pause(1000)  # Increased pause to reduce CPU usage
+            # If no summons, wait 5 seconds; otherwise, 1 second
+            pause_time = 5000 if len(monitor.summons) == 0 else 1000
+            Misc.Pause(pause_time)
             
     except Exception as e:
         Misc.SendMessage("Error in main: " + str(e), 0x25)

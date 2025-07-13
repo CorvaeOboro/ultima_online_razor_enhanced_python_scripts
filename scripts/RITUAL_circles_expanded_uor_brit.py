@@ -288,9 +288,16 @@ def place_item(point_x, point_y, item_id, z=None):
         Misc.SendMessage(f"Warning: Invalid position at ({point_x}, {point_y}), skipping...", 33)
         return False
     
-    # Check cached item count first
-    if ITEM_CACHE.get_count(item_id) <= 0:
-        Misc.SendMessage(f"Warning: No items of type {hex(item_id)} found in cache", 33)
+    # Check cached item count first, retry if empty
+    cache_retry_attempts = 3
+    for cache_try in range(cache_retry_attempts):
+        if ITEM_CACHE.get_count(item_id) > 0:
+            break
+        Misc.SendMessage(f"Warning: No items of type {hex(item_id)} found in cache (attempt {cache_try+1}/{cache_retry_attempts})", 33)
+        ITEM_CACHE.full_update()
+        Misc.Pause(PAUSE_DURATION * 2)  # Wait longer to allow for restock or pickup
+    else:
+        Misc.SendMessage(f"Error: Still no items of type {hex(item_id)} after {cache_retry_attempts} cache updates. Skipping point.", 33)
         return False
     
     for attempt in range(max_retries):
@@ -566,7 +573,8 @@ def place_items_at_points(points, item_id, z=None, progress_msg="Placing items")
     # First check if we have enough items
     available_items = ITEM_CACHE.get_count(item_id)
     if available_items < total_points:
-        Misc.SendMessage(f"Warning: Not enough items. Have {available_items}, need {total_points}", 33)
+        Misc.SendMessage(f"Warning: Not enough items for this pattern. Have {available_items}, need {total_points}. Skipping this pattern.", 33)
+        return set()
     
     Misc.SendMessage(f"{progress_msg}... (0/{total_points})", 68)
     for point_x, point_y in points:
@@ -579,8 +587,8 @@ def place_items_at_points(points, item_id, z=None, progress_msg="Placing items")
             else:
                 Misc.SendMessage(f"Warning: Failed to place item at ({point_x}, {point_y})", 33)
             
-            # Add a small pause between placements to prevent lag
-            Misc.Pause(100)
+            # Throttle between placements to prevent client overload
+            Misc.Pause(500)
             
         except Exception as e:
             Misc.SendMessage(f"Warning: Error placing item at ({point_x}, {point_y}): {str(e)}", 33)
@@ -759,13 +767,9 @@ def complete_ritual(center_x, center_y):
     positions = place_outer_circles(center_x, center_y, center_z)
     all_positions.update(positions)
     
-    if PLACE_COMPONENTS["Y_final_12"]:
-        positions = place_final_ring(center_x, center_y, RITUAL_CONFIG["Y_final_12"])
-        all_positions.update(positions)
-    
-    if PLACE_COMPONENTS["Z_final_13"]:
-        positions = place_final_ring(center_x, center_y, RITUAL_CONFIG["Z_final_13"])
-        all_positions.update(positions)
+    # Place final outer rings (both inner and outer) if enabled
+    if PLACE_COMPONENTS["Y_final_12"] or PLACE_COMPONENTS["Z_final_13"]:
+        place_outer_ring(center_x, center_y, center_z)
     
     Misc.SendMessage(f"Ritual circle placement complete. Total positions: {len(all_positions)}", 68)
     return all_positions
@@ -1124,6 +1128,56 @@ def place_base_circle(center_x, center_y, config):
     if points_placed > 0:
         Misc.SendMessage(f"Base circle complete. Placed {points_placed} points.", 68)
     
+    return placed_positions
+
+def place_middle_patterns(center_x, center_y):
+    """
+    Place the middle ritual patterns (diamond, circle, lanterns) if enabled.
+    Returns a set of all placed positions.
+    """
+    placed_positions = set()
+    # Middle diamond pattern (I_middle_8)
+    if PLACE_COMPONENTS.get("I_middle_8", False):
+        config = RITUAL_CONFIG["I_middle_8"]
+        # Diamond: 8 points at 45-degree increments
+        points = []
+        radius = config.get("radius", 8)
+        for i in range(8):
+            angle = (2 * math.pi * i) / 8  # 8 points around the circle
+            point_x = center_x + int(round(radius * math.cos(angle)))
+            point_y = center_y + int(round(radius * math.sin(angle)))
+            points.append((point_x, point_y))
+        for point_x, point_y in points:
+            if place_item(point_x, point_y, config["item_id"]):
+                placed_positions.add((point_x, point_y))
+        Misc.SendMessage(f"Placed middle diamond (I_middle_8) points: {len(points)}", 68)
+
+    # Middle circle pattern (J_middle_9)
+    if PLACE_COMPONENTS.get("J_middle_9", False):
+        config = RITUAL_CONFIG["J_middle_9"]
+        # Use existing generate_ring_points for a 9-radius circle
+        points, _ = generate_ring_points(center_x, center_y, config.get("radius", 9))
+        for point_x, point_y in points:
+            if place_item(point_x, point_y, config["item_id"]):
+                placed_positions.add((point_x, point_y))
+        Misc.SendMessage(f"Placed middle circle (J_middle_9) points: {len(points)}", 68)
+
+    # Middle lantern circle (K_middle_4)
+    if PLACE_COMPONENTS.get("K_middle_4", False):
+        config = RITUAL_CONFIG["K_middle_4"]
+        # 4 lanterns in a diamond (cardinal directions)
+        points = []
+        radius = config.get("radius", 7)
+        for i in range(4):
+            angle = (2 * math.pi * i) / 4  # 4 points (N, E, S, W)
+            point_x = center_x + int(round(radius * math.cos(angle)))
+            point_y = center_y + int(round(radius * math.sin(angle)))
+            points.append((point_x, point_y))
+        for point_x, point_y in points:
+            if place_item(point_x, point_y, config["item_id"]):
+                placed_positions.add((point_x, point_y))
+        Misc.SendMessage(f"Placed middle lanterns (K_middle_4) points: {len(points)}", 68)
+
     return placed_positions
 
 def place_gem_circle(center_x, center_y, config):

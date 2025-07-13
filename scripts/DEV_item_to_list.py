@@ -10,7 +10,7 @@ Trash , Bank , Salvage , Keep , Quest
 this is useful to store item ids for use in other scripts 
 edit the BASE_PATH to your local folders
 
-VERSION::20250621
+VERSION::20250708
 """
 import os
 import json
@@ -24,8 +24,8 @@ UI_POSITION_Y = 400
 # gump ID= 4294967295  = the max value , randomly select a high number gump so its unique
 GUMP_ID =  3429654321
 
-# Base path for data files
-BASE_PATH = r"D:\ULTIMA\SCRIPTS\RazorEnhanced_Python\data"
+# Base path for data files (set dynamically to a 'data' subdirectory next to the script)
+BASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 
 # Debug toggles
 DEBUG = {

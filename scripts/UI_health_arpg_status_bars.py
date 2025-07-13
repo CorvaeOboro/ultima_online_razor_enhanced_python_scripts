@@ -9,12 +9,14 @@ Features:
 TODO:
 bandage duration 
 
-VERSION :: 20250621
+VERSION :: 20250707
 """
 
 import time
 import re
 from System.Collections.Generic import List
+
+DEBUG_MODE = False # debug prints and messages 
 
 # gump ID= 4294967295  = the max value , randomly select a high number gump so its unique
 GUMP_ID =  3411114321
@@ -152,9 +154,10 @@ class MobaStatusBars:
             "medium": 0.7     # 70% health
         }
         
-    def debug(self, message, color=68):
-        """Send debug message"""
-        Misc.SendMessage(f"[MobaUI] {message}", color)
+    def debug_message(self, message, color=68):
+        """Send debug message if DEBUG_MODE is enabled"""
+        if DEBUG_MODE:
+            Misc.SendMessage(f"[MobaUI] {message}", color)
         
     def get_bar_color(self, current, maximum, resource_type):
         """Get color based on current value percentage"""
@@ -358,7 +361,7 @@ class MobaStatusBars:
             return True
             
         except Exception as e:
-            self.debug(f"Error creating gump: {str(e)}")
+            self.debug_message(f"Error creating gump: {str(e)}")
             return False
             
     def update(self):
@@ -371,12 +374,12 @@ class MobaStatusBars:
                 self.create_gump()
                     
         except Exception as e:
-            self.debug(f"Error updating: {str(e)}")
+            self.debug_message(f"Error updating: {str(e)}")
             
     def start(self):
         """Start the UI update loop"""
         try:
-            self.debug("Starting MOBA-style status bars...")
+            self.debug_message("Starting MOBA-style status bars...")
             
             self.active = True
             
@@ -385,14 +388,14 @@ class MobaStatusBars:
                 Misc.Pause(50)  # Short pause for smooth updates
                 
         except Exception as e:
-            self.debug(f"Error in main loop: {str(e)}")
+            self.debug_message(f"Error in main loop: {str(e)}")
             self.stop()
             
     def stop(self):
         """Stop the UI and clean up"""
         self.active = False
         Gumps.CloseGump(self.gump_id)
-        self.debug("Stopped MOBA-style status bars")
+        self.debug_message("Stopped MOBA-style status bars")
 
 def main():
     ui = MobaStatusBars()

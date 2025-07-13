@@ -6,7 +6,7 @@ Automatically attacks the nearest enemy with offensive spells:
 2. Prioritize Energy Bolt first
 3. Falls back to other spells if reagents are low or mana low
 
-VERSION::20250621
+VERSION::20250707
 """
 
 # GLOBAL SETTINGS
@@ -200,7 +200,7 @@ class SpellManager:
                 
                 self.debug(f"Casting {spell_name}")
                 Spells.CastMagery(spell_name)
-                Target.WaitForTarget(5000, False)  # Reduced from 10000ms
+                Target.WaitForTarget(5000, False)  
                 Target.TargetExecute(enemy)
                 Misc.Pause(self.cast_delay)
                 return True

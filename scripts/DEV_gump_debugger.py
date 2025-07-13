@@ -11,7 +11,7 @@ journal logs are stored in Classic U client folder =
 DOCUMENTATION:
 https://razorenhanced.net/dokuwiki/doku.php?id=gump_funcs
 
-VERSION::20250621
+VERSION::20250708
 """
 DEBUG_TO_INGAME_MESSAGE = True
 DEBUG_TO_JSON = True
@@ -52,7 +52,7 @@ class GumpDebugger:
         # For JSON logging
         self.session_log = {
             'session_start': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'debug_messages': [],
+
             'gumps': []
         }
         self.current_gump_entry = None
@@ -68,11 +68,7 @@ class GumpDebugger:
             'color': color,
             'indent': indent
         }
-        if DEBUG_TO_JSON:
-            self.session_log['debug_messages'].append(entry)
-            # Also add to current gump entry if analyzing a gump
-            if self.current_gump_entry is not None:
-                self.current_gump_entry.setdefault('debug_log', []).append(entry)
+
 
     def analyze_gump_text(self, gump_id):
         """Analyze all text content in the gump"""
@@ -176,7 +172,7 @@ class GumpDebugger:
                 'button_positions': [],
                 'raw_data': None,
                 'positions': [],
-                'debug_log': []
+ 
             }
             self.session_log['gumps'].append(self.current_gump_entry)
 
