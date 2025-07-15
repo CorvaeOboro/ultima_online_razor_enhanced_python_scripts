@@ -9,6 +9,7 @@ Toggles mounting/dismounting of an ethereal horse:
 Requirements:
 Item: Ethereal Horse Statuette (0x20DD)
 
+HOTKEY:: MiddleMouseButton
 VERSION::20250621
 """
 

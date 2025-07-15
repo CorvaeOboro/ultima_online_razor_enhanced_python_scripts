@@ -11,6 +11,7 @@ Manages items weight in your backpack by:
    - Heal and Cure potions (10 each)
    - Utility potions (5 each)
 
+HOTKEY:: X
 VERSION::20250621
 """
 

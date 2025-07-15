@@ -4,8 +4,12 @@ Spell Attack Nearest Enemy - a Razor Enhanced Python Script for Ultima Online
 Automatically attacks the nearest enemy with offensive spells:
 1. Checks/equips spellbook if needed
 2. Prioritize Energy Bolt first
-3. Falls back to other spells if reagents are low or mana low
+3. casts other spells if reagents or mana low
 
+TODO:
+- add spellbook switching , search by property like Energy Bolt
+
+HOTKEY:: Q
 VERSION::20250707
 """
 

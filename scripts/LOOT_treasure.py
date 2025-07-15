@@ -3,20 +3,97 @@ LOOT Treasure Chest Lockpick - a Razor Enhanced Python script for Ultima Online
 
 - Uses lockpicks to unlock nearby chests
 - Opens chests ( no disarm ) and extracts items
+
 TODO: 
 drop resources on the ground near chest 
 auto stop if cant pickup
+if overweight drop gold on ground , then salvage , then pickup gold 
 
-VERSION::20250621
+VERSION::20250713
 """
 
 from System.Collections.Generic import List
 from System import Int32
 
 DROP_RESOURCES_GROUND = False  # If True, drop resource items on ground. If False, move to backpack.
-DEBUG_MESSAGES_ON = True  # If False, suppress all Misc.SendMessage output
+DEBUG_MODE = True  # If False, suppress all Misc.SendMessage output
 
 class TreasureManager:
+    def is_overweight(self):
+        """Returns True if player is overweight (checks weight and Journal)."""
+        return self.journal_overweight() or self.weight_overweight()
+
+    def journal_overweight(self):
+        """Check the Journal for the overweight message."""
+        return Journal.Search("That container cannot hold more weight.")
+
+    def weight_overweight(self):
+        try:
+            return Player.Weight > Player.MaxWeight
+        except:
+            self.debug("Could not determine player weight.", self.error_color)
+            return False
+
+    def drop_all_gold_at_feet(self):
+        """Drops all gold from backpack at (or near) player's feet. Splits large stacks if needed, with robust re-querying and debug."""
+        # Gold coins: 0x0EED
+        max_stack = 60000
+        dropped = 0
+        attempts = 0
+        while True:
+            gold_items = Items.FindByID(0x0EED, -1, Player.Backpack.Serial, -1)
+            if not gold_items:
+                break
+            if not isinstance(gold_items, list):
+                gold_items = [gold_items]
+            dropped_this_pass = 0
+            for gold in gold_items:
+                if gold.Amount > max_stack:
+                    self.debug(f"Splitting gold stack {gold.Serial:X} of {gold.Amount}", self.error_color)
+                    try:
+                        Items.Move(gold, Player.Backpack, max_stack)
+                        Misc.Pause(self.move_delay)
+                    except:
+                        self.debug(f"Failed to split gold stack {gold.Serial:X}", self.error_color)
+                    continue  # Will re-query and try again
+                positions = self.get_nearby_drop_positions(Player.Position.X, Player.Position.Y, Player.Position.Z)
+                success = False
+                for (x, y, z) in positions:
+                    self.debug(f"Trying to drop {gold.Amount} gold at ({x},{y},{z}) from stack {gold.Serial:X}", self.debug_color)
+                    try:
+                        Items.Move(gold, 0xFFFFFFFF, 0, x, y, z)
+                        Misc.Pause(self.move_delay)
+                        # Confirm gold is no longer in backpack
+                        found = Items.FindBySerial(gold.Serial)
+                        if found is None or found.Container != Player.Backpack.Serial:
+                            dropped += 1
+                            dropped_this_pass += 1
+                            success = True
+                            self.debug(f"Dropped {gold.Amount} gold at ({x},{y},{z}) from stack {gold.Serial:X}", self.success_color)
+                            break
+                    except Exception as e:
+                        self.debug(f"Exception dropping gold: {e}", self.error_color)
+                        continue
+                if not success:
+                    # Fallback: try dropping 1 coin at a time
+                    if gold.Amount > 1:
+                        self.debug(f"Trying fallback: splitting {gold.Amount} gold into 1 coin", self.error_color)
+                        try:
+                            Items.Move(gold, Player.Backpack, 1)
+                            Misc.Pause(self.move_delay)
+                        except:
+                            self.debug(f"Failed to split 1 coin from stack {gold.Serial:X}", self.error_color)
+                        continue  # Will re-query and try again
+                    else:
+                        self.debug(f"Failed to drop gold stack {gold.Serial:X} at any nearby position, even as single coin!", self.error_color)
+            if dropped_this_pass == 0:
+                break  # Prevent infinite loop if nothing was dropped
+            attempts += 1
+            if attempts > 50:
+                self.debug("Too many attempts to drop gold, aborting to avoid infinite loop.", self.error_color)
+                break
+        self.debug(f"Dropped {dropped} gold stack(s)/coins at/near your feet.", self.success_color)
+
     def __init__(self):
         self.debug_color = 67  # Light blue for messages
         self.error_color = 33  # Red for errors
@@ -40,7 +117,7 @@ class TreasureManager:
         """Send a debug message to the game client (respects DEBUG_MESSAGES_ON global)"""
         if color is None:
             color = self.debug_color
-        if DEBUG_MESSAGES_ON:
+        if DEBUG_MODE:
             Misc.SendMessage(f"[Treasure] {message}", color)
     
     def find_nearby_chest(self):
@@ -156,6 +233,77 @@ class TreasureManager:
         return False
 
     def move_items(self, container):
+        """Move all items from container to backpack or drop resources on ground. If overweight, drop all gold at feet."""
+        items = Items.FindBySerial(container.Serial).Contains
+        if not items:
+            self.debug("Chest is empty!", self.error_color)
+            return
+        total_items = len(items)
+        moved_items = 0
+        self.debug(f"Moving {total_items} items to backpack/ground...")
+        for item in items:
+            retry_count = 0
+            success = False
+            if self.is_resource_item(item):
+                if DROP_RESOURCES_GROUND:
+                    # Try to drop on ground (original logic)
+                    while retry_count < self.max_retry_count:
+                        if self.try_drop_on_ground(item):
+                            moved_items += 1
+                            success = True
+                            break
+                        retry_count += 1
+                    if not success:
+                        self.debug(f"Failed to drop resource item {item.Serial:X} after {self.max_retry_count} attempts!", self.error_color)
+                else:
+                    # Move resource to backpack like other items
+                    while retry_count < self.max_retry_count:
+                        try:
+                            Journal.Clear("That container cannot hold more weight.")
+                            Items.Move(item, Player.Backpack, 0)
+                            Misc.Pause(self.move_delay)
+                            if Items.FindBySerial(item.Serial).Container == Player.Backpack.Serial:
+                                moved_items += 1
+                                success = True
+                                if moved_items % 5 == 0:
+                                    self.debug(f"Moved {moved_items}/{total_items} items...")
+                                break
+                            retry_count += 1
+                            Misc.Pause(self.retry_delay)
+                        except:
+                            retry_count += 1
+                            Misc.Pause(self.retry_delay)
+                    if not success:
+                        self.debug(f"Failed to move resource item {item.Serial:X} after {self.max_retry_count} attempts!", self.error_color)
+            else:
+                # Move to backpack as before
+                while retry_count < self.max_retry_count:
+                    try:
+                        Journal.Clear("That container cannot hold more weight.")
+                        Items.Move(item, Player.Backpack, 0)
+                        Misc.Pause(self.move_delay)
+                        if Items.FindBySerial(item.Serial).Container == Player.Backpack.Serial:
+                            moved_items += 1
+                            success = True
+                            if moved_items % 5 == 0:
+                                self.debug(f"Moved {moved_items}/{total_items} items...")
+                            break
+                        retry_count += 1
+                        Misc.Pause(self.retry_delay)
+                    except:
+                        retry_count += 1
+                        Misc.Pause(self.retry_delay)
+                if not success:
+                    self.debug(f"Failed to move item {item.Serial:X} after {self.max_retry_count} attempts!", self.error_color)
+
+            # Check overweight after each move
+            if self.journal_overweight():
+                self.debug("Player is overweight! Dropping all gold at feet...", self.error_color)
+                self.drop_all_gold_at_feet()
+                Journal.Clear("That container cannot hold more weight.")
+
+        self.debug(f"Finished moving items! Successfully moved {moved_items}/{total_items} items.", self.success_color)
+
         """Move all items from container to backpack or drop resources on ground"""
         items = Items.FindBySerial(container.Serial).Contains
         if not items:

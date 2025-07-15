@@ -8,7 +8,8 @@ restock reagents placing excessive and maintaing a "loadout"
 this script is similar to using an "Organizer" Agent in Razor , this script is slower but has more control 
 current item dictionaries are based on UO Unchained , modify as needed
 
-VERSION::20250708
+HOTKEY:: N
+VERSION::20250714
 """
 BANK_PHRASE = "bank"
 DEBUG_MODE = False # Set to True to enable debug/info messages

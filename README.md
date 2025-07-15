@@ -22,6 +22,8 @@
 - [UI_summon_health_monitor.py](scripts/UI_summon_health_monitor.py) – display the health of summoned creatures
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_summons_health.png?raw=true"/>
 - [UI_spell_hotbar_hotkeys.py](scripts/UI_spell_hotbar_hotkeys.py) – Spell hotbar , added hotkey display
+- [UI_experience_progress_tracker.py](scripts/UI_experience_progress_tracker.py) – XP tracker Gump with colorized progress bars and concise labels
+- [DEV_font_color_gump.py](scripts/DEV_font_color_gump.py) – UO font hue hex codes in a custom Gump
 
 ## RITUAL
 ritual magic 
@@ -51,8 +53,11 @@ ritual magic
 
 ## SPELL
 - [SPELL_attack_nearest.py](scripts/SPELL_attack_nearest.py) – Attack spells at nearest enemy, prioritizing Energy Bolt.
-- [SPELL_bless_other.py](scripts/SPELL_bless_other.py) –  Bless the nearest friendly player 
+- [SPELL_bless_other.py](scripts/SPELL_bless_other.py) – Bless the nearest friendly player
+- [SPELL_buff_self.py](scripts/SPELL_buff_self.py) – Buff yourself with configurable spells (e.g., Bless, Magic Reflect)
 - [SPELL_create_food.py](scripts/SPELL_create_food.py) – Create Food until out of mana
+- [SPELL_invis_self.py](scripts/SPELL_invis_self.py) – Cast Invisibility on yourself and re-cast as needed
+- [SPELL_self_cure_heal.py](scripts/SPELL_self_cure_heal.py) – Auto-cure poison and heal self, prioritizing mana and HP
 
 ## TRAIN
 - [TRAIN_alchemy.py](scripts/TRAIN_alchemy.py) – Trains Alchemy skill , optional poison-only mode

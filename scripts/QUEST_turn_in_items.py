@@ -1,23 +1,34 @@
 """
-Quest Turn-in Script - a Razor Enhanced Python Script for Ultima Online
+Quest Item Turn-in Script - a Razor Enhanced Python Script for Ultima Online
 
-Handles multiple quest types with different turn-in methods:
-1. Gump-based turn-ins (e.g., treasure maps , dyes , empty chests)
-2. Direct item transfers (e.g. give to NPC)
-3. Location-based drops (e.g., placing items at specific coordinates)
+NPC Event based item turn-ins , through gump or direct item transfer
+Turn-in methods:
+1. Gump-based turn-ins ( treasure maps , dyes , empty chests )
+2. Direct item transfers ( give ancient vase to NPC )
 
 Features:
 - Detection of available quests based on inventory items
 - Multiple turn-in locations and NPCs
 - Different turn-in mechanics per quest type
 - Quest assumption based on player location
-- Pathfinding to turn-in locations
+- Pathfinding to nearest turn-in location
 
 Quest Dictionary example is for Unchained , modify for your shard
 
-VERSION::20250621
+HOTKEY:: L
+VERSION:: 20250713
 """
+
 import math
+
+DEBUG_MODE = True
+
+def debug_message(message, color=65):
+    if DEBUG_MODE:
+        try:
+            Misc.SendMessage(f"[QUEST] {message}", color)
+        except Exception:
+            pass
 
 # Quest Configuration
 QUESTS = {
@@ -137,8 +148,10 @@ QUESTS = {
         "turn_in_type": "direct_transfer",
         "container_type": "npc"  # Transfer directly to NPC 
     },
-
 }
+
+# Lastly , if not near any turn in we try to attack specific quest mobiles 
+QUEST_MOBILES_TO_ATTACK = ["A Coccon", "a bonfire crystal"]
 
 def find_quest_items(quest_config):
     """Find all quest items in player's backpack for a specific quest."""
@@ -150,7 +163,7 @@ def find_quest_items(quest_config):
             if not isinstance(items, list):
                 items = [items]
             items_found[item_info["id"]] = items
-            Misc.SendMessage(f"Found {len(items)} {item_info['name']}(s)!", 65)
+            debug_message(f"Found {len(items)} {item_info['name']}(s)!", 65)
     
     return items_found
 
@@ -200,12 +213,12 @@ def move_to_location(target_x, target_y, target_z, max_distance=300):
         
         attempts += 1
         if attempts >= max_attempts:
-            Misc.SendMessage("Could not reach location after maximum attempts!", 33)
+            debug_message("Could not reach location after maximum attempts!", 33)
             return False
             
         # Break if we're too far
         if calculate_distance(Player.Position.X, Player.Position.Y, target_x, target_y) > max_distance:
-            Misc.SendMessage("Too far from target location!", 33)
+            debug_message("Too far from target location!", 33)
             return False
             
     return True
@@ -219,7 +232,7 @@ def handle_gump_turn_in(items, quest_config, location):
     # Find the NPC
     npc = Mobiles.FindBySerial(location["npc_serial"])
     if not npc:
-        Misc.SendMessage(f"Cannot find NPC at {location['name']}!", 33)
+        debug_message(f"Cannot find NPC at {location['name']}!", 33)
         return False
         
     for item_list in items.values():
@@ -238,9 +251,9 @@ def handle_gump_turn_in(items, quest_config, location):
                     Target.TargetExecute(item.Serial)  # Target the map
                     Misc.Pause(1500)  # Wait for turn-in to complete
                 else:
-                    Misc.SendMessage("Target cursor not received!", 33)
+                    debug_message("Target cursor not received!", 33)
             else:
-                Misc.SendMessage("Expected gump not received!", 33)
+                debug_message("Expected gump not received!", 33)
     
     # Close any remaining gumps
     Gumps.CloseGump(quest_config["gump_id"])
@@ -255,7 +268,7 @@ def handle_direct_transfer(items, quest_config, location):
     # Find the NPC
     npc = Mobiles.FindBySerial(location["npc_serial"])
     if not npc:
-        Misc.SendMessage(f"Cannot find NPC at {location['name']}!", 33)
+        debug_message(f"Cannot find NPC at {location['name']}!", 33)
         return False
         
     for item_list in items.values():
@@ -297,7 +310,7 @@ def handle_npc_turn_in(items, quest_config, location):
     # Find the NPC
     npc = Mobiles.FindBySerial(location["npc_serial"])
     if not npc:
-        Misc.SendMessage(f"Cannot find NPC at {location['name']}!", 33)
+        debug_message(f"Cannot find NPC at {location['name']}!", 33)
         return False
         
     for item_list in items.values():
@@ -311,47 +324,47 @@ def handle_npc_turn_in(items, quest_config, location):
 
 def validate_empty_container(item, quest_config):
     """Validate if a container is empty."""
-    Misc.SendMessage(quest_config["validation"]["message"], 67)
+    debug_message(quest_config["validation"]["message"], 67)
     if Items.ContainerCount(item, True) > 0:
-        Misc.SendMessage("Container is not empty!", 33)
+        debug_message("Container is not empty!", 33)
         return False
     return True
 
 def handle_quest_mobiles_fallback():
     """If not near turn-in, find and attack specific quest mobiles."""
-    quest_mobiles = ["A Coccon", "a bonfire crystal"]
+    
     found = False
     mobile_filter = Mobiles.Filter()
     mobile_filter.Enabled = True
     mobiles = Mobiles.ApplyFilter(mobile_filter)
     for mobile in mobiles:
-        if mobile.Name in quest_mobiles:
-            Misc.SendMessage("All Attack")  # Replace with your shard's attack macro if needed
+        if mobile.Name in QUEST_MOBILES_TO_ATTACK:
+            debug_message("All Attack")  # Replace with your shard's attack macro if needed
             Target.TargetExecute(mobile.Serial)
-            Misc.SendMessage(f"Targeted quest mobile: {mobile.Name} (0x{mobile.Serial:X})", 68)
+            debug_message(f"Targeted quest mobile: {mobile.Name} (0x{mobile.Serial:X})", 68)
             Misc.Pause(1000)
             found = True
     if not found:
-        Misc.SendMessage("No quest mobiles found for fallback action.", 33)
+        debug_message("No quest mobiles found for fallback action.", 33)
 
 def process_quest(quest_name, quest_config):
     """Process a specific quest turn-in."""
     # Find quest items
     items = find_quest_items(quest_config)
     if not items:
-        Misc.SendMessage(f"No items found for {quest_config['name']}!", 33)
+        debug_message(f"No items found for {quest_config['name']}!", 33)
         return False
     
     # Find nearest turn-in location
     location, distance = find_nearest_location(quest_config["locations"])
     if not location:
-        Misc.SendMessage("No valid turn-in location found!", 33)
+        debug_message("No valid turn-in location found!", 33)
         return False
     
     # Check if we're in range
     if not is_within_range(Player.Position.X, Player.Position.Y, 
                           location["x"], location["y"]):
-        Misc.SendMessage(f"Move closer to {location['name']} to turn in items!", 33)
+        debug_message(f"Move closer to {location['name']} to turn in items!", 33)
         handle_quest_mobiles_fallback()
         return False
     
@@ -372,7 +385,7 @@ def process_quest(quest_name, quest_config):
     elif quest_config["turn_in_type"] == "npc":
         return handle_npc_turn_in(items, quest_config, location)
     else:
-        Misc.SendMessage(f"Unknown turn-in type: {quest_config['turn_in_type']}", 33)
+        debug_message(f"Unknown turn-in type: {quest_config['turn_in_type']}", 33)
         return False
 
 def main():
@@ -380,17 +393,17 @@ def main():
     quests_available = False
     
     for quest_name, quest_config in QUESTS.items():
-        Misc.SendMessage(f"Checking for {quest_config['name']} items...", 67)
+        debug_message(f"Checking for {quest_config['name']} items...", 67)
         if find_quest_items(quest_config):
             quests_available = True
-            Misc.SendMessage(f"Processing {quest_config['name']}...", 67)
+            debug_message(f"Processing {quest_config['name']}...", 67)
             if process_quest(quest_name, quest_config):
-                Misc.SendMessage(f"Completed {quest_config['name']}!", 67)
+                debug_message(f"Completed {quest_config['name']}!", 67)
             else:
-                Misc.SendMessage(f"Failed to complete {quest_config['name']}!", 33)
+                debug_message(f"Failed to complete {quest_config['name']}!", 33)
     
     if not quests_available:
-        Misc.SendMessage("No quest items found in backpack!", 33)
+        debug_message("No quest items found in backpack!", 33)
 
 
 if __name__ == '__main__':

@@ -1,15 +1,15 @@
 """
-UI Player Status Bars - a Razor Enhanced Python Script for Ultima Online
+UI Player Health and Mana Status Bars - a Razor Enhanced Python Script for Ultima Online
 
-Creates a custom gump showing health, mana, and stamina in a ARPG-style horizontal bar layout.
-Features:
+Creates a custom gump showing health, mana, and stamina in a MOBA-style horizontal bar layout.
 - Horizontal progress bars for health, mana, 
-- Dynamic color intensity based on current values
+- Dynamic color intensity based on current health ( Green > Yellow > Red )
 
 TODO:
 bandage duration 
+add color dict for easy changing ( Blue to Orange gradient )
 
-VERSION :: 20250707
+VERSION :: 20250714
 """
 
 import time
@@ -28,15 +28,15 @@ GUMP_ART = {
     "SMALL_BAR": 9350,  # Smaller bar for stamina
 }
 
-# Bar segment dimensions
+# Bar segment dimensions , LARGE = Health Mana  , SMALL = Stamina 
 SEGMENT_DIMENSIONS = {
     "LARGE": {
         "WIDTH": 12,   # Pixels wide
         "HEIGHT": 16,  # Pixels tall
     },
     "SMALL": {
-        "WIDTH": 4,    # Pixels wide for stamina
-        "HEIGHT": 8,   # Pixels tall for stamina
+        "WIDTH": 4,    # Pixels wide
+        "HEIGHT": 8,   # Pixels tall
     }
 }
 

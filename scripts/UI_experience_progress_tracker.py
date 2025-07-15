@@ -9,7 +9,7 @@ change the log path to match your client
 currently tuned for UOUnchained progression 
 
 STATUS:: working
-VERSION::20250713
+VERSION::20250714
 """
 import re
 import time
@@ -22,7 +22,7 @@ ULTIMA_CLIENT_LOG_FOLDERPATH = r'D:\ULTIMA\UO_Unchained\Data\Client\JournalLogs'
 
 DEBUG_MODE = False  # Set to True to enable in-game debug messages
 
-# gump ID= 4294967295  = the max value , randomly select a high number gump so its unique
+# gump ID= 4294967295  = the max value , randomly select a high number less then max
 GUMP_ID =  3329354321
 
 GUMP_X = 700
@@ -58,7 +58,7 @@ FONT_COLORS = {
     'black': 0x0000        # black
 }
 
-COLORS = {
+GUMP_HUE_COLORS = {
     'background': FONT_COLORS['black'],
     'bar': FONT_COLORS['green'],
     'bar2': FONT_COLORS['blue'],
@@ -91,6 +91,22 @@ PROGRESS_PARENS_PATTERN = re.compile(r'([A-Za-z \[\]\:]+)\s*\((\d+)\s*/\s*(\d+)\
 
 # --- CONFIGURATION ---
 LOG_FILE_PATH = 'experience_progress_tracker.log'  # Output log file path
+
+# --- DIAGNOSTIC KEYWORDS ---
+JOURNAL_DIAGNOSTIC_KEYWORDS = {
+    'system_types': ['System'],
+    'system_names': ['System', 'Username'],
+    'search_terms': [
+        'Mastery',
+        'Weekly Quest',
+        'Spellsong',
+        'Holy',
+        'Elemental',
+        'Dungeon',
+        'Enhanced Summons'
+    ]
+}
+
 
 def log(message):
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
@@ -167,7 +183,7 @@ class ProgressTracker:
         debug(f'[XP Tracker] Parsing journal: last_index={self.last_journal_index}, line_count={line_count}')
 
         # Diagnostics: Add filters for likely XP/progress keywords
-        for keyword in ["Mastery", "Weekly Quest", "Spellsong", "Holy", "Elemental", "Dungeon", "Enhanced Summons"]:
+        for keyword in JOURNAL_DIAGNOSTIC_KEYWORDS['search_terms']:
             try:
                 Journal.FilterText(keyword)
                 debug(f'[XP Tracker] [Diagnostics] Journal.FilterText({repr(keyword)}) applied.')
@@ -192,27 +208,25 @@ class ProgressTracker:
                 debug(f'[XP Tracker] [GetLineText] idx={i}, line={repr(line)}')
             except Exception as e:
                 debug(f'[XP Tracker] [GetLineText] idx={i}, error={e}')
-        # Diagnostics: Try other journal APIs
-        try:
-            sys_type = Journal.GetTextByType('System')
-            debug(f'[XP Tracker] [Diagnostics] GetTextByType("System"): {repr(sys_type)}')
-        except Exception as e:
-            debug(f'[XP Tracker] [Diagnostics] GetTextByType("System") error: {e}')
-        try:
-            sys_name = Journal.GetTextByName('System')
-            debug(f'[XP Tracker] [Diagnostics] GetTextByName("System"): {repr(sys_name)}')
-        except Exception as e:
-            debug(f'[XP Tracker] [Diagnostics] GetTextByName("System") error: {e}')
-        try:
-            pha_name = Journal.GetTextByName('Phaedroxa')
-            debug(f'[XP Tracker] [Diagnostics] GetTextByName("Phaedroxa"): {repr(pha_name)}')
-        except Exception as e:
-            debug(f'[XP Tracker] [Diagnostics] GetTextByName("Phaedroxa") error: {e}')
-        try:
-            mastery_search = Journal.Search('Mastery')
-            debug(f'[XP Tracker] [Diagnostics] Search("Mastery"): {repr(mastery_search)}')
-        except Exception as e:
-            debug(f'[XP Tracker] [Diagnostics] Search("Mastery") error: {e}')
+        # Diagnostics: Try other journal APIs using global diagnostic keywords
+        for sys_type_val in JOURNAL_DIAGNOSTIC_KEYWORDS['system_types']:
+            try:
+                sys_type = Journal.GetTextByType(sys_type_val)
+                debug(f'[XP Tracker] [Diagnostics] GetTextByType({repr(sys_type_val)}): {repr(sys_type)}')
+            except Exception as e:
+                debug(f'[XP Tracker] [Diagnostics] GetTextByType({repr(sys_type_val)}) error: {e}')
+        for sys_name_val in JOURNAL_DIAGNOSTIC_KEYWORDS['system_names']:
+            try:
+                sys_name = Journal.GetTextByName(sys_name_val)
+                debug(f'[XP Tracker] [Diagnostics] GetTextByName({repr(sys_name_val)}): {repr(sys_name)}')
+            except Exception as e:
+                debug(f'[XP Tracker] [Diagnostics] GetTextByName({repr(sys_name_val)}) error: {e}')
+        for search_term in JOURNAL_DIAGNOSTIC_KEYWORDS['search_terms']:
+            try:
+                search_result = Journal.Search(search_term)
+                debug(f'[XP Tracker] [Diagnostics] Search({repr(search_term)}): {repr(search_result)}')
+            except Exception as e:
+                debug(f'[XP Tracker] [Diagnostics] Search({repr(search_term)}) error: {e}')
 
         for i in range(self.last_journal_index, line_count):
             entry = entries[i]
@@ -298,17 +312,17 @@ class ProgressTracker:
         # No background for a transparent/overlay look
         width = BAR_WIDTH + 28
         height = self._gump_height()
-        Gumps.AddLabel(g, 12, 8, COLORS['text'], "Experience Progress Tracker")
+        Gumps.AddLabel(g, 12, 8, GUMP_HUE_COLORS['text'], "Experience Progress Tracker")
         y = 28  # Slightly higher for compactness
         task_list = self.get_task_list()
         if not task_list:
-            Gumps.AddLabel(g, 18, y + 1, COLORS['text'], "No progress found.")
+            Gumps.AddLabel(g, 18, y + 1, GUMP_HUE_COLORS['text'], "No progress found.")
             y += BAR_HEIGHT + BAR_SPACING
         for idx, task in enumerate(task_list):
             cur, maxval, pct = self.get_progress(task)
             # Determine category color
             lower_task = task.lower()
-            color = COLORS['bar']  # Default
+            color = GUMP_HUE_COLORS['bar']  # Default
             for cat, cat_color in CATEGORY_COLORS.items():
                 if cat != 'default' and cat in lower_task:
                     color = cat_color
@@ -332,10 +346,10 @@ class ProgressTracker:
             label_nums = f"{cur}/{maxval}"
             # Draw main label (percent and name)
             # Estimate the width of the main label (percent + name + colon + 2 spaces)
-            # Assume ~6 pixels per character for default font (tighter)
+            # Assume ~6 pixels per character for default font 
             main_label_width = 6 * len(label_main)
             Gumps.AddLabel(g, 18, y + 1, color, label_main)
-            num_x = 18 + main_label_width + 4  # 4px gap for clarity
+            num_x = 18 + main_label_width + 4  # 4px gap width 
             # Draw numbers in smaller font or lighter color, offset to the right
             try:
                 # Use HTML Gump for small font if supported (font size 8)

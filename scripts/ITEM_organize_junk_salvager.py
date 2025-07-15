@@ -9,12 +9,9 @@ Requirements:
 - Any configured salvage tool in player's backpack ( tinker tools , or sewing kit )
 - A red dyed backpack that will hold the salvagable items
 
-VERSION::20250621
+HOTKEY:: O
+VERSION::20250714
 """
-
-import sys
-import time
-from System.Collections.Generic import List
 
 # Global debug mode switch
 DEBUG_MODE = False  # Set to True to enable debug/info messages
@@ -492,22 +489,21 @@ class JunkSalvager:
         self.debug(f"Tier 2 items found: {self.stats['tier2_items']}", 'info')
         self.debug(f"Other magical items: {self.stats['other_items']}", 'info')
         self.debug(f"Items moved to junk: {self.stats['items_moved']}", 'info')
-        self.debug("=====================", 'important')
 
 def find_junk_backpack():
     """Find the red junk backpack in player's backpack"""
     if not Player.Backpack:
-        Misc.SendMessage("No backpack found!", 33)
+        debug_message("No backpack found!", 33)
         return None
         
     # Try each hue in our acceptable range
     for hue in JUNK_BACKPACK_HUES:
         junk = Items.FindByID(JUNK_BACKPACK_ID, hue, Player.Backpack.Serial)
         if junk:
-            Misc.SendMessage(f"Found junk backpack (hue: 0x{hue:X}): 0x{junk.Serial:X}", 68)
+            debug_message(f"Found junk backpack (hue: 0x{hue:X}): 0x{junk.Serial:X}", 68)
             return junk.Serial
             
-    Misc.SendMessage(f"No junk backpack found with hues {[f'0x{h:X}' for h in JUNK_BACKPACK_HUES]}! Place a red backpack in your backpack.", 33)
+    debug_message(f"No junk backpack found with hues {[f'0x{h:X}' for h in JUNK_BACKPACK_HUES]}! Place a red backpack in your backpack.", 33)
     return None
 
 # Auto-find junk backpack on script load

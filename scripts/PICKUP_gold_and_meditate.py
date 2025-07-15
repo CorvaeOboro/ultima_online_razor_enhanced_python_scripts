@@ -4,7 +4,8 @@ Pickup Gold and Meditate - Razor Enhanced Python Script for Ultima Online
 - Picks up all gold (0x0EED) on the ground within 1 tile of the player
 - Uses Meditate skill if not already meditating
 
-VERSION::20250621
+HOTKEY::Spacebar
+VERSION::20250713
 """
 
 import time

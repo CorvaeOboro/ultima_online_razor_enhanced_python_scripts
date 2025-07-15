@@ -4,10 +4,11 @@
  Casts Magic Reflection, Arch Protection, and Bless on self if not already active
  Buff order: Magic Reflection -> Arch Protection -> Bless
 
-VERSION::20250621
+HOTKEY:: T
+VERSION::20250713
 """
-import time
 
+DEBUG_MODE = True
 # CONFIGURABLE: Pause between casts (ms)
 CAST_PAUSE = 600
 

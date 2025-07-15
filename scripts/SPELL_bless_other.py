@@ -2,7 +2,8 @@
 SPELL bless other - A Razor Enhanced Python script for Ultima Online
 cast Bless on the nearest blue player
 
-VERSION::20250621
+HOTKEY:: H
+VERSION::20250713
 """
 
 BLESS_MANA_COST = 14
