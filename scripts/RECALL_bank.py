@@ -7,8 +7,9 @@ Recall to Bank or Home- a Razor Enhanced Python script for Ultima Online
 - Activates recall through the gump
 
 HOTKEY:: B
-VERSION::20250621
+VERSION::20250718
 """
+DEBUG_MODE = False  # If False, suppress all Misc.SendMessage output
 
 RUNEBOOK_ID = 0x0EFA  # Runebook item ID
 RUNEBOOK_NAME = "Runebook"  # Name of the runebook to find
@@ -16,7 +17,6 @@ GUMP_ID = 89  # Runebook gump ID
 RUNE_NUMBER = 12  # Which rune in the runebook to recall to (1-based)
 RECALL_BUTTON = 49 + RUNE_NUMBER
 GUMP_TIMEOUT = 10000  # Timeout for gump operations in milliseconds
-DEBUG_MODE = True  # If False, suppress all Misc.SendMessage output
 
 #//==================================================================
 def debug_message(msg, color=33):

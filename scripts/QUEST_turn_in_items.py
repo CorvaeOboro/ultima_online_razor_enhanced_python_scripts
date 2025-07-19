@@ -151,7 +151,7 @@ QUESTS = {
 }
 
 # Lastly , if not near any turn in we try to attack specific quest mobiles 
-QUEST_MOBILES_TO_ATTACK = ["A Coccon", "a bonfire crystal"]
+QUEST_MOBILES_TO_ATTACK = ["A Coccon", "a bonfire crystal","Demonic Portal",]
 
 def find_quest_items(quest_config):
     """Find all quest items in player's backpack for a specific quest."""

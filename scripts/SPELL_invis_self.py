@@ -1,18 +1,18 @@
 """
 SPELL INVIS SELF - A Razor Enhanced Python Script for Ultima Online
 
-Casts Invisibility and targets self. Waits for the cast to complete and targets the player automatically.
+Casts Invisibility and targets self.
 
-- Casts Invisibility
-- Waits for target cursor
-- Targets self
+TODO:
+make mana check optional ( "lower mana cost" modifiers might make this fail when it could cast it )
+deal with already casting or existing target 
 
 HOTKEY:: W
-VERSION::20250713
+VERSION::20250714
 """
 
 import time
-
+DEBUG_MODE = True
 SPELL_INVIS = "Invisibility"
 INVIS_MANA_COST = 20
 
@@ -21,11 +21,11 @@ TARGET_TIMEOUT = 2  # seconds
 REPEAT_UNTIL_INVIS = True  # Set to False to only try once
 MAX_ATTEMPTS = 5  # Safety limit if repeat is enabled
 
+#//============================================================
 
 def can_cast_invis():
     return Player.Mana >= INVIS_MANA_COST
 
-DEBUG_MODE = True
 
 def debug_message(msg, color=68):
     if DEBUG_MODE:

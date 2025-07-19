@@ -1,5 +1,5 @@
 """
-SPELL SELF CURE + HEAL - A Razor Enhanced Python Script for Ultima Online
+SPELL CURE + HEAL SELF - A Razor Enhanced Python Script for Ultima Online
 
 Healing and curing logic with explicit conditionals and thresholds:
 
