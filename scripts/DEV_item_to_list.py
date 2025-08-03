@@ -2,18 +2,20 @@
 Development Item to JSON List  - a Razor Enhanced Python Script for Ultima Online
 
 Creates a gump UI for selecting items 
-exporting their details to categorized json.
+exporting their details to categorized .json files.
 
 Categories:
-Trash , Bank , Salvage , Keep , Quest
+Trash , Bank , Salvage , Keep , Quest ,
+ Food , Update , Orb , Ritual
 
 this is useful to store item ids for use in other scripts 
-edit the BASE_PATH to your local folders
+exported .json files are stored in a 'data' subdirectory next to the script
 
-VERSION::20250708
+VERSION::20250722
 """
 import os
 import json
+import shutil
 import time
 from datetime import datetime
 
@@ -39,29 +41,54 @@ DEBUG = {
 list_configs = [
     {
         "name": "Trash",
-        "file": os.path.join(BASE_PATH, "trash_items.json"),
+        "file": os.path.join(BASE_PATH, "items_trash.json"),
         "description": "Items to automatically throw away"
     },
     {
         "name": "Bank",
-        "file": os.path.join(BASE_PATH, "bank_items.json"),
+        "file": os.path.join(BASE_PATH, "items_bank.json"),
         "description": "Items to move to bank"
     },
     {
         "name": "Salvage",
-        "file": os.path.join(BASE_PATH, "salvage_items.json"),
+        "file": os.path.join(BASE_PATH, "items_salvage.json"),
         "description": "Items to consider for salvage"
     },
     {
         "name": "Keep",
-        "file": os.path.join(BASE_PATH, "keep_items.json"),
+        "file": os.path.join(BASE_PATH, "items_keep.json"),
         "description": "Important items to never throw away"
     },
     {
         "name": "Quest",
-        "file": os.path.join(BASE_PATH, "quest_items.json"),
+        "file": os.path.join(BASE_PATH, "items_quest.json"),
         "description": "Items needed for quest turn-ins"
-    }
+    },
+    {
+        "name": "Food",
+        "file": os.path.join(BASE_PATH, "items_food.json"),
+        "description": "Food items for consumption or scripts"
+    },
+    {
+        "name": "Update",
+        "file": os.path.join(BASE_PATH, "items_update.json"),
+        "description": "Items whose art we want to update"
+    },
+    {
+        "name": "Ritual",
+        "file": os.path.join(BASE_PATH, "items_ritual.json"),
+        "description": "Items used in rituals"
+    },
+    {
+        "name": "Orb",
+        "file": os.path.join(BASE_PATH, "items_orb.json"),
+        "description": "Items whose art we want to update"
+    },
+    {
+        "name": "Resource",
+        "file": os.path.join(BASE_PATH, "items_resource.json"),
+        "description": "Resource items: ingots, boards, leather, cloth, etc. for crafting or scripts"
+    },
 ]
 
 # Track the current gump ID
@@ -154,8 +181,6 @@ def write_item_entry(config, entry):
         debug_msg(f"Error writing to file: {str(e)}", 33)
         return False
 
-import shutil
-
 def try_repair_ndjson(file_path):
     """Attempt to repair a legacy NDJSON/JSONL file into a valid JSON array."""
     objects = []
@@ -184,7 +209,6 @@ def try_repair_ndjson(file_path):
     except Exception as e:
         debug_msg(f"NDJSON repair failed: {str(e)}", 33)
         return None
-
 
 def target_and_record(config):
     """Target an item and record its properties."""
@@ -331,7 +355,7 @@ def main():
 def debug_msg(message, color=90):
     """Send a debug message if verbose logging is enabled."""
     if DEBUG["VERBOSE_LOGGING"]:
-        Misc.SendMessage(f"[DEBUG] {message}", color)
+        Misc.SendMessage(f"[DEV_ITEM_TO_LIST] {message}", color)
 
 if __name__ == "__main__":
     main()

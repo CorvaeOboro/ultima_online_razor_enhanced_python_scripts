@@ -16,19 +16,12 @@ Features:
 Quest Dictionary example is for Unchained , modify for your shard
 
 HOTKEY:: L
-VERSION:: 20250713
+VERSION:: 20250722
 """
 
 import math
 
 DEBUG_MODE = True
-
-def debug_message(message, color=65):
-    if DEBUG_MODE:
-        try:
-            Misc.SendMessage(f"[QUEST] {message}", color)
-        except Exception:
-            pass
 
 # Quest Configuration
 QUESTS = {
@@ -151,7 +144,13 @@ QUESTS = {
 }
 
 # Lastly , if not near any turn in we try to attack specific quest mobiles 
-QUEST_MOBILES_TO_ATTACK = ["A Coccon", "a bonfire crystal","Demonic Portal",]
+QUEST_MOBILES_TO_ATTACK = ["A Coccon", "a bonfire crystal", "Demonic Portal",]
+
+#//======================================================================
+
+def debug_message(message, color=65):
+    if DEBUG_MODE:
+        Misc.SendMessage(f"[QUEST] {message}", color)
 
 def find_quest_items(quest_config):
     """Find all quest items in player's backpack for a specific quest."""

@@ -10,7 +10,7 @@ Automates the process of turning in orbs to a Quest NPC, with the following logi
 6. Debug messages are printed for each orb found, targeted, and each action taken.
 
 HOTKEY: M
-VERSION: 20250718
+VERSION: 20250722
 """
 
 # CONFIG: List of orb names to protect (not to turn in or convert)
@@ -41,8 +41,11 @@ MASTERY_ORBS = {
 
 #//===========================================================================
 def debug_message(msg):
+    # Utility: Print debug messages to client
     Misc.SendMessage(f'[OrbTurnIn] {msg}', 54)
 
+# Step 1: Find all orbs in backpack, excluding protected types
+# Returns a list of orb items available for turn-in
 def get_orbs_in_backpack():
     orbs = Items.FindByID(ORB_ITEM_ID, -1, Player.Backpack.Serial, -1)
     if not orbs:
@@ -52,14 +55,17 @@ def get_orbs_in_backpack():
         orb_list = orbs
     else:
         orb_list = [orbs]
+    # Step 2: Filter out protected orb types
     return [orb for orb in orb_list if orb.Name not in PROTECTED_ORBS]
 
+# Step 3: Open the NPC's quest gump
+# Returns True if gump opened successfully, False otherwise
 def open_npc_gump():
     npc = Mobiles.FindBySerial(NPC_SERIAL)
     if not npc:
         debug_message("Cannot find Quest NPC!", 33)
         return False
-    Mobiles.UseMobile(npc)
+    Mobiles.UseMobile(npc)  # Interact with NPC
     Misc.Pause(1000)
     # Wait for gump to open
     if Gumps.WaitForGump(NPC_GUMP_ID, 3000):
@@ -67,32 +73,39 @@ def open_npc_gump():
     debug_message("Failed to open NPC gump.")
     return False
 
+# Step 4: Press a button on the NPC gump
+# button_id: which button to press (add orb, claim orb, etc)
 def press_gump_button(button_id):
     Gumps.WaitForGump(NPC_GUMP_ID, 3000)
     Gumps.SendAction(NPC_GUMP_ID, button_id)
     Misc.Pause(600)
 
+# Step 5: Add up to 3 orbs to the gump, handling journal messages and claim logic
+# stats: dict to track total orbs added/claimed and per-type breakdown
 def add_orbs_to_gump(stats):
     added = 0
     while added < 3:
+        # Step 1: Get available orbs
         orbs = get_orbs_in_backpack()
         if not orbs:
             debug_message("No more orbs available for turn-in.")
             break
         orb = orbs[0]
-        # Confirm gump is open before every add
+        # Step 2: Confirm gump is open before adding
         if not Gumps.HasGump(NPC_GUMP_ID):
             if not open_npc_gump():
                 debug_message("Failed to open NPC gump for adding orb.")
                 break
         debug_message(f"Targeting orb: {orb.Name}")
+        # Step 3: Press add orb button and target orb
         press_gump_button(BUTTON_ADD_ORB)
         Target.WaitForTarget(2000, False)
         Target.TargetExecute(orb.Serial)
         Misc.Pause(800)
-        # Check for journal messages
+        # Step 4: Check for special journal messages
         if Journal.Search("You already traded 3 orbs! Claim one first."):
             debug_message("Claiming one now.")
+            # Step 4a: If blocked, claim an orb and reset
             if open_npc_gump():
                 press_gump_button(BUTTON_CLAIM_ORB)
                 Misc.Pause(1200)
@@ -106,6 +119,7 @@ def add_orbs_to_gump(stats):
         if Journal.Search("could not be added"):
             debug_message("Orb could not be added. Stopping add.")
             break
+        # Step 5: Track successful orb submission
         debug_message(f"Orb {orb.Name} submitted.")
         added += 1
         stats['added'] += 1
@@ -115,6 +129,7 @@ def add_orbs_to_gump(stats):
         stats['per_type'][orb_type] += 1
     return added
 
+# Step 6: Press the CLAIM/CONVERT button to claim the reward orb
 def convert_orbs():
     press_gump_button(BUTTON_CLAIM_ORB)
     Misc.Pause(1200)

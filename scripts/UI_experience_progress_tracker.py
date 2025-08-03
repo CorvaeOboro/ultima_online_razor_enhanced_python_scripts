@@ -5,11 +5,15 @@ Tracks progression systems by parsing journal and visualizes in a custom Gump UI
 EXAMPLES TO MATCH = 'Label: 123 / 456', '[Label: 123 / 456]',
 percentage first , colorize by category , display as bar 
 
-change the log path to match your client
-currently tuned for UOUnchained progression 
+change the ULTIMA_CLIENT_LOG_FOLDERPATH to match your client location JournalLogs
+currently tuned for UOUnchained progression ( Mastery , Weekly Quests , Dungeons )
+
+TODO:
+include summons progress , doesnt have colon 
 
 STATUS:: working
-VERSION::20250714
+HOTKEY:: StartUp
+VERSION::20250802
 """
 import re
 import time
@@ -243,6 +247,9 @@ class ProgressTracker:
 
     def _parse_line(self, line):
         debug(f'[XP Tracker] [Parse Attempt] line={repr(line)}')
+        if 'Max Stones' in line:
+            debug('[XP Tracker] [Parse Ignore] Skipping Max Stones line')
+            return False
         m = PROGRESS_PATTERN.search(line)
         if m:
             debug(f'[XP Tracker] [Regex:slash] MATCHED: groups={m.groups()}')
@@ -251,6 +258,8 @@ class ProgressTracker:
                 title = title[:-1].strip()
             # Only use the last segment after splitting by colon, for clean Gump labels
             title_clean = title.split(':')[-1].strip() if ':' in title else title
+            # Remove brackets from display name
+            title_clean = title_clean.replace('[','').replace(']','').strip()
             cur = int(m.group(2))
             maxval = int(m.group(3))
             key = title_clean if title_clean else 'Progress'
@@ -272,6 +281,8 @@ class ProgressTracker:
                 title = title[:-1].strip()
             # Only use the last segment after splitting by colon, for clean Gump labels
             title_clean = title.split(':')[-1].strip() if ':' in title else title
+            # Remove brackets from display name
+            title_clean = title_clean.replace('[','').replace(']','').strip()
             cur = int(m2.group(2))
             maxval = int(m2.group(3))
             key = title_clean if title_clean else 'Progress'
@@ -312,7 +323,7 @@ class ProgressTracker:
         # No background for a transparent/overlay look
         width = BAR_WIDTH + 28
         height = self._gump_height()
-        Gumps.AddLabel(g, 12, 8, GUMP_HUE_COLORS['text'], "Experience Progress Tracker")
+        Gumps.AddLabel(g, 12, 8, GUMP_HUE_COLORS['text'], "Progress Tracker")
         y = 28  # Slightly higher for compactness
         task_list = self.get_task_list()
         if not task_list:
@@ -342,6 +353,8 @@ class ProgressTracker:
             # Remove both 'Creature Killed In' and 'Creature Killed in' (case-insensitive)
             import re
             short_task = re.sub(r'(?i)creature killed in', '', task).replace('  ', ' ').strip()
+            # Remove brackets at display time
+            short_task = short_task.replace('[','').replace(']','').strip()
             label_main = f"{pct_str}  {short_task.title()}: "
             label_nums = f"{cur}/{maxval}"
             # Draw main label (percent and name)

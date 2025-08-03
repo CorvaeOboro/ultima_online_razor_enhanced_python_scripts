@@ -3,21 +3,18 @@ Item Weight Manager Script - a Razor Enhanced PythonScript for Ultima Online
 
 Manages items weight in your backpack by:
 1. Dropping all disposable items:
-   - Magic scrolls (all circles)
-   - Pagan reagents
-   - Empty bottles , Poison and Lesser potions
+    - Resources (leather, ingots, boards, cut cloth leather, etc.)
+    - Magic scrolls (all circles)
+    - Pagan reagents
+    - Empty bottles , Poison and Lesser potions
 2. Maintaining minimum counts for:
-   - Regular reagents (200 each)
-   - Heal and Cure potions (10 each)
-   - Utility potions (5 each)
+    - Regular reagents (200 each)
+    - Heal and Cure potions (10 each)
+    - Utility potions (5 each)
 
 HOTKEY:: X
-VERSION::20250621
+VERSION::20250802
 """
-
-import sys
-from System.Collections.Generic import List
-import time
 
 # Global debug mode switch
 DEBUG_MODE = False  # Set to True to enable debug/info messages
@@ -25,8 +22,12 @@ DEBUG_MODE = False  # Set to True to enable debug/info messages
 # Configuration
 MAX_REAGENT_COUNT = 200  # Maximum number of reagents to keep
 
-# Items to always drop (no count management)
-DISPOSABLE_ITEMS = [
+# ============================================================================
+# DISPOSABLE ITEM CATEGORIES
+# ============================================================================
+
+# Magic Scrolls - All spell scrolls organized by circle
+MAGIC_SCROLLS = [
     # Circle 1 Scrolls
     {"name": "1_Clumsy", "id": 0x1F2E, "hue": None},
     {"name": "1_CreateFood", "id": 0x1F2F, "hue": None},
@@ -106,8 +107,10 @@ DISPOSABLE_ITEMS = [
     {"name": "8_SummonEarthElemental", "id": 0x1F6A, "hue": None},
     {"name": "8_SummonFireElemental", "id": 0x1F6B, "hue": None},
     {"name": "8_SummonWaterElemental", "id": 0x1F6C, "hue": None},
-    
-    # Pagan Reagents
+]
+
+# Pagan Reagents - Necromancy and other special reagents
+PAGAN_REAGENTS = [
     {"name": "Pig Iron", "id": 0x0F8A, "hue": None},
     {"name": "Grave Dust", "id": 0x0F8F, "hue": None},
     {"name": "Daemon Blood", "id": 0x0F7D, "hue": None},
@@ -118,38 +121,26 @@ DISPOSABLE_ITEMS = [
     {"name": "Dragons Blood", "id": 0x0F82, "hue": None},
     {"name": "Executioners Cap", "id": 0x0F83, "hue": None},
     {"name": "Fertile Dirt", "id": 0x0F81, "hue": None},
-    
-    # Resources
+]
+
+# Raw Resources - Mining, lumberjacking, and other raw materials
+RAW_RESOURCES = [
+    # Ores
     {"name": "Iron Ore", "id": 0x19B9, "hue": None},
     {"name": "Iron Ore B", "id": 0x19B7, "hue": None},
+    
+    # Raw Materials
     {"name": "Cut Leather", "id": 0x1081, "hue": None},
     {"name": "Pile of Hides", "id": 0x1079, "hue": None},
     {"name": "Raw Ribs", "id": 0x09F1, "hue": None},
     {"name": "Fish Steaks", "id": 0x097A, "hue": None},
-
-    # Arrows
+    
+    # Ammunition
     {"name": "CrossbowBolts", "id": 0x1BFB, "hue": None},
-    
-    # Clothing
-    {"name": "Cloth", "id": 0x1766, "hue": None},
-    {"name": "Folded Cloth", "id": 0x175D, "hue": None},
-    {"name": "Plain Dress", "id": 0x1F01, "hue": None},
-    {"name": "Fancy Dress", "id": 0x1F00, "hue": None},
-    {"name": "Cloak", "id": 0x1515, "hue": None},
-    {"name": "Robe", "id": 0x1F03, "hue": None},
-    {"name": "Shirt", "id": 0x1517, "hue": None},
-    {"name": "Body Sash", "id": 0x1541, "hue": None},
-    
-    # Shoes
-    {"name": "Sandals", "id": 0x170D, "hue": None},
-    {"name": "Shoes", "id": 0x170F, "hue": None},
-    {"name": "Boots", "id": 0x170B, "hue": None},
-    {"name": "Thigh Boots", "id": 0x1711, "hue": None},
-    
-    # Empty Bottles
-    {"name": "Empty Bottle", "id": 0x0F0E, "hue": None},
-    {"name": "Poison Potion", "id": 0x0F0A, "hue": None},
-    
+]
+
+# Crafted Resources - Processed materials like boards, ingots, leather
+CRAFTED_RESOURCES = [
     # Boards
     {"name": "Board", "id": 0x1BD7, "hue": None},
     {"name": "Oak Board", "id": 0x1BDD, "hue": None},
@@ -180,6 +171,61 @@ DISPOSABLE_ITEMS = [
     {"name": "Verite Ingot", "id": 0x1BEF, "hue": None},
     {"name": "Valorite Ingot", "id": 0x1BEF, "hue": None},
 ]
+
+
+# Food Items - All consumable food items from food eater script
+FOOD_ITEMS = [
+    # Fruits
+    {"name": "Peach", "id": 0x09D2, "hue": None},
+    {"name": "Apple", "id": 0x09D0, "hue": None},
+    {"name": "Grapes", "id": 0x09D1, "hue": None},
+    {"name": "Pear", "id": 0x0994, "hue": None},
+    {"name": "Banana", "id": 0x171F, "hue": None},
+    {"name": "Pumpkin", "id": 0x0C6A, "hue": None},
+    {"name": "Onion", "id": 0x0C6D, "hue": None},
+    {"name": "Carrot", "id": 0x0C78, "hue": None},
+    {"name": "Squash", "id": 0x0C6C, "hue": None},
+
+    # Vegetables
+    {"name": "Lettuce", "id": 0x0C70, "hue": None},
+    {"name": "Cabbage", "id": 0x0C7B, "hue": None},
+ 
+    # Baked Goods
+    {"name": "Muffins", "id": 0x09EB, "hue": None},
+    {"name": "Bread Loaf", "id": 0x103B, "hue": None},
+    
+    # Meats
+    {"name": "Cheese", "id": 0x097D, "hue": None},
+    {"name": "Sausage", "id": 0x09C0, "hue": None},
+    {"name": "Cooked Bird", "id": 0x09B7, "hue": None},
+    {"name": "Cut of Ribs", "id": 0x09F2, "hue": None},
+    {"name": "Ham", "id": 0x09C9, "hue": None},
+    {"name": "Leg of Lamb", "id": 0x160A, "hue": None},
+    {"name": "Chicken Leg", "id": 0x1608, "hue": None},
+    {"name": "Fish Steak", "id": 0x097A, "hue": None},
+    {"name": "Fish Steak 2", "id": 0x097B, "hue": None},
+    {"name": "Bacon", "id": 0x097E, "hue": None},
+]
+
+# Miscellaneous Items - Empty bottles, potions, and other items
+MISCELLANEOUS_ITEMS = [
+    {"name": "Empty Bottle", "id": 0x0F0E, "hue": None},
+    {"name": "Poison Potion", "id": 0x0F0A, "hue": None},
+]
+
+# ============================================================================
+# COMBINED DISPOSABLE ITEMS LIST
+# ============================================================================
+
+# Items to always drop (no count management) - Combined from all categories
+DISPOSABLE_ITEMS = (
+    MAGIC_SCROLLS +
+    PAGAN_REAGENTS +
+    RAW_RESOURCES +
+    CRAFTED_RESOURCES +
+    FOOD_ITEMS +
+    MISCELLANEOUS_ITEMS
+)
 
 # Items to manage count (keep minimum amount)
 MANAGED_ITEMS = [
@@ -273,6 +319,30 @@ def try_drop_items(item, amount_to_drop):
     
     return amount_dropped
 
+def find_all_item_variants(item_id, container_serial):
+    """Find all variants (different hues) of an item in a container.
+    Returns a list of all item objects with the specified ItemID, regardless of hue."""
+    all_variants = []
+    
+    # Use Items.FindAllByID with -1 hue to get all variants, then filter by container
+    all_items_of_type = Items.FindAllByID(item_id, -1, container_serial, -1)
+    
+    if not all_items_of_type:
+        debug_message(f"No variants found for ItemID 0x{item_id:04X}", 67)
+        return all_variants
+    
+    # Convert single item to list if needed
+    if not isinstance(all_items_of_type, list):
+        all_items_of_type = [all_items_of_type]
+    
+    # Add all found items to our variants list
+    for item in all_items_of_type:
+        if item and item.Container == container_serial:
+            all_variants.append(item)
+    
+    debug_message(f"Found {len(all_variants)} variants of ItemID 0x{item_id:04X}", 67)
+    return all_variants
+
 def find_existing_items():
     """Pre-check all items in backpack and return a dict of item_id -> count."""
     existing_items = {}
@@ -328,54 +398,84 @@ def manage_all_items():
     debug_message("Item count management complete!", 67)
 
 def drop_all_items(item_info):
-    """Drop all instances of an item."""
+    """Drop all instances of an item, including all variants with different hues."""
     # Find items with specific hue if specified
     if "hue" in item_info and item_info["hue"] is not None:
         items = Items.FindByID(item_info["id"], item_info["hue"], Player.Backpack.Serial)
-    else:
-        items = Items.FindByID(item_info["id"], -1, Player.Backpack.Serial)
-    
-    if not items:
-        return
-    
-    # Convert single item to list
-    if not isinstance(items, list):
-        items = [items]
-    
-    # Count items with specific hue if specified
-    if "hue" in item_info and item_info["hue"] is not None:
+        if not items:
+            return
+        
+        # Convert single item to list
+        if not isinstance(items, list):
+            items = [items]
+        
         count = len(items)
+        debug_message(f"Dropping {count} {item_info['name']} (specific hue)", 67)
+        
+        # Drop each stack separately
+        for item in items:
+            try_drop_items(item, item.Amount if hasattr(item, 'Amount') else 1)
+            Misc.Pause(100)
     else:
-        count = Items.ContainerCount(Player.Backpack.Serial, item_info["id"], -1)
-    
-    debug_message(f"Dropping {count} {item_info['name']}", 67)
-    try_drop_items(items[0], count)
+        # Find ALL variants of this ItemID (all hues)
+        all_variants = find_all_item_variants(item_info["id"], Player.Backpack.Serial)
+        
+        if not all_variants:
+            return
+        
+        total_count = sum(item.Amount if hasattr(item, 'Amount') else 1 for item in all_variants)
+        debug_message(f"Dropping {total_count} {item_info['name']} ({len(all_variants)} stacks with different hues)", 67)
+        
+        # Drop each variant stack separately
+        for item in all_variants:
+            amount = item.Amount if hasattr(item, 'Amount') else 1
+            debug_message(f"  Dropping {amount} items from stack (hue: {item.Hue})", 67)
+            try_drop_items(item, amount)
+            Misc.Pause(100)
 
 def manage_item_count(item_info):
-    """Manage count for a specific item."""
-    # For managed items, we don't need to check hue
-    items = Items.FindByID(item_info["id"], -1, Player.Backpack.Serial)
-    if not items:
+    """Manage count for a specific item, handling all variants with different hues."""
+    # Find ALL variants of this ItemID (all hues)
+    all_variants = find_all_item_variants(item_info["id"], Player.Backpack.Serial)
+    
+    if not all_variants:
         return
     
-    # Convert single item to list
-    if not isinstance(items, list):
-        items = [items]
-    
-    total_count = Items.ContainerCount(Player.Backpack.Serial, item_info["id"], -1)
+    # Calculate total count across all variants
+    total_count = sum(item.Amount if hasattr(item, 'Amount') else 1 for item in all_variants)
     amount_to_drop = total_count - item_info["min_count"]
     
     if amount_to_drop > 0:
-        debug_message(f"Need to drop {amount_to_drop} {item_info['name']}", 67)
-        amount_dropped = try_drop_items(items[0], amount_to_drop)
+        debug_message(f"Need to drop {amount_to_drop} {item_info['name']} (total: {total_count}, across {len(all_variants)} stacks)", 67)
+        
+        # Drop from variants until we reach the desired amount
+        remaining_to_drop = amount_to_drop
+        
+        for item in all_variants:
+            if remaining_to_drop <= 0:
+                break
+                
+            item_amount = item.Amount if hasattr(item, 'Amount') else 1
+            drop_from_this_stack = min(item_amount, remaining_to_drop)
+            
+            debug_message(f"  Dropping {drop_from_this_stack} from stack (hue: {item.Hue})", 67)
+            amount_dropped = try_drop_items(item, drop_from_this_stack)
+            remaining_to_drop -= amount_dropped
+            
+            Misc.Pause(100)
         
         # If we couldn't drop all items, wait and try again
-        if amount_dropped < amount_to_drop:
+        if remaining_to_drop > 0:
             Misc.Pause(500)
-            new_count = Items.ContainerCount(Player.Backpack.Serial, item_info["id"], -1)
-            remaining_to_drop = new_count - item_info["min_count"]
-            if remaining_to_drop > 0:
-                try_drop_items(items[0], remaining_to_drop)
+            debug_message(f"Retrying to drop remaining {remaining_to_drop} items", 67)
+            
+            # Refresh the variant list and try again
+            updated_variants = find_all_item_variants(item_info["id"], Player.Backpack.Serial)
+            new_total = sum(item.Amount if hasattr(item, 'Amount') else 1 for item in updated_variants)
+            final_to_drop = new_total - item_info["min_count"]
+            
+            if final_to_drop > 0 and updated_variants:
+                try_drop_items(updated_variants[0], final_to_drop)
 
 # Run the manager
 if __name__ == "__main__":

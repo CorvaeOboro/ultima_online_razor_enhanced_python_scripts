@@ -9,7 +9,8 @@ TODO:
 bandage duration 
 add color dict for easy changing ( Blue to Orange gradient )
 
-VERSION :: 20250714
+HOTKEY:: StartUp
+VERSION :: 20250802
 """
 
 import time
@@ -50,7 +51,7 @@ STATUS_EFFECTS = {
     },
     "poison": {
         "duration": 30000,  # 30 seconds in ms
-        "color": 63,       # Purple
+        "color": 0x01A2,   # Purple (updated, matches DEV_font_color_gump.py)
         "pattern": r"You have been poisoned",
     },
     "bleed": {
@@ -105,7 +106,8 @@ class MobaStatusBars:
                 "high": 168,     # Bright Green
                 "medium": 53,    # Yellow
                 "low": 33,       # Red
-                "critical": 38   # Bright Red
+                "critical": 38,  # Bright Red
+                "poisoned": 0x01A2   # Purple (confirmed from DEV_font_color_gump.py)
             },
             "mana": {
                 "fill": 88,     # Light Blue
@@ -122,6 +124,7 @@ class MobaStatusBars:
         self.segment_colors = {
             "filled": {
                 "health": lambda pct: (
+                    self.colors["health"]["poisoned"] if self.is_poisoned() else
                     self.colors["health"]["high"] if pct >= 0.7 else
                     self.colors["health"]["medium"] if pct >= 0.4 else
                     self.colors["health"]["low"] if pct >= 0.2 else
@@ -131,7 +134,11 @@ class MobaStatusBars:
                 "stamina": lambda _: self.colors["stamina"]["fill"]
             },
             "depleted": 2999,  # Very dark grey hue for unfilled segments
-            "changed": 32  # Bright red for recently changed segments
+            "changed": {
+                "health": 32,  # Bright red for health damage
+                "mana": 63,   # Purple for mana damage
+                "default": 32  # Default red for other resources
+            }
         }
         
         # Track previous values for change detection (only health and mana)
@@ -158,6 +165,38 @@ class MobaStatusBars:
         """Send debug message if DEBUG_MODE is enabled"""
         if DEBUG_MODE:
             Misc.SendMessage(f"[MobaUI] {message}", color)
+    
+    def is_poisoned(self):
+        """Check if the player is currently poisoned"""
+        try:
+            return Player.Poisoned
+        except:
+            # Fallback: check for poison status effect if Player.Poisoned doesn't work
+            return self.status_effects.get("poison", {}).get("active", False)
+
+    def start_bandage_timer(self):
+        """Call this when bandage application starts. Calculates and stores expected end time."""
+        dex = getattr(Player, 'Dex', 100)  # Default to 100 if not available
+        # UO bandage time formula: 11 - (dex / 20), min 4s, max 11s
+        duration = max(4.0, min(11.0, 11.0 - (dex / 20.0)))
+        self.status_effects['bandage']['active'] = True
+        self.status_effects['bandage']['start_time'] = time.time()
+        self.status_effects['bandage']['duration'] = duration
+        self.debug_message(f"Bandage timer started: {duration:.2f}s (DEX={dex})", 68)
+
+    def get_bandage_timer(self):
+        """Returns (remaining_time, total_duration). If not active, returns (0,0)."""
+        effect = self.status_effects.get('bandage', {})
+        if not effect.get('active', False):
+            return 0, 0
+        now = time.time()
+        elapsed = now - effect.get('start_time', 0)
+        duration = effect.get('duration', 6.0)
+        remaining = max(0, duration - elapsed)
+        if remaining <= 0:
+            self.status_effects['bandage']['active'] = False
+            return 0, 0
+        return remaining, duration
         
     def get_bar_color(self, current, maximum, resource_type):
         """Get color based on current value percentage"""
@@ -165,7 +204,10 @@ class MobaStatusBars:
         colors = self.colors[resource_type]
         
         if resource_type == "health":
-            if percentage <= self.thresholds["critical"]:
+            # Check for poison first - overrides all other colors
+            if self.is_poisoned():
+                return colors["poisoned"]
+            elif percentage <= self.thresholds["critical"]:
                 return colors["critical"]
             elif percentage <= self.thresholds["low"]:
                 return colors["low"]
@@ -233,7 +275,11 @@ class MobaStatusBars:
                         change["segment"] == i 
                         for change in self.changed_segments[bar_type]
                     )
-                    color = self.segment_colors["changed"] if is_changed else self.segment_colors["depleted"]
+                    if is_changed:
+                        # Use specific color for the bar type (red for health, purple for mana)
+                        color = self.segment_colors["changed"].get(bar_type, self.segment_colors["changed"]["default"])
+                    else:
+                        color = self.segment_colors["depleted"]
                 else:
                     color = self.segment_colors["depleted"]
             
@@ -309,10 +355,10 @@ class MobaStatusBars:
             total_width = self.bar_width + 4  # Minimal padding
             status_section_height = (len(STATUS_EFFECTS) * 
                                    (self.status_bar_height + self.spacing))
-            total_height = (self.bar_height * 2 + 
+            total_height = int(0.55 * (self.bar_height * 2 + 
                           self.stamina_height +
                           status_section_height +
-                          self.spacing * 4 + 4)  # Minimal padding
+                          self.spacing * 4 + 4))  # Minimal padding, scaled down
             
             # Add background with pure black tint
             Gumps.AddBackground(gump, 0, 0, total_width, total_height, self.art["background"])
@@ -347,7 +393,21 @@ class MobaStatusBars:
             y_pos += self.bar_height + self.spacing
             self.draw_segmented_bar(gump, 5, y_pos, self.bar_width, self.stamina_height,
                                   Player.Stam, Player.StamMax, "stamina")
-            
+
+            # Bandage progress bar (below stamina)
+            remaining, duration = self.get_bandage_timer()
+            if duration > 0:
+                bandage_pct = 1.0 - (remaining / duration)
+                bandage_width = int(self.bar_width * bandage_pct)
+                bandage_y = y_pos + self.stamina_height + self.spacing
+                color = self.colors["health"]["high"]  # Bright green, like stamina
+                # Draw background bar (dark)
+                Gumps.AddImageTiled(gump, 5, bandage_y, self.bar_width, self.stamina_height, self.art["bar"]["small"], self.segment_colors["depleted"])
+                # Draw filled portion (fills as time passes)
+                if bandage_width > 0:
+                    Gumps.AddImageTiled(gump, 5, bandage_y, bandage_width, self.stamina_height, self.art["bar"]["small"], color)
+                y_pos = bandage_y
+
             # Status effect bars
             y_pos += self.stamina_height + self.spacing
             for effect in STATUS_EFFECTS:
