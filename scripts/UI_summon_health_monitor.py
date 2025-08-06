@@ -1,13 +1,14 @@
 """
 UI Summon Health Monitor - a Razor Enhanced Python Script for Ultima Online
 
+displays health bars for summoned creatures on a consistent custom gump
+
 tracks and displays health bar for summoned creatures on a minimal custom gump
 consistent follower healthbars , for temporary summons
 
 HOTKEY:: StartUp
 VERSION :: 20250802
 """
-import sys
 from datetime import datetime
 
 DEBUG_MODE = False  # Set to False to disable debug messages

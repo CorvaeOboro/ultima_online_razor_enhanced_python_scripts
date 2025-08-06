@@ -9,7 +9,7 @@ this script is similar to using an "Organizer" Agent in Razor , this script is s
 current item dictionaries are based on UO Unchained , modify as needed
 
 HOTKEY:: N
-VERSION::20250714
+VERSION::20250722
 """
 BANK_PHRASE = "bank"
 DEBUG_MODE = False # Set to True to enable debug/info messages
@@ -21,7 +21,11 @@ REAGENT_MIN = 100  # Minimum amount to keep in backpack
 REAGENT_MAX = 200  # Amount above which to move to bank
 # RESOURCES - crafting or imbue materials 
 MOVE_RESOURCES = True  # Set to True to enable moving resources to sub-container
-RESOURCE_CONTAINER_SERIAL = 0x468092DD  # Set to the serial of your resource container (inside the bank box)
+RESOURCE_CONTAINER_SERIALS = [0x40050F9D, 0x40047C80]  # List of possible resource container serials (inside the bank box, by priority)
+RESOURCE_CONTAINER_PRIORITY = 0  # Index of the preferred container in the list
+# POTION RESTOCK
+POTION_RESTOCK = True  # Set to True to enable potion restocking
+POTION_TARGET = 10  # Target amount of potions to maintain in backpack
 
 # Dictionary of items to deposit: Name -> ItemID
 items_to_deposit = {
@@ -59,6 +63,16 @@ reagents_to_manage = {
     'Nightshade':      0x0F88,
     'Spider Silk':     0x0F8D,
     'Sulfurous Ash':   0x0F8C,
+}
+
+# Dictionary of potions to manage: Name -> ItemID
+potions_to_manage = {
+    'Greater Heal Potion':    0x0F0C,
+    'Greater Cure Potion':    0x0F07,
+    'Greater Strength Potion': 0x0F09,
+    'Greater Agility Potion': 0x0F08,
+    'Total Refresh Potion':   0x0F0B,
+    'Greater Magic Resist Potion': 0x0F06,
 }
 
 # Dictionary of item IDs with specific hues and names for special items: ItemID -> {Hue -> Name}
@@ -151,6 +165,7 @@ special_items_dict = {
 itemIDs_to_name = {v: k for k, v in items_to_deposit.items()}
 supplyIDs_to_name = {v: k for k, v in supplies_to_deposit.items()}
 reagentIDs_to_name = {v: k for k, v in reagents_to_manage.items()}
+potionIDs_to_name = {v: k for k, v in potions_to_manage.items()}
 
 def debug_message(msg, color=67):
     """Send a debug/status message if SHOW_DEBUG is enabled."""
@@ -185,6 +200,102 @@ def manage_reagents(bankBox):
                 Misc.Pause(600)
             else:
                 debug_message(f"Warning: No {reagent_name} found in bank!", 33)
+
+def manage_potions(bankBox):
+    """Manage potions based on target amount. If potions are missing, try to create them from kegs and empty bottles."""
+    if not POTION_RESTOCK:
+        return
+        
+    debug_message("Managing potions...", 65)
+    
+    for potion_id in potions_to_manage.values():
+        potion_name = potionIDs_to_name[potion_id]
+        
+        # Count potions in backpack
+        backpack_count = Items.ContainerCount(Player.Backpack.Serial, potion_id, -1)
+        
+        if backpack_count < POTION_TARGET:
+            potions_needed = POTION_TARGET - backpack_count
+            debug_message(f"Need {potions_needed} more {potion_name}. Current: {backpack_count}", 65)
+            
+            # First, try to get potions directly from bank
+            bank_potion = Items.FindByID(potion_id, -1, bankBox.Serial, -1)
+            if bank_potion and bank_potion.Amount >= potions_needed:
+                debug_message(f"Getting {potions_needed} {potion_name} from bank", 65)
+                Items.Move(bank_potion, Player.Backpack, potions_needed)
+                Misc.Pause(600)
+                continue
+            elif bank_potion and bank_potion.Amount > 0:
+                # Take what's available
+                available = bank_potion.Amount
+                debug_message(f"Getting {available} {potion_name} from bank (partial)", 65)
+                Items.Move(bank_potion, Player.Backpack, available)
+                Misc.Pause(600)
+                potions_needed -= available
+            
+            # If we still need potions, try to make them from kegs and empty bottles
+            if potions_needed > 0:
+                debug_message(f"Still need {potions_needed} {potion_name}. Attempting to create from keg...", 65)
+                create_potions_from_keg(bankBox, potion_id, potion_name, potions_needed)
+
+def create_potions_from_keg(bankBox, potion_id, potion_name, amount_needed):
+    """Create potions by using a keg and empty bottles from the bank."""
+    
+    # Find empty bottles in bank (ItemID 0x0F0E)
+    empty_bottle_id = 0x0F0E
+    bank_bottles = Items.FindByID(empty_bottle_id, -1, bankBox.Serial, -1)
+    
+    if not bank_bottles or bank_bottles.Amount < amount_needed:
+        debug_message(f"Warning: Not enough empty bottles in bank for {potion_name}. Need {amount_needed}, found {bank_bottles.Amount if bank_bottles else 0}", 33)
+        return
+    
+    # Get empty bottles from bank to backpack
+    debug_message(f"Getting {amount_needed} empty bottles from bank", 65)
+    Items.Move(bank_bottles, Player.Backpack, amount_needed)
+    Misc.Pause(600)
+    
+    # Find appropriate keg in bank
+    # Kegs typically have different ItemIDs based on potion type
+    # For this implementation, we'll search for kegs by looking for items that might be kegs
+    # This is a simplified approach - you may need to adjust keg ItemIDs based on your server
+    keg_ids = [0x1940, 0x1941, 0x1942, 0x1943, 0x1944, 0x1945]  # Common keg ItemIDs
+    
+    keg_found = None
+    for keg_id in keg_ids:
+        potential_keg = Items.FindByID(keg_id, -1, bankBox.Serial, -1)
+        if potential_keg:
+            # Additional check could be done here to verify it's the right type of keg
+            # For now, we'll use the first keg found
+            keg_found = potential_keg
+            break
+    
+    if not keg_found:
+        debug_message(f"Warning: No suitable keg found in bank for {potion_name}", 33)
+        # Return bottles to bank
+        backpack_bottles = Items.FindByID(empty_bottle_id, -1, Player.Backpack.Serial, -1)
+        if backpack_bottles:
+            Items.Move(backpack_bottles, bankBox, amount_needed)
+            Misc.Pause(600)
+        return
+    
+    debug_message(f"Found keg (ID: 0x{keg_found.ItemID:04X}) for {potion_name}", 65)
+    
+    # Use keg to fill bottles
+    for i in range(amount_needed):
+        # Find an empty bottle in backpack
+        empty_bottle = Items.FindByID(empty_bottle_id, -1, Player.Backpack.Serial, -1)
+        if empty_bottle:
+            debug_message(f"Using keg to fill bottle {i+1}/{amount_needed}", 65)
+            # Use the empty bottle on the keg
+            Items.UseItem(empty_bottle)
+            Misc.Pause(200)
+            Target.TargetExecute(keg_found)
+            Misc.Pause(800)  # Wait for the potion to be created
+        else:
+            debug_message(f"Warning: No empty bottle found in backpack for filling {i+1}", 33)
+            break
+    
+    debug_message(f"Completed potion creation attempt for {potion_name}", 65)
 
 def move_resources_to_subcontainer(bankBox, resourceContainer):
     """
@@ -265,14 +376,27 @@ def main():
 
     # Optionally move resources to a specific sub-container in the bank
     if MOVE_RESOURCES:
-        resourceContainer = RESOURCE_CONTAINER_SERIAL  
-        if resourceContainer:
-            move_resources_to_subcontainer(bankBox, resourceContainer)
+        # Find all matching resource containers in the bank
+        found_containers = []
+        for serial in RESOURCE_CONTAINER_SERIALS:
+            container = Items.FindBySerial(serial)
+            if container and container.Container == bankBox.Serial:
+                found_containers.append(serial)
+        if not found_containers:
+            debug_message("Resource container serial not found in bank. Skipping resource move.", 33)
         else:
-            debug_message("Resource container serial not set. Skipping resource move.", 33)
+            # Warn if multiple containers found
+            if len(found_containers) > 1:
+                debug_message(f"Warning: Multiple resource containers found in bank: {[hex(s) for s in found_containers]}", 53)
+                debug_message(f"Using priority container: {hex(found_containers[RESOURCE_CONTAINER_PRIORITY])}", 53)
+            resourceContainer = found_containers[RESOURCE_CONTAINER_PRIORITY]
+            move_resources_to_subcontainer(bankBox, resourceContainer)
 
     # Manage reagents
     manage_reagents(bankBox)
+    
+    # Manage potions
+    manage_potions(bankBox)
 
     if not items_moved:
         debug_message("No items were moved to bank.", 65)

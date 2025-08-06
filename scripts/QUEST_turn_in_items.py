@@ -15,8 +15,11 @@ Features:
 
 Quest Dictionary example is for Unchained , modify for your shard
 
+TODO:
+- updating npc locations to reborn 
+
 HOTKEY:: L
-VERSION:: 20250722
+VERSION:: 20250806
 """
 
 import math
@@ -106,11 +109,11 @@ QUESTS = {
         "name": "Sandstorm Ancient Vase",
         "locations": [
             {
-                "name": " Sasha the archaeologist ",
-                "x": 1833,
-                "y": 953,
+                "name": "Sasha the archaeologist (Sandstorm)",
+                "x": 1835,
+                "y": 944,
                 "z": 1,
-                "npc_serial": 0x00004279
+                "npc_serial": 0x00003767
             }
         ],
         "items": [
@@ -259,9 +262,10 @@ def handle_gump_turn_in(items, quest_config, location):
     return True
 
 def handle_direct_transfer(items, quest_config, location):
-    """Handle direct item transfer to NPC or container."""
-    # First try to move to the NPC
+    """Handle direct item transfer to NPC or container, with auto-navigation if out of range."""
+    # Always attempt to move to the NPC location first
     if not move_to_location(location["x"], location["y"], location["z"]):
+        debug_message(f"Failed to navigate to NPC at {location['name']} ({location['x']}, {location['y']}, {location['z']})!", 33)
         return False
 
     # Find the NPC
@@ -269,7 +273,16 @@ def handle_direct_transfer(items, quest_config, location):
     if not npc:
         debug_message(f"Cannot find NPC at {location['name']}!", 33)
         return False
-        
+
+    # Optionally, check distance to NPC and try to move closer if needed
+    if hasattr(npc, 'Position'):
+        dist = math.hypot(Player.Position.X - npc.Position.X, Player.Position.Y - npc.Position.Y)
+        if dist > 2:  # If not close enough, try to move closer
+            debug_message(f"Too far from NPC ({dist:.1f} tiles), moving closer...", 67)
+            if not move_to_location(npc.Position.X, npc.Position.Y, npc.Position.Z):
+                debug_message(f"Failed to move close enough to NPC at {npc.Position.X}, {npc.Position.Y}, {npc.Position.Z}", 33)
+                return False
+
     for item_list in items.values():
         for item in item_list:
             Items.Move(item, npc.Serial, 0)

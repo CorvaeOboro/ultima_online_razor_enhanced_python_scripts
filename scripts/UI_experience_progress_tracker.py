@@ -8,9 +8,6 @@ percentage first , colorize by category , display as bar
 change the ULTIMA_CLIENT_LOG_FOLDERPATH to match your client location JournalLogs
 currently tuned for UOUnchained progression ( Mastery , Weekly Quests , Dungeons )
 
-TODO:
-include summons progress , doesnt have colon 
-
 STATUS:: working
 HOTKEY:: StartUp
 VERSION::20250802
@@ -30,12 +27,12 @@ DEBUG_MODE = False  # Set to True to enable in-game debug messages
 GUMP_ID =  3329354321
 
 GUMP_X = 700
-GUMP_Y = 600  # Moved higher on screen
+GUMP_Y = 600  
 UPDATE_INTERVAL = 300  # ms
 JOURNAL_SCAN_INTERVAL = 100  # ms
-BAR_WIDTH = 260  # Increased width
-BAR_HEIGHT = 16  # Increased height
-BAR_SPACING = 6  # Slightly more spacing
+BAR_WIDTH = 260  
+BAR_HEIGHT = 16  
+BAR_SPACING = 6  
 
 FONT_COLORS = {
     'red': 0x0020,         # red
@@ -85,6 +82,9 @@ CATEGORY_COLORS = {
     'summons': FONT_COLORS['teal'],
     'default': FONT_COLORS['white']
 }
+
+# Exclude certain progress types that are not quests (e.g., XP, Max Stones)
+EXCLUDED_PROGRESS_KEYS = ["Xp", "Max Stones"]
 
 # --- JOURNAL PROGRESS PATTERN ---
 # Matches any line containing "<current>/<max>" and uses text before as the title
@@ -245,11 +245,17 @@ class ProgressTracker:
             self._parse_line(line)
         self.last_journal_index = line_count
 
+    
     def _parse_line(self, line):
         debug(f'[XP Tracker] [Parse Attempt] line={repr(line)}')
         if 'Max Stones' in line:
             debug('[XP Tracker] [Parse Ignore] Skipping Max Stones line')
             return False
+        # Exclude lines with keys in exclusion list
+        for excluded in EXCLUDED_PROGRESS_KEYS:
+            if excluded in line:
+                debug(f'[XP Tracker] [Parse Ignore] Skipping excluded key: {excluded}')
+                return False
         m = PROGRESS_PATTERN.search(line)
         if m:
             debug(f'[XP Tracker] [Regex:slash] MATCHED: groups={m.groups()}')

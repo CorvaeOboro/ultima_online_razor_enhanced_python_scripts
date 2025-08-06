@@ -8,16 +8,15 @@ Organizes items in the backpack with specific positioning and directional spacin
 - Books: Top left, horizontal sorting left-to-right with offset spacing
 - Trap pouches: Bottom right, vertical spacing offset, NO stacking
 - Runes: Top right, vertical sorting top-to-bottom with offset stacking
-- Bandages: Top right middle, horizontal right-to-left with offset stacking
+- Tools: Top right middle, horizontal right-to-left with offset stacking
 
 These positions are tuned for a "150" container size without scaling items sizes 
 the default is "100" container size so you may want to adjust the x and y values for your settings
 
 TODO:
-- move unknown items to the center , optional 
 - offset the pouches vertically
 
-VERSION::20250722
+VERSION::20250805
 """
 ORGANIZE_UNKNOWN_ITEMS = True
 ORGANIZE_REAGENTS = True
@@ -25,28 +24,28 @@ ORGANIZE_POTIONS = True
 ORGANIZE_GEMS = True
 ORGANIZE_TOOLS = True
 
-DEBUG_MODE = True  # Set to True to enable debug/info messages
+DEBUG_MODE = False  # Set to True to enable debug/info messages
 SPACING_OFFSET = 7  # Pixels to offset spacing
 MAX_STACK_SIZE = 999  # Maximum items to stack in one location
 
 # Item Categories with properties
 ITEM_GROUPS = {
-    "REAGENTS": {
+    "REAGENTS": { # start 40 offset x = +15
         "items": [
-            {"name": "Black Pearl", "id": 0x0F7A, "x": 60, "y": 300},
-            {"name": "Blood Moss", "id": 0x0F7B, "x": 70, "y": 300},
-            {"name": "Garlic", "id": 0x0F84, "x": 80, "y": 300},
-            {"name": "Ginseng", "id": 0x0F85, "x": 90, "y": 300},
+            {"name": "Black Pearl", "id": 0x0F7A, "x": 40, "y": 300},
+            {"name": "Blood Moss", "id": 0x0F7B, "x": 55, "y": 300},
+            {"name": "Garlic", "id": 0x0F84, "x": 70, "y": 300},
+            {"name": "Ginseng", "id": 0x0F85, "x": 85, "y": 300},
             {"name": "Mandrake Root", "id": 0x0F86, "x": 100, "y": 300},
-            {"name": "Nightshade", "id": 0x0F88, "x": 110, "y": 300},
-            {"name": "Spider's Silk", "id": 0x0F8D, "x": 120, "y": 300},
-            {"name": "Sulfurous Ash", "id": 0x0F8C, "x": 130, "y": 300},
+            {"name": "Nightshade", "id": 0x0F88, "x": 115, "y": 300},
+            {"name": "Spider's Silk", "id": 0x0F8D, "x": 130, "y": 300},
+            {"name": "Sulfurous Ash", "id": 0x0F8C, "x": 145, "y": 300},
             # Pagan Reagents
             {"name": "Bat Wing", "id": 0x0F78, "x": 160, "y": 300},
-            {"name": "Grave Dust", "id": 0x0F8F, "x": 180, "y": 300},
-            {"name": "Daemon Blood", "id": 0x0F7D, "x": 200, "y": 300},
-            {"name": "Nox Crystal", "id": 0x0F8E, "x": 220, "y": 300},
-            {"name": "Pig Iron", "id": 0x0F8A, "x": 240, "y": 300}
+            {"name": "Grave Dust", "id": 0x0F8F, "x": 175, "y": 300},
+            {"name": "Daemon Blood", "id": 0x0F7D, "x": 190, "y": 300},
+            {"name": "Nox Crystal", "id": 0x0F8E, "x": 215, "y": 300},
+            {"name": "Pig Iron", "id": 0x0F8A, "x": 230, "y": 300}
         ],
         "move_to_char": True  # Special flag for reagents to combine them into one stack
     },
@@ -61,26 +60,27 @@ ITEM_GROUPS = {
         ],
         "move_to_char": False
     },
-    "GEMS": {
+    "GEMS": { # start 48 offset x = +12 
         "items": [
-            {"name": "Emerald",       "id": 0x0F10, "x": 60,   "y": 115},
-            {"name": "sapphireA",     "id": 0x0F11, "x": 70,  "y": 115},
-            {"name": "Ruby",          "id": 0x0F13, "x": 80,  "y": 115},
-            {"name": "Citrine",       "id": 0x0F15, "x": 90,  "y": 115},
-            {"name": "Amethyst",      "id": 0x0F16, "x": 100,  "y": 115},
-            {"name": "Sapphire",      "id": 0x0F19, "x": 110,  "y": 115},
-            {"name": "Star Sapphire", "id": 0x0F21, "x": 120,  "y": 115},
-            {"name": "Amber",         "id": 0x0F25, "x": 130,  "y": 115},
-            {"name": "Diamond",       "id": 0x0F26, "x": 140,  "y": 115},
-            {"name": "Tourmaline",    "id": 0x0F2D, "x": 150,  "y": 115},
-            {"name": "TourmalineB",   "id": 0x0F18, "x": 160, "y": 115},
-            {"name": "saphireB",      "id": 0x0F0F, "x": 170, "y": 115}
+            {"name": "Ruby",          "id": 0x0F13, "x": 48,  "y": 120},  # Red
+            {"name": "Amber",         "id": 0x0F25, "x": 60,  "y": 120},  # Orange
+            {"name": "Citrine",       "id": 0x0F15, "x": 72,  "y": 120},  # Yellow
+            {"name": "Tourmaline",    "id": 0x0F18, "x": 84,  "y": 120},  # GreenPink
+            {"name": "Diamond",       "id": 0x0F26, "x": 96,  "y": 120},  # White/Clear
+            {"name": "Emerald",       "id": 0x0F10, "x": 108, "y": 120},  # Green
+            {"name": "Sapphire",      "id": 0x0F11, "x": 120, "y": 120},  # Blue
+            {"name": "Star Sapphire", "id": 0x0F0F, "x": 132, "y": 120},  # Blue
+            {"name": "Amethyst",      "id": 0x0F16, "x": 144, "y": 120},  # Violet
+            # No Drop Gems Alternate IDs
+            {"name": "sapphireA",     "id": 0x0F19, "x": 156, "y": 120},  # Blue  extras in world
+            {"name": "saphireB",      "id": 0x0F21, "x": 168, "y": 120},  # Blue extras in world
+            {"name": "TourmalineB",   "id": 0x0F2D, "x": 180, "y": 120},  # GreenPink extras in world
         ],
         "move_to_char": False
     },
     "BOOKS": {
         "items": [
-            {"name": "Spellbook", "id": 0x0EFA, "x": 20, "y": 20}
+            {"name": "Spellbook", "id": 0x0EFA, "x": 45, "y": 20}
         ],
         "move_to_char": False,
         "is_spellbook": True  # Special flag for spellbook handling
@@ -104,28 +104,28 @@ ITEM_GROUPS = {
         ],
         "move_to_char": False
     },
-    "TOOLS": {
+    "TOOLS": { # start 125 offset x = +10
         "items": [
-            {"name": "Sewing Kit", "id": 0x0F9D, "x": 200, "y": 20},
-            {"name": "Lockpicks", "id": 0x14FC, "x": 210, "y": 20},
-            {"name": "Backpack", "id": 0x0E75, "x": 220, "y": 20},
-            {"name": "Bag", "id": 0x0E76, "x": 230, "y": 20},
-            {"name": "Pouch", "id": 0x0E79, "x": 240, "y": 20},
-            {"name": "Tinker Tools", "id": 0x1EB8, "x": 250, "y": 20},
-            {"name": "Scissors", "id": 0x0F9F, "x": 260, "y": 20},
-            {"name": "Mortar and Pestle", "id": 0x0E9B, "x": 270, "y": 20},
-            {"name": "Smith's Hammer", "id": 0x13E3, "x": 280, "y": 20},
-            {"name": "Tongs", "id": 0x0FBB, "x": 290, "y": 20},
-            {"name": "Saw", "id": 0x1034, "x": 200, "y": 30},
-            {"name": "Plane", "id": 0x102C, "x": 210, "y": 30},
-            {"name": "Draw Knife", "id": 0x10E4, "x": 220, "y": 30},
-            {"name": "Froe", "id": 0x10E5, "x": 230, "y": 30},
-            {"name": "Scorp", "id": 0x10E7, "x": 240, "y": 30},
-            {"name": "Inshave", "id": 0x10E6, "x": 250, "y": 30},
-            {"name": "Pickaxe", "id": 0x0E86, "x": 260, "y": 30},
-            {"name": "Shovel", "id": 0x0F39, "x": 270, "y": 30},
-            {"name": "Hatchet", "id": 0x0F43, "x": 280, "y": 30},
-            {"name": "Fishing Pole", "id": 0x0DC0, "x": 290, "y": 30}
+            {"name": "Sewing Kit", "id": 0x0F9D, "x": 125, "y": 20},
+            {"name": "Lockpicks", "id": 0x14FC, "x": 135, "y": 20},
+            {"name": "Backpack", "id": 0x0E75, "x": 145, "y": 20},
+            {"name": "Bag", "id": 0x0E76, "x": 155, "y": 20},
+            {"name": "Pouch", "id": 0x0E79, "x": 165, "y": 20},
+            {"name": "Tinker Tools", "id": 0x1EB8, "x": 175, "y": 20},
+            {"name": "Scissors", "id": 0x0F9F, "x": 185, "y": 20},
+            {"name": "Mortar and Pestle", "id": 0x0E9B, "x": 195, "y": 20},
+            {"name": "Smith's Hammer", "id": 0x13E3, "x": 205, "y": 20},
+            {"name": "Tongs", "id": 0x0FBB, "x": 215, "y": 20},
+            {"name": "Saw", "id": 0x1034, "x": 225, "y": 20},
+            {"name": "Plane", "id": 0x102C, "x": 235, "y": 20},
+            {"name": "Draw Knife", "id": 0x10E4, "x": 245, "y": 20},
+            {"name": "Froe", "id": 0x10E5, "x": 255, "y": 20},
+            {"name": "Scorp", "id": 0x10E7, "x": 265, "y": 20},
+            {"name": "Inshave", "id": 0x10E6, "x": 275, "y": 20},
+            {"name": "Pickaxe", "id": 0x0E86, "x": 285, "y": 20},
+            {"name": "Shovel", "id": 0x0F39, "x": 295, "y": 20},
+            {"name": "Hatchet", "id": 0x0F43, "x": 305, "y": 20},
+            {"name": "Fishing Pole", "id": 0x0DC0, "x": 315, "y": 20}
         ],
         "move_to_char": False
     }
@@ -133,10 +133,10 @@ ITEM_GROUPS = {
 
 # Controls the unknown item box placement and size
 UNKNOWN_BOX = {
-    'center_x': 65,
+    'center_x': 80,
     'center_y': 80,
     'width': 70,
-    'height': 45,
+    'height': 40,
 }
 #//============================================================
 
@@ -164,7 +164,6 @@ def move_spellbooks(items, base_x, base_y):
     """Special handling for spellbooks - organize by hue."""
     if not items:
         return
-        
     # Group spellbooks by hue
     hue_groups = {}
     for item in items:
@@ -172,37 +171,26 @@ def move_spellbooks(items, base_x, base_y):
         if hue not in hue_groups:
             hue_groups[hue] = []
         hue_groups[hue].append(item)
-    
     # Sort hues for consistent ordering
     sorted_hues = sorted(hue_groups.keys())
-    
     # Position variables
     current_x = base_x
     current_y = base_y
     books_per_row = 5
     book_spacing = 5
     row_spacing = 10
-    
     # Place books by hue groups
     for hue in sorted_hues:
         books = hue_groups[hue]
         for i, book in enumerate(books):
-            # Calculate position
-            x = current_x + (i % books_per_row) * book_spacing
-            y = current_y + (i // books_per_row) * row_spacing
-            
-            # Move the book
+            x = base_x + (i % books_per_row) * book_spacing
+            y = base_y + (i // books_per_row) * row_spacing
             Items.Move(book.Serial, Player.Backpack.Serial, book.Amount, x, y)
             Misc.Pause(600)
-            
             if i > 0 and i % books_per_row == books_per_row - 1:
                 debug_message(f"Placed {i+1} spellbooks of hue {hue}", 65)
-        
-        # Move to next group position
-        current_x += book_spacing * books_per_row + 10
-        if current_x > base_x + book_spacing * books_per_row * 3:
-            current_x = base_x
-            current_y += row_spacing * 3
+        # After each hue group, move starting y down for the next group if needed
+        base_y += row_spacing
 
 def move_items(items, target_x, target_y, group_config):
     """Move items to target location with appropriate handling."""
@@ -231,35 +219,6 @@ def move_items(items, target_x, target_y, group_config):
             for item in items_on_char:
                 Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, current_x, current_y)
                 Misc.Pause(600)
-                
-                stack_count += 1
-                if stack_count >= MAX_STACK_SIZE:
-                    # Start a new stack
-                    current_x += SPACING_OFFSET * MAX_STACK_SIZE
-                    stack_count = 0
-                else:
-                    # Offset within current stack
-                    current_x += SPACING_OFFSET
-                    current_y += SPACING_OFFSET
-    else:
-        # Regular item stacking
-        stack_count = 0
-        current_x = target_x
-        current_y = target_y
-        
-        for item in items:
-            Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, current_x, current_y)
-            Misc.Pause(600)
-            
-            stack_count += 1
-            if stack_count >= MAX_STACK_SIZE:
-                # Start a new stack
-                current_x += SPACING_OFFSET * MAX_STACK_SIZE
-                stack_count = 0
-            else:
-                # Offset within current stack
-                current_x += SPACING_OFFSET
-                current_y += SPACING_OFFSET
 
 def get_known_item_ids():
     """Return a set of all known item IDs from ITEM_GROUPS."""

@@ -21,9 +21,9 @@
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_health_bar_long.gif?raw=true"/>
 - [UI_summon_health_monitor.py](scripts/UI_summon_health_monitor.py) – display the health of summoned creatures
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_summons_health.png?raw=true"/>
-- [UI_spell_hotbar_hotkeys.py](scripts/UI_spell_hotbar_hotkeys.py) – Spell hotbar , added hotkey display
-- [UI_experience_progress_tracker.py](scripts/UI_experience_progress_tracker.py) – XP tracker Gump with colorized progress bars and concise labels
-- [DEV_font_color_gump.py](scripts/DEV_font_color_gump.py) – UO font hue hex codes in a custom Gump
+- [UI_spell_hotbar_hotkeys.py](scripts/UI_spell_hotbar_hotkeys.py) – the example Spell hotbar with added hotkey display
+- [UI_experience_progress_tracker.py](scripts/UI_experience_progress_tracker.py) – visualize progression system as progress bar , parsed from journal
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_experience_progress_tracker.png?raw=true"/>
 
 ## RITUAL
 ritual magic 
@@ -73,7 +73,7 @@ ritual magic
 - [DEV_gump_debugger.py](scripts/DEV_gump_debugger.py) – Analyze ingame gumps outputs JSON 
 - [DEV_item_inspector.py](scripts/DEV_item_inspector.py) – Backpack items and equipment info to JSON
 - [DEV_item_to_list.py](scripts/DEV_item_to_list.py) –  Inspected item exported to categorized JSON 
-
+- [DEV_font_color_gump.py](scripts/DEV_font_color_gump.py) – UO font hue hex codes in a custom Gump
 
 # THANKS
 - many thanks to the ultima online custom shard community , 

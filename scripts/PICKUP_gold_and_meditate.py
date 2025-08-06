@@ -1,11 +1,12 @@
 """
 Pickup Gold and Meditate - Razor Enhanced Python Script for Ultima Online
 
-- Picks up all gold (0x0EED) on the ground within 1 tile of the player
 - Uses Meditate skill if not already meditating
+- Picks up all gold (0x0EED) on the ground within 1 tile of the player
+- we drop all our gold often to free up weight to loot , once the loot is processed this quickly picks up those stacks
 
 HOTKEY::Spacebar
-VERSION::20250713
+VERSION::20250722
 """
 
 import time
@@ -103,13 +104,8 @@ def main():
     log_player_buffs_and_status()
     pickup_gold_nearby()
     if not is_meditating():
-        #Misc.SendMessage("Using Meditate skill...", 68)
-        #print("Using Meditate skill...")
         Player.UseSkill("Meditation")
-        Misc.Pause(1200)
-    #else:
-        #Misc.SendMessage("Already meditating.", 68)
-        #print("Already meditating.")
+    # spam meditation regardless
     Player.UseSkill("Meditation")
 
 if __name__ == '__main__':

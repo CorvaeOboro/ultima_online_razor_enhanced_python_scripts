@@ -1,7 +1,9 @@
 """
-Item Weight Manager Script - a Razor Enhanced PythonScript for Ultima Online
+Item Weight Manager - a Razor Enhanced Python Script for Ultima Online
 
-Manages items weight in your backpack by:
+Drops items from your backpack to the ground 
+Always drop list , and Maintain minimum list
+
 1. Dropping all disposable items:
     - Resources (leather, ingots, boards, cut cloth leather, etc.)
     - Magic scrolls (all circles)
@@ -13,7 +15,7 @@ Manages items weight in your backpack by:
     - Utility potions (5 each)
 
 HOTKEY:: X
-VERSION::20250802
+VERSION::20250806
 """
 
 # Global debug mode switch

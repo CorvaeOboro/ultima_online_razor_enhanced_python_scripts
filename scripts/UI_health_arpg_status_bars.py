@@ -1,13 +1,16 @@
 """
 UI Player Health and Mana Status Bars - a Razor Enhanced Python Script for Ultima Online
 
-Creates a custom gump showing health, mana, and stamina in a MOBA-style horizontal bar layout.
+Creates a custom gump showing health, mana, and stamina in a ARPG-style horizontal bar layout.
 - Horizontal progress bars for health, mana, 
-- Dynamic color intensity based on current health ( Green > Yellow > Red )
+- Color intensity based on current health ( Green > Yellow > Red )
+- Flashing loss of segment on damage taken
+- Purple when poisoned
+- Small dots horizontally for stamina 
 
 TODO:
 bandage duration 
-add color dict for easy changing ( Blue to Orange gradient )
+add color dict for changing color scheme ( Blue to Orange gradient )
 
 HOTKEY:: StartUp
 VERSION :: 20250802
@@ -15,7 +18,6 @@ VERSION :: 20250802
 
 import time
 import re
-from System.Collections.Generic import List
 
 DEBUG_MODE = False # debug prints and messages 
 
@@ -61,7 +63,7 @@ STATUS_EFFECTS = {
     }
 }
 
-class MobaStatusBars:
+class ARPGStatusBars:
     def __init__(self):
         # UI dimensions
         self.bar_width = 204  # Adjusted to be multiple of segment width (17 segments * 12 pixels)
@@ -164,7 +166,7 @@ class MobaStatusBars:
     def debug_message(self, message, color=68):
         """Send debug message if DEBUG_MODE is enabled"""
         if DEBUG_MODE:
-            Misc.SendMessage(f"[MobaUI] {message}", color)
+            Misc.SendMessage(f"[ARPGUI] {message}", color)
     
     def is_poisoned(self):
         """Check if the player is currently poisoned"""
@@ -439,7 +441,7 @@ class MobaStatusBars:
     def start(self):
         """Start the UI update loop"""
         try:
-            self.debug_message("Starting MOBA-style status bars...")
+            self.debug_message("Starting ARPG-style status bars...")
             
             self.active = True
             
@@ -455,10 +457,10 @@ class MobaStatusBars:
         """Stop the UI and clean up"""
         self.active = False
         Gumps.CloseGump(self.gump_id)
-        self.debug_message("Stopped MOBA-style status bars")
+        self.debug_message("Stopped ARPG-style status bars")
 
 def main():
-    ui = MobaStatusBars()
+    ui = ARPGStatusBars()
     ui.start()
 
 if __name__ == "__main__":

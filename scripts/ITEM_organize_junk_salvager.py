@@ -6,18 +6,45 @@ A Strict Item Filter , configurable to save items by type and by tier of their p
 - Salvages items in the "junk" (red) backpack ( unchained )
 - Configurable Tier reservations by their properties ( Vanquishing , Greater Slaying , Invulnerable )
 
+Adjust the settings to your liking , default setting =
+- only save leather , plate , and maces , of tier 1 highest ( invulnable , vanquishing ) 
+
 Requirements:
 - Any configured salvage tool in player's backpack ( tinker tools , or sewing kit )
 - A red dyed backpack that will hold the salvagable items
 
 # TODO:
 - have equip_slot be apart of the item dicts properties 
-- implement silgle item strictness 
+- implement single item strictness 
+- add shields
 
 HOTKEY:: O
 VERSION::20250714
 """
 #//========================================================================================
+# TIER AFFIX DEFINITIONS (GLOBAL)
+TIER1_AFFIXES = [ # these are the best 
+    "Vanquishing",    # +25 damage
+    "Greater",        # Slaying +25%
+    "Invulnerable"    # +100% armor
+]
+
+TIER2_AFFIXES = [
+    "Power",             # +20 damage
+    "Supremely Accurate", # +25% Hit Chance
+    "Fortification"      # +80% armor
+]
+
+TIER3_AFFIXES = [
+    "Force",        # +15 damage
+    "Massive"    # +60% armor
+]
+
+TIER4_AFFIXES = [
+    "Might",        # +10 damage
+    "Substantial"    # +40% armor
+]
+
 # SETTINGS
 DEBUG_MODE = False  # Set to True to enable debug/info messages
 AUTO_SALVAGE = True      # Set to False to skip auto-salvaging (for debugging)
@@ -25,14 +52,14 @@ AUTO_SALVAGE = True      # Set to False to skip auto-salvaging (for debugging)
 # ITEM TYPE-based filtering , SAVE itmes you favor , set to False types unfavored
 SAVE_ITEM_WEAPON_AXE = False
 SAVE_ITEM_WEAPON_SWORD = False
-SAVE_ITEM_WEAPON_MACE = False
+SAVE_ITEM_WEAPON_MACE = True # defaulting only maces
 SAVE_ITEM_WEAPON_FENCING = False
 SAVE_ITEM_WEAPON_ARCHERY = False
 SAVE_ITEM_WEAPON_UNKNOWN = False
 
 # Default is only saving leather and plate armor 
-SAVE_ITEM_ARMOR_LEATHER = True
-SAVE_ITEM_ARMOR_PLATE = False
+SAVE_ITEM_ARMOR_LEATHER = True # defaulting leather armor for mages
+SAVE_ITEM_ARMOR_PLATE = True # defaulting plate armor for warriors
 SAVE_ITEM_ARMOR_CHAINMAIL = False
 SAVE_ITEM_ARMOR_RINGMAIL = False
 SAVE_ITEM_ARMOR_STUDDED = False
@@ -42,22 +69,31 @@ SAVE_ITEM_ARMOR_SHIELD = False
 
 # STRICTEST FILTERING - SINGLE ITEM ID
 SAVE_ONLY_THIS_ONE_WEAPON = False # sometimes we only favor a single weapon id 
-SAVE_ONLY_THIS_ONE_WEAPON_ID = 0x0F5C 
+SAVE_ONLY_THIS_ONE_WEAPON_ID = 0x143D # Hammer Pick
 
 SAVE_ONLY_THIS_ONE_ARMOR = False # sometimes we only favor a single armor id 
-SAVE_ONLY_THIS_ONE_ARMOR_ID = 0x0F5C 
+SAVE_ONLY_THIS_ONE_ARMOR_ID = 0x0F5C # Leather female plate
+
+SAVE_ONLY_THIS_ONE_SHIELD = False # sometimes we only favor a single shield id 
+SAVE_ONLY_THIS_ONE_SHIELD_ID = 0x1BC4 # Order shield
 
 # AFFIX TIER FILTERING
 RESERVE_TIERS = {
     'TIER1': True,      # Set to True to reserve Tier 1 items
-    'TIER2': False,      # Set to True to reserve Tier 2 items
-    'MAGICAL': False    # Set to True to reserve other magical items
+    'TIER2': True,     # Set to True to reserve Tier 2 items
+    'TIER3': True,     # Set to True to reserve Tier 3 items
+    'TIER4': True,     # Set to True to reserve Tier 4 items
+    'MAGICAL': False   # Set to True to reserve other magical items
 }
 
 # Junk Backpack Configuration
 JUNK_BACKPACK_ID = 0x0E75 # a backpack 
 JUNK_BACKPACK_HUES = [0x0021, 0x0026, 0x002B]  # Range of red hues that are acceptable
 JUNK_BACKPACK_SERIAL = 0  # Will be auto-set by find_junk_backpack()
+
+# Arcane Dust
+ARCANE_DUST_ITEMID = 0x5745
+ARCANE_DUST_COLOR = 0x07ad
 
 # Item Type Configuration
 #//========================================================================================
@@ -331,19 +367,6 @@ SALVAGE_TOOLS = {
 #//========================================================================================
 class JunkSalvager:
     def __init__(self):
-        # Tier definitions
-        self.tier1_affixes = [
-            "Vanquishing",    # +25 damage
-            "Greater",        # Slaying +25%
-            "Invulnerable"    # +100% armor
-        ]
-        
-        self.tier2_affixes = [
-            "Power",             # +20 damage
-            "Supremely Accurate", # +25% Hit Chance
-            "Fortification"      # +80% armor
-        ]
-        
         # Debug colors
         self.colors = {
             'info': 68,      # Blue
@@ -358,6 +381,8 @@ class JunkSalvager:
         self.stats = {
             'tier1_items': 0,
             'tier2_items': 0,
+            'tier3_items': 0,
+            'tier4_items': 0,
             'other_items': 0,
             'items_moved': 0,
             'items_checked': 0,
@@ -373,6 +398,8 @@ class JunkSalvager:
         self.debug_message("=== Configuration ===", self.colors['config'])
         self.debug_message(f"Reserve Tier 1 items: {'Yes' if RESERVE_TIERS['TIER1'] else 'No'}", self.colors['config'])
         self.debug_message(f"Reserve Tier 2 items: {'Yes' if RESERVE_TIERS['TIER2'] else 'No'}", self.colors['config'])
+        self.debug_message(f"Reserve Tier 3 items: {'Yes' if RESERVE_TIERS['TIER3'] else 'No'}", self.colors['config'])
+        self.debug_message(f"Reserve Tier 4 items: {'Yes' if RESERVE_TIERS['TIER4'] else 'No'}", self.colors['config'])
         self.debug_message(f"Reserve magical items: {'Yes' if RESERVE_TIERS['MAGICAL'] else 'No'}", self.colors['config'])
         self.debug_message(f"Move delay: {str(MOVE_DELAY)}ms", self.colors['config'])
         self.debug_message(f"Auto-salvage: {'Yes' if AUTO_SALVAGE else 'No'}", self.colors['config'])
@@ -492,10 +519,14 @@ class JunkSalvager:
         properties = self.get_item_properties(item)
         affix_str = ', '.join([str(p) for p in properties]) if properties else 'None'
         tier = 'None'
-        if self.has_affix(properties, self.tier1_affixes):
+        if self.has_affix(properties, TIER1_AFFIXES):
             tier = 'T1'
-        elif self.has_affix(properties, self.tier2_affixes):
+        elif self.has_affix(properties, TIER2_AFFIXES):
             tier = 'T2'
+        elif self.has_affix(properties, TIER3_AFFIXES):
+            tier = 'T3'
+        elif self.has_affix(properties, TIER4_AFFIXES):
+            tier = 'T4'
         elif self.has_any_affix(properties):
             tier = 'Magical'
 
@@ -518,6 +549,14 @@ class JunkSalvager:
         if tier == 'T2':
             self.stats['tier2_items'] += 1
             return not RESERVE_TIERS['TIER2']
+        # Check tier 3
+        if tier == 'T3':
+            self.stats['tier3_items'] += 1
+            return not RESERVE_TIERS['TIER3']
+        # Check tier 4
+        if tier == 'T4':
+            self.stats['tier4_items'] += 1
+            return not RESERVE_TIERS['TIER4']
         # Check other magical items
         if tier == 'Magical':
             self.stats['other_items'] += 1
@@ -562,13 +601,15 @@ class JunkSalvager:
         Misc.Pause(1000)
         
         # Use any resulting arcane dust
-        dust = Items.FindByID(0x2DB4, -1, Player.Backpack.Serial)
+        dust = Items.FindByID(ARCANE_DUST_ITEMID, ARCANE_DUST_COLOR, Player.Backpack.Serial)
         if dust:
+            self.debug_message(f"Using Arcane Dust (ID: 0x{ARCANE_DUST_ITEMID:X}, Color: 0x{ARCANE_DUST_COLOR:X})", 'info')
             Items.UseItem(dust)
             Target.WaitForTarget(1000)
             Target.TargetExecute(JUNK_BACKPACK_SERIAL)
             return True
-            
+        else:
+            self.debug_message(f"No Arcane Dust (ID: 0x{ARCANE_DUST_ITEMID:X}, Color: 0x{ARCANE_DUST_COLOR:X}) found after salvaging.", 'warning')
         return False
 
     def process_inventory(self):
