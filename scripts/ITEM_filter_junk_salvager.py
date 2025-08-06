@@ -22,6 +22,48 @@ HOTKEY:: O
 VERSION::20250714
 """
 #//========================================================================================
+
+# SETTINGS
+DEBUG_MODE = False  # Set to True to enable debug/info messages
+AUTO_SALVAGE = True      # Set to False to skip auto-salvaging (for debugging)
+
+# ITEM TYPE-based filtering , SAVE itmes you favor , set to False types unfavored
+SAVE_ITEM_WEAPON_AXE = False
+SAVE_ITEM_WEAPON_SWORD = False
+SAVE_ITEM_WEAPON_MACE = True # defaulting only maces
+SAVE_ITEM_WEAPON_FENCING = False
+SAVE_ITEM_WEAPON_ARCHERY = False
+SAVE_ITEM_WEAPON_UNKNOWN = False
+
+# Default is only saving leather and plate armor 
+SAVE_ITEM_ARMOR_LEATHER = True # defaulting leather armor for mages
+SAVE_ITEM_ARMOR_PLATE = True # defaulting plate armor for warriors
+SAVE_ITEM_ARMOR_CHAINMAIL = False
+SAVE_ITEM_ARMOR_RINGMAIL = False
+SAVE_ITEM_ARMOR_STUDDED = False
+SAVE_ITEM_ARMOR_BONE = False
+
+SAVE_ITEM_ARMOR_SHIELD = True
+
+# STRICTEST FILTERING - SINGLE ITEM ID
+SAVE_ONLY_THIS_ONE_WEAPON = False # sometimes we only favor a single weapon id 
+SAVE_ONLY_THIS_ONE_WEAPON_ID = 0x143D # Hammer Pick
+
+SAVE_ONLY_THIS_ONE_ARMOR = False # sometimes we only favor a single armor id 
+SAVE_ONLY_THIS_ONE_ARMOR_ID = 0x0F5C # Leather female plate
+
+SAVE_ONLY_THIS_ONE_SHIELD = False # sometimes we only favor a single shield id 
+SAVE_ONLY_THIS_ONE_SHIELD_ID = 0x1BC4 # Order shield
+
+# AFFIX TIER FILTERING
+RESERVE_TIERS = {
+    'TIER1': True,      # Set to True to reserve Tier 1 items
+    'TIER2': True,     # Set to True to reserve Tier 2 items
+    'TIER3': True,     # Set to True to reserve Tier 3 items
+    'TIER4': True,     # Set to True to reserve Tier 4 items
+    'MAGICAL': False   # Set to True to reserve other magical items
+}
+
 # TIER AFFIX DEFINITIONS (GLOBAL)
 TIER1_AFFIXES = [ # these are the best 
     "Vanquishing",    # +25 damage
@@ -45,46 +87,6 @@ TIER4_AFFIXES = [
     "Substantial"    # +40% armor
 ]
 
-# SETTINGS
-DEBUG_MODE = False  # Set to True to enable debug/info messages
-AUTO_SALVAGE = True      # Set to False to skip auto-salvaging (for debugging)
-
-# ITEM TYPE-based filtering , SAVE itmes you favor , set to False types unfavored
-SAVE_ITEM_WEAPON_AXE = False
-SAVE_ITEM_WEAPON_SWORD = False
-SAVE_ITEM_WEAPON_MACE = True # defaulting only maces
-SAVE_ITEM_WEAPON_FENCING = False
-SAVE_ITEM_WEAPON_ARCHERY = False
-SAVE_ITEM_WEAPON_UNKNOWN = False
-
-# Default is only saving leather and plate armor 
-SAVE_ITEM_ARMOR_LEATHER = True # defaulting leather armor for mages
-SAVE_ITEM_ARMOR_PLATE = True # defaulting plate armor for warriors
-SAVE_ITEM_ARMOR_CHAINMAIL = False
-SAVE_ITEM_ARMOR_RINGMAIL = False
-SAVE_ITEM_ARMOR_STUDDED = False
-SAVE_ITEM_ARMOR_BONE = False
-
-SAVE_ITEM_ARMOR_SHIELD = False
-
-# STRICTEST FILTERING - SINGLE ITEM ID
-SAVE_ONLY_THIS_ONE_WEAPON = False # sometimes we only favor a single weapon id 
-SAVE_ONLY_THIS_ONE_WEAPON_ID = 0x143D # Hammer Pick
-
-SAVE_ONLY_THIS_ONE_ARMOR = False # sometimes we only favor a single armor id 
-SAVE_ONLY_THIS_ONE_ARMOR_ID = 0x0F5C # Leather female plate
-
-SAVE_ONLY_THIS_ONE_SHIELD = False # sometimes we only favor a single shield id 
-SAVE_ONLY_THIS_ONE_SHIELD_ID = 0x1BC4 # Order shield
-
-# AFFIX TIER FILTERING
-RESERVE_TIERS = {
-    'TIER1': True,      # Set to True to reserve Tier 1 items
-    'TIER2': True,     # Set to True to reserve Tier 2 items
-    'TIER3': True,     # Set to True to reserve Tier 3 items
-    'TIER4': True,     # Set to True to reserve Tier 4 items
-    'MAGICAL': False   # Set to True to reserve other magical items
-}
 
 # Junk Backpack Configuration
 JUNK_BACKPACK_ID = 0x0E75 # a backpack 
