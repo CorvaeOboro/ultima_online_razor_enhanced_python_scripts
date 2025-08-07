@@ -16,7 +16,6 @@ import re
 import time
 import string
 import threading
-from datetime import datetime
 import os
 
 ULTIMA_CLIENT_LOG_FOLDERPATH = r'D:\ULTIMA\UO_Unchained\Data\Client\JournalLogs'
@@ -439,11 +438,11 @@ class LogFileProgressTracker(ProgressTracker):
         if updated:
             self.dirty = True
     def update(self):
-        now = datetime.now()
+        now = time.time()
         if self.last_update is None:
             time_diff = self.update_interval + 1  # Force first update
         else:
-            time_diff = (now - self.last_update).total_seconds() * 1000
+            time_diff = (now - self.last_update) * 1000  # Convert seconds to ms
         if time_diff >= self.update_interval:
             debug('[XP Tracker] Running update cycle...')
             if self.tasks:

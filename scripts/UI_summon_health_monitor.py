@@ -7,9 +7,8 @@ tracks and displays health bar for summoned creatures on a minimal custom gump
 consistent follower healthbars , for temporary summons
 
 HOTKEY:: StartUp
-VERSION :: 20250802
+VERSION :: 20250806
 """
-from datetime import datetime
 
 DEBUG_MODE = False  # Set to False to disable debug messages
 # gump ID= 4294967295  = the max value , randomly select a high number gump so its unique
@@ -309,24 +308,16 @@ class SummonMonitor:
     def update(self):
         """Update the summon monitor"""
         try:
-            current_time = datetime.now()
-            if self.last_update is None:
-                time_diff = self.update_interval + 1  # Force first update
+            # removed datetime update check
+            self.debug_message("Running update cycle...")
+            self.find_summons()
+            if len(self.summons) > 0:
+                self.create_gump()
             else:
-                time_diff = (current_time - self.last_update).total_seconds() * 1000
-            
-            if time_diff >= self.update_interval:
-                self.debug_message("Running update cycle...")
-                self.find_summons()
-                
-                if len(self.summons) > 0:
-                    self.create_gump()
-                else:
-                    self.debug_message("No summons found, skipping gump creation")
-                    Gumps.CloseGump(self.gump_id)  # Close gump if no summons
-                    
-                self.last_update = current_time
-                
+                self.debug_message("No summons found, skipping gump creation")
+                Gumps.CloseGump(self.gump_id)  # Close gump if no summons
+            self.last_update = 0  # Set to dummy value, not used
+
         except Exception as e:
             Misc.SendMessage("Error in update: " + str(e), self.colors['critical'])
 
