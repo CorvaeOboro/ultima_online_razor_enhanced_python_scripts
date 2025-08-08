@@ -17,7 +17,6 @@ import os
 import json
 import shutil
 import time
-from datetime import datetime
 
 UI_ACTIVE = True
 UI_POSITION_X = 400
@@ -109,7 +108,7 @@ def format_item_entry(item):
         debug_msg("Error: No item provided!", 33)
         return None
         
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     
     # Get name from properties first
     props = Items.GetPropStringList(item)

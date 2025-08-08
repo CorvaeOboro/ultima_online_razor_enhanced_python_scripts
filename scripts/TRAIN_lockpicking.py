@@ -11,11 +11,6 @@ Features:
 VERSION::20250621
 """
 
-import sys
-from System.Collections.Generic import List
-from Scripts.utilities.items import FindItem
-import time
-
 # Configuration
 TARGET_SKILL = 90.0  # Stop training at this skill level
 LOCKPICK_ID = 0x14FC  # Item ID for lockpicks

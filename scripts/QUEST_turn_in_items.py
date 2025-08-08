@@ -21,9 +21,6 @@ TODO:
 HOTKEY:: L
 VERSION:: 20250806
 """
-
-import math
-
 DEBUG_MODE = True
 
 # Quest Configuration
@@ -155,6 +152,15 @@ def debug_message(message, color=65):
     if DEBUG_MODE:
         Misc.SendMessage(f"[QUEST] {message}", color)
 
+def custom_sqrt(x, epsilon=1e-7):
+    """Compute the square root of x using Newton's method."""
+    if x < 0:
+        raise ValueError('Cannot compute sqrt of negative number')
+    guess = x / 2.0 if x > 1 else 1.0
+    while abs(guess * guess - x) > epsilon:
+        guess = (guess + x / guess) / 2.0
+    return guess
+
 def find_quest_items(quest_config):
     """Find all quest items in player's backpack for a specific quest."""
     items_found = {}
@@ -190,7 +196,7 @@ def is_within_range(x1, y1, x2, y2, range_tiles=3):
 
 def calculate_distance(x1, y1, x2, y2):
     """Calculate distance between two points."""
-    return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    return custom_sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
 def get_direction_to(current_x, current_y, target_x, target_y):
     """Get direction to move towards target."""
@@ -276,7 +282,7 @@ def handle_direct_transfer(items, quest_config, location):
 
     # Optionally, check distance to NPC and try to move closer if needed
     if hasattr(npc, 'Position'):
-        dist = math.hypot(Player.Position.X - npc.Position.X, Player.Position.Y - npc.Position.Y)
+        dist = custom_sqrt((Player.Position.X - npc.Position.X) ** 2 + (Player.Position.Y - npc.Position.Y) ** 2)
         if dist > 2:  # If not close enough, try to move closer
             debug_message(f"Too far from NPC ({dist:.1f} tiles), moving closer...", 67)
             if not move_to_location(npc.Position.X, npc.Position.Y, npc.Position.Z):

@@ -1,5 +1,5 @@
 """
-ITEM Filter Organizer Junk Salvager - a Razor Enhanced Python Script for Ultima Online
+ITEM Filter Junk Salvager - a Razor Enhanced Python Script for Ultima Online
 
 A Strict Item Filter , configurable to save items by type and by tier of their properties 
 - Moves low tier items to a junk backpack based on Tier configuration
@@ -16,10 +16,9 @@ Requirements:
 # TODO:
 - have equip_slot be apart of the item dicts properties 
 - implement single item strictness 
-- add shields
 
 HOTKEY:: O
-VERSION::20250714
+VERSION::20250806
 """
 #//========================================================================================
 
@@ -43,7 +42,7 @@ SAVE_ITEM_ARMOR_RINGMAIL = False
 SAVE_ITEM_ARMOR_STUDDED = False
 SAVE_ITEM_ARMOR_BONE = False
 
-SAVE_ITEM_ARMOR_SHIELD = True
+SAVE_ITEM_ARMOR_SHIELD = True # defaulting save shields
 
 # STRICTEST FILTERING - SINGLE ITEM ID
 SAVE_ONLY_THIS_ONE_WEAPON = False # sometimes we only favor a single weapon id 
@@ -288,8 +287,7 @@ ARMOR_LEATHER_INFO = {
     0x1C0A: { 'name': 'Leather Bustier', 'id': '0x1C0A', 'subtype': 'Leather', 'category': 'Armor' },
 }
 
-ARMOR_PLATEMAIL_INFO = {
-    0x13EC: { 'name': 'Plate Mail Arms', 'id': '0x13EC', 'subtype': 'Platemail', 'category': 'Armor' },
+ARMOR_PLATEMAIL_INFO = {    
     0x1415: { 'name': 'Plate Mail Chest', 'id': '0x1415', 'subtype': 'Platemail', 'category': 'Armor' },
     0x1411: { 'name': 'Plate Mail Legs', 'id': '0x1411', 'subtype': 'Platemail', 'category': 'Armor' },
     0x1414: { 'name': 'Plate Mail Gorget', 'id': '0x1414', 'subtype': 'Platemail', 'category': 'Armor' },
@@ -329,6 +327,7 @@ ARMOR_BONE_INFO = {
 
 ARMOR_RINGMAIL_INFO = {
     0x13C0: { 'name': 'Ring Mail Tunic', 'id': '0x13C0', 'subtype': 'Ringmail', 'category': 'Armor' },
+    0x13EC: { 'name': 'Ringmail Tunic', 'id': '0x13EC', 'subtype': 'Ringmail', 'category': 'Armor' },
     0x13C3: { 'name': 'Ring Mail Sleeves', 'id': '0x13C3', 'subtype': 'Ringmail', 'category': 'Armor' },
     0x13C4: { 'name': 'Ring Mail Gloves', 'id': '0x13C4', 'subtype': 'Ringmail', 'category': 'Armor' },
     0x13EE: { 'name': 'Ringmail Sleeves', 'id': '0x13EE', 'subtype': 'Ringmail', 'category': 'Armor' },

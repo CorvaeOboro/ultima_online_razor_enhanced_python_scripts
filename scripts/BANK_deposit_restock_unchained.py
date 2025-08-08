@@ -9,7 +9,7 @@ this script is similar to using an "Organizer" Agent in Razor , this script is s
 current item dictionaries are based on UO Unchained , modify as needed
 
 HOTKEY:: N
-VERSION::20250722
+VERSION::20250808
 """
 BANK_PHRASE = "bank"
 DEBUG_MODE = False # Set to True to enable debug/info messages
@@ -28,7 +28,7 @@ POTION_RESTOCK = True  # Set to True to enable potion restocking
 POTION_TARGET = 10  # Target amount of potions to maintain in backpack
 
 # Dictionary of items to deposit: Name -> ItemID
-items_to_deposit = {
+ITEMS_TO_DEPOSIT = {
     'Emerald':       0x0F10,
     'sapphireA':       0x0F11,
     'Ruby':          0x0F13,
@@ -44,7 +44,7 @@ items_to_deposit = {
 }
 
 # Dictionary of supplies to move: Name -> ItemID
-supplies_to_deposit = {
+SUPPLIES_TO_DEPOSIT = {
     'Arrow': 0x0F42,
     'Enchanted Apple': 0x09D0,
     'Metal Ingot': 0x1BF2,
@@ -54,7 +54,7 @@ supplies_to_deposit = {
 }
 
 # Dictionary of reagents to manage: Name -> ItemID
-reagents_to_manage = {
+REAGENTS_TO_MANAGE = {
     'Black Pearl':     0x0F7A,
     'Blood Moss':      0x0F7B,
     'Garlic':         0x0F84,
@@ -66,7 +66,7 @@ reagents_to_manage = {
 }
 
 # Dictionary of potions to manage: Name -> ItemID
-potions_to_manage = {
+POTIONS_TO_MANAGE = {
     'Greater Heal Potion':    0x0F0C,
     'Greater Cure Potion':    0x0F07,
     'Greater Strength Potion': 0x0F09,
@@ -75,10 +75,11 @@ potions_to_manage = {
     'Greater Magic Resist Potion': 0x0F06,
 }
 
-# Dictionary of item IDs with specific hues and names for special items: ItemID -> {Hue -> Name}
-
 # Dictionary of resources to deposit: Name -> ItemID
-resources_to_deposit = {
+# These are imbueing materials , we are placing them in a sub-container inside the bank box
+# Orbs end up in here because of Void Obrs
+# TODO: use hue to differentiate 
+RESOURCES_TO_DEPOSIT = {
     'AcidSac': 0x0C67,
     'AncientPottery': 0x2243,
     'Bauble': 0x023B,
@@ -162,10 +163,10 @@ special_items_dict = {
 #//=============================================================================
 
 # dictionaries to map ItemID to Name for easy lookup
-itemIDs_to_name = {v: k for k, v in items_to_deposit.items()}
-supplyIDs_to_name = {v: k for k, v in supplies_to_deposit.items()}
-reagentIDs_to_name = {v: k for k, v in reagents_to_manage.items()}
-potionIDs_to_name = {v: k for k, v in potions_to_manage.items()}
+ITEMIDS_TO_NAME = {v: k for k, v in ITEMS_TO_DEPOSIT.items()}
+SUPPLYIDS_TO_NAME = {v: k for k, v in SUPPLIES_TO_DEPOSIT.items()}
+REAGENTIDS_TO_NAME = {v: k for k, v in REAGENTS_TO_MANAGE.items()}
+POTIONIDS_TO_NAME = {v: k for k, v in POTIONS_TO_MANAGE.items()}
 
 def debug_message(msg, color=67):
     """Send a debug/status message if SHOW_DEBUG is enabled."""
@@ -179,10 +180,10 @@ def manage_reagents(bankBox):
         
     debug_message("Managing reagents...", 65)
     
-    for reagent_id in reagents_to_manage.values():
+    for reagent_id in REAGENTS_TO_MANAGE.values():
         # Count reagents in backpack
         backpack_count = Items.ContainerCount(Player.Backpack.Serial, reagent_id, -1)
-        reagent_name = reagentIDs_to_name[reagent_id]
+        reagent_name = REAGENTIDS_TO_NAME[reagent_id]
         
         if backpack_count > REAGENT_MAX:
             # Move excess to bank
@@ -208,8 +209,8 @@ def manage_potions(bankBox):
         
     debug_message("Managing potions...", 65)
     
-    for potion_id in potions_to_manage.values():
-        potion_name = potionIDs_to_name[potion_id]
+    for potion_id in POTIONS_TO_MANAGE.values():
+        potion_name = POTIONIDS_TO_NAME[potion_id]
         
         # Count potions in backpack
         backpack_count = Items.ContainerCount(Player.Backpack.Serial, potion_id, -1)
@@ -240,6 +241,7 @@ def manage_potions(bankBox):
 
 def create_potions_from_keg(bankBox, potion_id, potion_name, amount_needed):
     """Create potions by using a keg and empty bottles from the bank."""
+    # THIS IS WORK IN PROGRESS , currently not working
     
     # Find empty bottles in bank (ItemID 0x0F0E)
     empty_bottle_id = 0x0F0E
@@ -299,13 +301,13 @@ def create_potions_from_keg(bankBox, potion_id, potion_name, amount_needed):
 
 def move_resources_to_subcontainer(bankBox, resourceContainer):
     """
-    Move all resource items (from resources_to_deposit) from backpack to a specific sub-container in the bank box.
+    Move all resource items (from RESOURCES_TO_DEPOSIT) from backpack to a specific sub-container in the bank box.
     Args:
         bankBox: Serial of the main bank box container
         resourceContainer: Serial of the sub-container inside the bank box
     """
     debug_message("Moving resources to bank sub-container...", 65)
-    for resource_name, resource_id in resources_to_deposit.items():
+    for resource_name, resource_id in RESOURCES_TO_DEPOSIT.items():
         # Find all matching items in backpack
         items = Items.FindByID(resource_id, -1, Player.Backpack.Serial)
         if not items:
@@ -347,23 +349,23 @@ def main():
 
     # Move gems if enabled
     if MOVE_GEMS:
-        for item_id in items_to_deposit.values():
+        for item_id in ITEMS_TO_DEPOSIT.values():
             items = Items.FindAllByID(item_id, -1, Player.Backpack.Serial, -1)
             for item in items:
                 Items.Move(item, bankBox, 0)
                 Misc.Pause(600)
                 items_moved = True
-                debug_message(f"Moved {itemIDs_to_name[item_id]} to bank", 65)
+                debug_message(f"Moved {ITEMIDS_TO_NAME[item_id]} to bank", 65)
 
     # Move supplies if enabled
     if MOVE_SUPPLIES:
-        for item_id in supplies_to_deposit.values():
+        for item_id in SUPPLIES_TO_DEPOSIT.values():
             items = Items.FindAllByID(item_id, -1, Player.Backpack.Serial, -1)
             for item in items:
                 Items.Move(item, bankBox, 0)
                 Misc.Pause(600)
                 items_moved = True
-                debug_message(f"Moved {supplyIDs_to_name[item_id]} to bank", 65)
+                debug_message(f"Moved {SUPPLYIDS_TO_NAME[item_id]} to bank", 65)
 
         for item_id, hue_dict in special_items_dict.items():
             for hue, name in hue_dict.items():
@@ -380,17 +382,24 @@ def main():
         found_containers = []
         for serial in RESOURCE_CONTAINER_SERIALS:
             container = Items.FindBySerial(serial)
-            if container and container.Container == bankBox.Serial:
-                found_containers.append(serial)
+            # Only append valid item objects (not ints)
+            if container is not None and hasattr(container, "Container") and container.Container == bankBox.Serial:
+                if hasattr(container, "Serial") and not isinstance(container, int):
+                    found_containers.append(container)
+                else:
+                    debug_message(f"Skipping invalid container for serial {serial}: type={type(container)}", 33)
         if not found_containers:
             debug_message("Resource container serial not found in bank. Skipping resource move.", 33)
         else:
             # Warn if multiple containers found
             if len(found_containers) > 1:
-                debug_message(f"Warning: Multiple resource containers found in bank: {[hex(s) for s in found_containers]}", 53)
-                debug_message(f"Using priority container: {hex(found_containers[RESOURCE_CONTAINER_PRIORITY])}", 53)
-            resourceContainer = found_containers[RESOURCE_CONTAINER_PRIORITY]
-            move_resources_to_subcontainer(bankBox, resourceContainer)
+                debug_message(f"Warning: Multiple resource containers found in bank: {[hex(c.Serial) for c in found_containers]}", 53)
+            if RESOURCE_CONTAINER_PRIORITY < len(found_containers):
+                debug_message(f"Using priority container: {hex(found_containers[RESOURCE_CONTAINER_PRIORITY].Serial)}", 53)
+                resourceContainer = found_containers[RESOURCE_CONTAINER_PRIORITY]
+                move_resources_to_subcontainer(bankBox, resourceContainer.Serial)
+            else:
+                debug_message(f"Priority index {RESOURCE_CONTAINER_PRIORITY} out of range for found containers (count: {len(found_containers)}). Skipping resource move.", 33)
 
     # Manage reagents
     manage_reagents(bankBox)

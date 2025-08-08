@@ -4,17 +4,17 @@ ITEM Organize Backpack - a Razor Enhanced Python Script for Ultima Online
 Organizes items in the backpack with specific positioning and directional spacing control:
 - Reagents: Lower left, left-to-right sorting, combines reagents
 - Potions: Above reagents, left-to-right sorting with offset spacing
-- Gems: Upper middle, vertical sorting top-to-bottom with offset spacing
+- Gems: Second Lowest middle, horizontal sorting left-to-right with offset spacing
 - Books: Top left, horizontal sorting left-to-right with offset spacing
 - Trap pouches: Bottom right, vertical spacing offset, NO stacking
-- Runes: Top right, vertical sorting top-to-bottom with offset stacking
+- Runes: Top right, vertical sorting stop-to-bottom with offset stacking
 - Tools: Top right middle, horizontal right-to-left with offset stacking
 
 These positions are tuned for a "150" container size without scaling items sizes 
 the default is "100" container size so you may want to adjust the x and y values for your settings
 
 TODO:
-- offset the pouches vertically
+- offset the trap pouches vertically
 
 VERSION::20250805
 """
@@ -209,7 +209,7 @@ def move_items(items, target_x, target_y, group_config):
             Misc.Pause(600)
         
         # Then move them to their designated spot in backpack
-        Misc.Pause(1200)  # Extra pause to ensure items are on character
+        Misc.Pause(1200)  # Extra pause 
         items_on_char = find_items_by_id(items[0].ItemID)
         if items_on_char:
             stack_count = 0
@@ -274,7 +274,6 @@ def organize_backpack():
         "POTIONS": ORGANIZE_POTIONS,
         "GEMS": ORGANIZE_GEMS,
         "TOOLS": ORGANIZE_TOOLS,
-        # Add more group toggles here if needed
     }
 
     for group_name, group_config in ITEM_GROUPS.items():

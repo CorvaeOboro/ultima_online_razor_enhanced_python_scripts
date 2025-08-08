@@ -14,8 +14,6 @@ VERSION::20250802
 """
 import re
 import time
-import string
-import threading
 import os
 
 ULTIMA_CLIENT_LOG_FOLDERPATH = r'D:\ULTIMA\UO_Unchained\Data\Client\JournalLogs'
@@ -110,7 +108,10 @@ JOURNAL_DIAGNOSTIC_KEYWORDS = {
     ]
 }
 
-
+def is_printable_ascii(ch):
+    o = ord(ch)
+    return (32 <= o <= 126) or ch in '\t\n\r\x0b\x0c'
+    
 def log(message):
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
     with open(LOG_FILE_PATH, 'a', encoding='utf-8') as f:
@@ -392,34 +393,25 @@ def find_newest_log_file(log_dir):
     newest = max(files, key=os.path.getmtime)
     return newest
 
-def tail_log_file(filepath, callback):
-    with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
-        f.seek(0, 2)  # Always go to end of file on startup (never parse old lines)
-        debug(f'[XP Tracker] [Log Tail] Started tailing {filepath} at EOF')
-        while True:
-            pos = f.tell()
-            line = f.readline()
-            if not line:
-                time.sleep(0.1)
-                continue
-            # Only process complete lines
-            if not line.endswith('\n'):
-                f.seek(pos)  # Wait for the rest of the line
-                time.sleep(0.05)
-                continue
-            # Clean up non-printable characters
-            cleaned = ''.join(ch for ch in line if ch in string.printable)
-            if '[XP Tracker]' in cleaned:
-                # Skip own debug output to prevent infinite feedback loop
-                continue
-            if cleaned.strip() == '':
-                # Optionally debug skipped lines
-                continue
-            try:
-                debug(f'[XP Tracker] [Log Tail] Cleaned line: {cleaned.rstrip()}')
-                callback(cleaned.rstrip('\n'))
-            except Exception as e:
-                debug(f'[XP Tracker] [Log Tail] Exception processing line: {e} | line={repr(cleaned)}')
+def tail_log_file_iteration(f, callback):
+    pos = f.tell()
+    line = f.readline()
+    if not line:
+        return False  # No new line
+    if not line.endswith('\n'):
+        f.seek(pos)
+        return False  # Incomplete line
+    cleaned = ''.join(ch for ch in line if is_printable_ascii(ch))
+    if '[XP Tracker]' in cleaned:
+        return False
+    if cleaned.strip() == '':
+        return False
+    try:
+        debug(f'[XP Tracker] [Log Tail] Cleaned line: {cleaned.rstrip()}')
+        callback(cleaned.rstrip('\n'))
+    except Exception as e:
+        debug(f'[XP Tracker] [Log Tail] Exception processing line: {e} | line={repr(cleaned)}')
+    return True
 
 class LogFileProgressTracker(ProgressTracker):
     def __init__(self, log_path):
@@ -462,12 +454,15 @@ def main():
             return
         debug(f'[XP Tracker] Using log file: {log_path}')
         tracker = LogFileProgressTracker(log_path)
-        # Start log file tailer in a background thread
-        t = threading.Thread(target=tail_log_file, args=(log_path, tracker.process_log_line), daemon=True)
-        t.start()
-        # Main loop: handle Gump drawing and response
+        # Open the log file and poll for new lines each main loop cycle
+        log_file = open(log_path, 'r', encoding='utf-8', errors='replace')
+        log_file.seek(0, 2)  # Go to end of file
+        debug(f'[XP Tracker] [Log Tail] Started tailing {log_path} at EOF')
         cycle = 0
         while True:
+            # Poll for all new log lines
+            while tail_log_file_iteration(log_file, tracker.process_log_line):
+                pass
             debug(f'[XP Tracker] Main loop cycle {cycle}, dirty={tracker.dirty}')
             tracker.handle_gump_response()
             time.sleep(0.5)  # Sleep to be passive and non-blocking
