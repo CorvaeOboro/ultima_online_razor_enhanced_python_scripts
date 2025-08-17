@@ -37,11 +37,12 @@ ritual magic
 - [RITUAL_spiral_round.py](scripts/RITUAL_spiral_round.py) – Places a rotated spiral with smooth corners using black pearls
 
 ## ITEM
-- [ITEM_organize_backpack.py](scripts/ITEM_organize_backpack.py) – Organizes backpack items by type into  position
-- [ITEM_filter_junk_salvager.py](scripts/ITEM_filter_junk_salvager.py) – Moves low-tier items to a junk backpack and salvages 
+- [ITEM_organize_backpack.py](scripts/ITEM_organize_backpack.py) – Organizes backpack items by type into position
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ITEM_organize_backpack.webp?raw=true"/>
+- [ITEM_filter_junk_salvager.py](scripts/ITEM_filter_junk_salvager.py) – Moves low-tier items to a junk backpack and salvages , filter by type and affixes 
 - [ITEM_weight_manager.py](scripts/ITEM_weight_manager.py) – Drops unfavored items and over maximum reagents
 - [ITEM_transfer_container_to_backpack.py](scripts/ITEM_transfer_container_to_backpack.py) – Moves all items from target container to player
-- [ITEM_drop_gold.py](scripts/ITEM_drop_gold.py) – Drops all gold 
+- [ITEM_drop_gold.py](scripts/ITEM_drop_gold.py) – Drops all gold to ground
 - [ITEM_food_eater.py](scripts/ITEM_food_eater.py) – Eat food until full
 - [ITEM_mount_toggle.py](scripts/ITEM_mount_toggle.py) – Toggles mounting of ethereal horse
 - [ITEM_use_kindling.py](scripts/ITEM_use_kindling.py) – Use kindling until campfire
@@ -49,17 +50,17 @@ ritual magic
 ## MISC
 - [LOOT_treasure.py](scripts/LOOT_treasure.py) – Unlocks, opens, and loot nearby treasure chests
 - [QUEST_turn_in_items.py](scripts/QUEST_turn_in_items.py) – Automate Quest turn-ins 
-- [RECALL_bank.py](scripts/RECALL_bank.py) – Recall bank or home
+- [RECALL_bank.py](scripts/RECALL_bank.py) – Recall bank or home , specific rune # in runebook
 - [COMBAT_pouch.py](scripts/COMBAT_pouch.py) – stun break using trapped pouch
 - [PICKUP_gold_and_meditate.py](scripts/PICKUP_gold_and_meditate.py) – meditate
 
 ## SPELL
-- [SPELL_attack_nearest.py](scripts/SPELL_attack_nearest.py) – Attack spells at nearest enemy, prioritizing Energy Bolt.
+- [SPELL_attack_nearest.py](scripts/SPELL_attack_nearest.py) – Attack spells at nearest enemy, prioritizing Energy Bolt, conditional based on available reagents and mana
 - [SPELL_bless_other.py](scripts/SPELL_bless_other.py) – Bless the nearest friendly player
-- [SPELL_buff_self.py](scripts/SPELL_buff_self.py) – Buff yourself with configurable spells (e.g., Bless, Magic Reflect)
+- [SPELL_buff_self.py](scripts/SPELL_buff_self.py) – Buff yourself with Magic Reflect, ArchProtection, Bless
 - [SPELL_create_food.py](scripts/SPELL_create_food.py) – Create Food until out of mana
 - [SPELL_invis_self.py](scripts/SPELL_invis_self.py) – Cast Invisibility on yourself and re-cast as needed
-- [SPELL_self_cure_heal.py](scripts/SPELL_self_cure_heal.py) – Auto-cure poison and heal self, prioritizing mana and HP
+- [SPELL_cure_heal_self.py](scripts/SPELL_cure_heal_self.py) – ArchCure poison and heal self based on conditional 
 
 ## TRAIN
 - [TRAIN_alchemy.py](scripts/TRAIN_alchemy.py) – Trains Alchemy skill , optional poison-only mode
@@ -76,6 +77,9 @@ ritual magic
 - [DEV_item_inspector.py](scripts/DEV_item_inspector.py) – Backpack items and equipment info to JSON
 - [DEV_item_to_list.py](scripts/DEV_item_to_list.py) –  Inspected item exported to categorized JSON 
 - [DEV_font_color_gump.py](scripts/DEV_font_color_gump.py) – UO font hue hex codes in a custom Gump
+
+# TROUBLESHOOTING
+- "import" errors = download [python](https://www.python.org/downloads/) and copy the Lib folder contents into Lib folder in RazorEnhanced
 
 # THANKS
 - many thanks to the ultima online custom shard community , 

@@ -12,7 +12,15 @@ VERSION::20250621
 """
 
 # Configuration
-TARGET_SKILL = 90.0  # Stop training at this skill level
+DEBUG_MODE = True  # Set to True to enable debug messages
+
+def debug_message(msg, color=67):
+    """Show debug messages only when DEBUG_MODE is enabled."""
+    if DEBUG_MODE:
+        Misc.SendMessage(f"[Lockpicking] {msg}", color)
+
+# Training parameters
+TARGET_SKILL = 100.0  # Stop training at this skill level
 LOCKPICK_ID = 0x14FC  # Item ID for lockpicks
 TRAINING_BOX_ID = 0x09AA  # Training box item ID
 # TRAINING_BOX_HUE = 0x0000  # Default hue for training box
@@ -21,12 +29,12 @@ DELAY_BETWEEN_PICKS = 1000  # Delay in ms between lockpicking attempts
 def find_training_box():
     """Find the lockpicking training box in player's backpack"""
     if not Player.Backpack:
-        Misc.SendMessage("No backpack found!", 33)
+        debug_message("No backpack found!", 33)
         return None
         
     training_box = Items.FindByID(TRAINING_BOX_ID, -1, Player.Backpack.Serial)
     if not training_box:
-        Misc.SendMessage("No training box found in backpack!", 33)
+        debug_message("No training box found in backpack!", 33)
         return None
         
     return training_box
@@ -34,19 +42,24 @@ def find_training_box():
 def find_lockpicks():
     """Find lockpicks in player's backpack"""
     if not Player.Backpack:
-        Misc.SendMessage("No backpack found!", 33)
+        debug_message("No backpack found!", 33)
         return None
         
     lockpicks = Items.FindByID(LOCKPICK_ID, -1, Player.Backpack.Serial)
     if not lockpicks:
-        Misc.SendMessage("No lockpicks found in backpack!", 33)
+        debug_message("No lockpicks found in backpack!", 33)
         return None
         
     return lockpicks
 
 def train_lockpicking():
     """Main training loop"""
-    Misc.SendMessage("Starting Lockpicking training...", 66)
+    debug_message("Starting Lockpicking training...", 66)
+    # Early exit if already at or above target
+    current_skill = Player.GetRealSkillValue('Lockpicking')
+    if current_skill >= TARGET_SKILL:
+        debug_message(f"Current Lockpicking {current_skill:.1f} is already at or above target {TARGET_SKILL:.1f}. Nothing to do.", 68)
+        return
     
     while Player.GetRealSkillValue('Lockpicking') < TARGET_SKILL:
         # Find required items
@@ -54,7 +67,7 @@ def train_lockpicking():
         lockpicks = find_lockpicks()
         
         if not training_box or not lockpicks:
-            Misc.SendMessage("Missing required items. Stopping training.", 33)
+            debug_message("Missing required items. Stopping training.", 33)
             break
             
         # Use lockpick on training box
@@ -67,11 +80,11 @@ def train_lockpicking():
         
         # Show progress
         current_skill = Player.GetRealSkillValue('Lockpicking')
-        Misc.SendMessage(f"Current Lockpicking: {current_skill:.1f}", 66)
+        debug_message(f"Current Lockpicking: {current_skill:.1f}", 66)
         
         # Check if we've reached target skill
         if current_skill >= TARGET_SKILL:
-            Misc.SendMessage("Target skill reached! Training complete.", 67)
+            debug_message("Target skill reached! Training complete.", 68)
             break
 
 # Start the training

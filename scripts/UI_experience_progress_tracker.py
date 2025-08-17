@@ -8,13 +8,13 @@ percentage first , colorize by category , display as bar
 change the ULTIMA_CLIENT_LOG_FOLDERPATH to match your client location JournalLogs
 currently tuned for UOUnchained progression ( Mastery , Weekly Quests , Dungeons )
 
-STATUS:: working
+TROUBLESHOOTING:: if import errors, download python and copy the Lib folder contents into Lib folder in RazorEnhanced
 HOTKEY:: StartUp
-VERSION::20250802
+VERSION::20250808
 """
-import re
-import time
-import os
+import re # regex regular expression parsing journal 
+import time # time delay 
+import os # file path reading
 
 ULTIMA_CLIENT_LOG_FOLDERPATH = r'D:\ULTIMA\UO_Unchained\Data\Client\JournalLogs'
 
@@ -33,7 +33,7 @@ BAR_SPACING = 6
 
 FONT_COLORS = {
     'red': 0x0020,         # red
-    'dark red': 0x0024,    # dark red
+    'red dark': 0x0024,    # dark red
     'maroon': 0x0021,      # maroon 
     'pink': 0x0028,        # pink 
     'orange': 0x0030,      # orange 
@@ -42,17 +42,17 @@ FONT_COLORS = {
     'beige': 0x002D,       # beige 
     'brown': 0x01BB,       # light brown
     'green': 0x0044,       # green 
-    'dark green': 0x0042,  # dark green
+    'green dark': 0x0042,  # dark green
     'lime': 0x0040,        # lime
     'teal': 0x0058,        # teal
     'aqua': 0x005F,        # aqua
-    'light blue': 0x005A,  # light blue
+    'blue light': 0x005A,  # light blue
     'blue': 0x0056,        # blue 
-    'dark blue': 0x0001,   # dark blue 
+    'blue dark': 0x0001,   # dark blue 
     'purple': 0x01A2,      # purple
     'white': 0x0384,       # white
     'gray': 0x0385,        # gray 
-    'dark gray': 0x07AF,   # dark gray
+    'gray dark': 0x07AF,   # dark gray
     'black': 0x0000        # black
 }
 
@@ -71,14 +71,30 @@ GUMP_HUE_COLORS = {
 
 CATEGORY_COLORS = {
     'weekly quest': FONT_COLORS['gold'],
-    'mastery': FONT_COLORS['blue'],
     'dungeon': FONT_COLORS['gold'],
     'spellsong': FONT_COLORS['green'],
-    'holy': FONT_COLORS['blue'],
     'elemental': FONT_COLORS['purple'],
     'summons': FONT_COLORS['teal'],
     'default': FONT_COLORS['white']
 }
+
+MASTERY_COLORS = {
+    'Aero': FONT_COLORS['blue light'],
+    'Artisan': FONT_COLORS['brown'],
+    'Blood': FONT_COLORS['red'],
+    'Bulwark': FONT_COLORS['gray'],
+    'Death': FONT_COLORS['gray dark'],
+    'Doom': FONT_COLORS['purple'],
+    'Druidic': FONT_COLORS['green'],
+    'Earth': FONT_COLORS['green dark'],
+    'Fira': FONT_COLORS['orange'],
+    'Fortune': FONT_COLORS['gold'],
+    'Holy': FONT_COLORS['blue'],
+    'Lyrical': FONT_COLORS['yellow'],
+    'Poison': FONT_COLORS['green'],
+    'Shadow': FONT_COLORS['gray dark'],
+}
+
 
 # Exclude certain progress types that are not quests (e.g., XP, Max Stones)
 EXCLUDED_PROGRESS_KEYS = ["Xp", "Max Stones"]
@@ -92,6 +108,8 @@ PROGRESS_PARENS_PATTERN = re.compile(r'([A-Za-z \[\]\:]+)\s*\((\d+)\s*/\s*(\d+)\
 
 # --- CONFIGURATION ---
 LOG_FILE_PATH = 'experience_progress_tracker.log'  # Output log file path
+# Truncate the log file on startup to avoid unbounded growth
+LOG_TRUNCATE_ON_START = True
 
 # --- DIAGNOSTIC KEYWORDS ---
 JOURNAL_DIAGNOSTIC_KEYWORDS = {
@@ -123,7 +141,8 @@ def debug(message):
             Misc.SendMessage(str(message))
         except Exception:
             pass  # In case Misc isn't available at import time
-    log(str(message))
+        # Only write to file when DEBUG_MODE is enabled
+        log(str(message))
 
 def debug_module_info():
     try:
@@ -165,7 +184,16 @@ def debug_module_info():
     except Exception as e:
         debug('DEBUG ERROR: ' + str(e))
 
-debug_module_info()
+if LOG_TRUNCATE_ON_START:
+    try:
+        # Truncate the log file at startup
+        with open(LOG_FILE_PATH, 'w', encoding='utf-8'):
+            pass
+    except Exception:
+        pass
+
+if DEBUG_MODE:
+    debug_module_info()
 
 class ProgressTracker:
     def __init__(self):
@@ -186,51 +214,52 @@ class ProgressTracker:
         line_count = len(entries)
         debug(f'[XP Tracker] Parsing journal: last_index={self.last_journal_index}, line_count={line_count}')
 
-        # Diagnostics: Add filters for likely XP/progress keywords
-        for keyword in JOURNAL_DIAGNOSTIC_KEYWORDS['search_terms']:
-            try:
-                Journal.FilterText(keyword)
-                debug(f'[XP Tracker] [Diagnostics] Journal.FilterText({repr(keyword)}) applied.')
-            except Exception as e:
-                debug(f'[XP Tracker] [Diagnostics] Journal.FilterText({repr(keyword)}) error: {e}')
+        if DEBUG_MODE:
+            # Diagnostics: Add filters for likely XP/progress keywords
+            for keyword in JOURNAL_DIAGNOSTIC_KEYWORDS['search_terms']:
+                try:
+                    Journal.FilterText(keyword)
+                    debug(f'[XP Tracker] [Diagnostics] Journal.FilterText({repr(keyword)}) applied.')
+                except Exception as e:
+                    debug(f'[XP Tracker] [Diagnostics] Journal.FilterText({repr(keyword)}) error: {e}')
 
-        # Diagnostics: Dump ALL journal lines for inspection
-        all_entries = Journal.GetJournalEntry(0)
-        debug(f'[XP Tracker] [Diagnostics] Dumping ALL journal entries ({len(all_entries)} total):')
-        for idx, entry in enumerate(all_entries):
-            debug(f'[XP Tracker] [ALL] idx={idx}, Type={repr(getattr(entry, "Type", None))}, Name={repr(getattr(entry, "Name", None))}, Text={repr(getattr(entry, "Text", None))}, Color={repr(getattr(entry, "Color", None))}')
-            if getattr(entry, "Type", None) == "System":
-                debug(f'[XP Tracker] [ALL][Type==System] idx={idx}, Text={repr(getattr(entry, "Text", None))}')
-            if getattr(entry, "Name", None) == "System":
-                debug(f'[XP Tracker] [ALL][Name==System] idx={idx}, Text={repr(getattr(entry, "Text", None))}')
+            # Diagnostics: Dump ALL journal lines for inspection
+            all_entries = Journal.GetJournalEntry(0)
+            debug(f'[XP Tracker] [Diagnostics] Dumping ALL journal entries ({len(all_entries)} total):')
+            for idx, entry in enumerate(all_entries):
+                debug(f'[XP Tracker] [ALL] idx={idx}, Type={repr(getattr(entry, "Type", None))}, Name={repr(getattr(entry, "Name", None))}, Text={repr(getattr(entry, "Text", None))}, Color={repr(getattr(entry, "Color", None))}')
+                if getattr(entry, "Type", None) == "System":
+                    debug(f'[XP Tracker] [ALL][Type==System] idx={idx}, Text={repr(getattr(entry, "Text", None))}')
+                if getattr(entry, "Name", None) == "System":
+                    debug(f'[XP Tracker] [ALL][Name==System] idx={idx}, Text={repr(getattr(entry, "Text", None))}')
 
-        # Diagnostics: Brute-force Journal.GetLineText
-        debug(f'[XP Tracker] [Diagnostics] Brute-force Journal.GetLineText(0..199):')
-        for i in range(200):
-            try:
-                line = Journal.GetLineText(i)
-                debug(f'[XP Tracker] [GetLineText] idx={i}, line={repr(line)}')
-            except Exception as e:
-                debug(f'[XP Tracker] [GetLineText] idx={i}, error={e}')
-        # Diagnostics: Try other journal APIs using global diagnostic keywords
-        for sys_type_val in JOURNAL_DIAGNOSTIC_KEYWORDS['system_types']:
-            try:
-                sys_type = Journal.GetTextByType(sys_type_val)
-                debug(f'[XP Tracker] [Diagnostics] GetTextByType({repr(sys_type_val)}): {repr(sys_type)}')
-            except Exception as e:
-                debug(f'[XP Tracker] [Diagnostics] GetTextByType({repr(sys_type_val)}) error: {e}')
-        for sys_name_val in JOURNAL_DIAGNOSTIC_KEYWORDS['system_names']:
-            try:
-                sys_name = Journal.GetTextByName(sys_name_val)
-                debug(f'[XP Tracker] [Diagnostics] GetTextByName({repr(sys_name_val)}): {repr(sys_name)}')
-            except Exception as e:
-                debug(f'[XP Tracker] [Diagnostics] GetTextByName({repr(sys_name_val)}) error: {e}')
-        for search_term in JOURNAL_DIAGNOSTIC_KEYWORDS['search_terms']:
-            try:
-                search_result = Journal.Search(search_term)
-                debug(f'[XP Tracker] [Diagnostics] Search({repr(search_term)}): {repr(search_result)}')
-            except Exception as e:
-                debug(f'[XP Tracker] [Diagnostics] Search({repr(search_term)}) error: {e}')
+            # Diagnostics: Brute-force Journal.GetLineText
+            debug(f'[XP Tracker] [Diagnostics] Brute-force Journal.GetLineText(0..199):')
+            for i in range(200):
+                try:
+                    line = Journal.GetLineText(i)
+                    debug(f'[XP Tracker] [GetLineText] idx={i}, line={repr(line)}')
+                except Exception as e:
+                    debug(f'[XP Tracker] [GetLineText] idx={i}, error={e}')
+            # Diagnostics: Try other journal APIs using global diagnostic keywords
+            for sys_type_val in JOURNAL_DIAGNOSTIC_KEYWORDS['system_types']:
+                try:
+                    sys_type = Journal.GetTextByType(sys_type_val)
+                    debug(f'[XP Tracker] [Diagnostics] GetTextByType({repr(sys_type_val)}): {repr(sys_type)}')
+                except Exception as e:
+                    debug(f'[XP Tracker] [Diagnostics] GetTextByType({repr(sys_type_val)}) error: {e}')
+            for sys_name_val in JOURNAL_DIAGNOSTIC_KEYWORDS['system_names']:
+                try:
+                    sys_name = Journal.GetTextByName(sys_name_val)
+                    debug(f'[XP Tracker] [Diagnostics] GetTextByName({repr(sys_name_val)}): {repr(sys_name)}')
+                except Exception as e:
+                    debug(f'[XP Tracker] [Diagnostics] GetTextByName({repr(sys_name_val)}) error: {e}')
+            for search_term in JOURNAL_DIAGNOSTIC_KEYWORDS['search_terms']:
+                try:
+                    search_result = Journal.Search(search_term)
+                    debug(f'[XP Tracker] [Diagnostics] Search({repr(search_term)}): {repr(search_result)}')
+                except Exception as e:
+                    debug(f'[XP Tracker] [Diagnostics] Search({repr(search_term)}) error: {e}')
 
         for i in range(self.last_journal_index, line_count):
             entry = entries[i]
@@ -248,8 +277,9 @@ class ProgressTracker:
     
     def _parse_line(self, line):
         debug(f'[XP Tracker] [Parse Attempt] line={repr(line)}')
-        if 'Max Stones' in line:
-            debug('[XP Tracker] [Parse Ignore] Skipping Max Stones line')
+        # Exclude any line mentioning max stones or carrying stones / max stones (case-insensitive, robust)
+        if re.search(r'max\s*stones', line, re.IGNORECASE) or re.search(r'carrying stones\s*/\s*max stones', line, re.IGNORECASE):
+            debug('[XP Tracker] [Parse Ignore] Skipping Max Stones/carrying stones line')
             return False
         # Exclude lines with keys in exclusion list
         for excluded in EXCLUDED_PROGRESS_KEYS:
@@ -333,19 +363,26 @@ class ProgressTracker:
         y = 28  # Slightly higher for compactness
         task_list = self.get_task_list()
         if not task_list:
-            Gumps.AddLabel(g, 18, y + 1, GUMP_HUE_COLORS['text'], "No progress found.")
+            # Draw a blank placeholder bar so the Gump shows immediately
+            Gumps.AddImageTiled(g, 12, y, BAR_WIDTH, BAR_HEIGHT, 2624)
             y += BAR_HEIGHT + BAR_SPACING
         for idx, task in enumerate(task_list):
             cur, maxval, pct = self.get_progress(task)
-            # Determine category color
-            lower_task = task.lower()
-            color = GUMP_HUE_COLORS['bar']  # Default
-            for cat, cat_color in CATEGORY_COLORS.items():
-                if cat != 'default' and cat in lower_task:
-                    color = cat_color
+            # Determine text color: use MASTERY_COLORS first if mastery match, else fallback to category
+            text_color = None
+            for mastery, m_color in MASTERY_COLORS.items():
+                if mastery.lower() in task.lower():
+                    text_color = m_color
                     break
-            else:
-                color = CATEGORY_COLORS['default']
+            if text_color is None:
+                lower_task = task.lower()
+                for cat, cat_color in CATEGORY_COLORS.items():
+                    if cat != 'default' and cat in lower_task:
+                        text_color = cat_color
+                        break
+                else:
+                    text_color = CATEGORY_COLORS['default']
+            bar_color = GUMP_HUE_COLORS['bar']  # You may want to enhance bar color logic later
             # Bar background
             Gumps.AddImageTiled(g, 12, y, BAR_WIDTH, BAR_HEIGHT, 2624)  # Black tiled bar
             # Progress bar
@@ -355,9 +392,8 @@ class ProgressTracker:
                 Gumps.AddAlphaRegion(g, 12, y, fill_width, BAR_HEIGHT)
             # Task label: percent, then name
             pct_str = f"{pct:02d}%"  # Always two digits
-            # Shorten label if it contains 'Creature Killed In'
+            # Remove label if it contains 'Creature Killed In'
             # Remove both 'Creature Killed In' and 'Creature Killed in' (case-insensitive)
-            import re
             short_task = re.sub(r'(?i)creature killed in', '', task).replace('  ', ' ').strip()
             # Remove brackets at display time
             short_task = short_task.replace('[','').replace(']','').strip()
@@ -367,7 +403,7 @@ class ProgressTracker:
             # Estimate the width of the main label (percent + name + colon + 2 spaces)
             # Assume ~6 pixels per character for default font 
             main_label_width = 6 * len(label_main)
-            Gumps.AddLabel(g, 18, y + 1, color, label_main)
+            Gumps.AddLabel(g, 18, y + 1, text_color, label_main)
             num_x = 18 + main_label_width + 4  # 4px gap width 
             # Draw numbers in smaller font or lighter color, offset to the right
             try:
@@ -378,8 +414,8 @@ class ProgressTracker:
                 # Fallback: use a dimmer color for numbers
                 Gumps.AddLabel(g, num_x, y + 1, 922, label_nums)  # 922 = grayish
             y += BAR_HEIGHT + BAR_SPACING
-        Gumps.AddButton(g, BAR_WIDTH + 2, 4, 3600, 3601, 1, 0, 0)  # Close button, working convention
-        debug(f'[XP Tracker] Sending Gump to serial {Player.Serial}')
+        Gumps.AddButton(g, BAR_WIDTH + 2, 4, 3600, 3601, 1, 0, 0)  # Close button
+        debug(f'[XP Tracker] Sending Gump to Player serial {Player.Serial}')
         Gumps.SendGump(GUMP_ID, Player.Serial, self.gump_x, self.gump_y, g.gumpDefinition, g.gumpStrings)
 
     def _gump_height(self):
@@ -418,7 +454,7 @@ class LogFileProgressTracker(ProgressTracker):
         super().__init__()
         self.log_path = log_path
         self.gump_open = True
-        self.dirty = False  # Set to True when progress changes
+        self.dirty = True  # Start dirty so the Gump draws immediately
         self.last_update = None
         self.update_interval = 2000  # ms, matches summon monitor
     def process_log_line(self, line):
@@ -437,11 +473,8 @@ class LogFileProgressTracker(ProgressTracker):
             time_diff = (now - self.last_update) * 1000  # Convert seconds to ms
         if time_diff >= self.update_interval:
             debug('[XP Tracker] Running update cycle...')
-            if self.tasks:
-                self._draw_gump()
-            else:
-                debug('[XP Tracker] No progress tasks, closing Gump.')
-                Gumps.CloseGump(GUMP_ID)
+            # Always draw; when no tasks, a placeholder row is shown
+            self._draw_gump()
             self.last_update = now
 
 def main():
@@ -458,6 +491,8 @@ def main():
         log_file = open(log_path, 'r', encoding='utf-8', errors='replace')
         log_file.seek(0, 2)  # Go to end of file
         debug(f'[XP Tracker] [Log Tail] Started tailing {log_path} at EOF')
+        # Draw initial Gump immediately with placeholder row
+        tracker._draw_gump()
         cycle = 0
         while True:
             # Poll for all new log lines

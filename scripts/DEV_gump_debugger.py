@@ -11,16 +11,36 @@ journal logs are stored in Classic U client folder =
 DOCUMENTATION:
 https://razorenhanced.net/dokuwiki/doku.php?id=gump_funcs
 
-VERSION::20250708
+VERSION::20250808
 """
 DEBUG_TO_INGAME_MESSAGE = True
 DEBUG_TO_JSON = True
 
 import time
-from datetime import datetime
-from System.Collections.Generic import List
 import os
-import json
+
+def to_json(obj, indent=4, _level=0):
+    """Custom JSON serializer for dict, list, str, int, float, bool, None."""
+    sp = ' ' * (indent * _level)
+    if isinstance(obj, dict):
+        items = []
+        for k, v in obj.items():
+            items.append(f'{sp}    "{str(k)}": {to_json(v, indent, _level+1)}')
+        return '{\n' + ',\n'.join(items) + f'\n{sp}' + '}'
+    elif isinstance(obj, list):
+        items = [to_json(i, indent, _level+1) for i in obj]
+        return '[\n' + ',\n'.join(' ' * (indent * (_level+1)) + i for i in items) + f'\n{sp}]'
+    elif isinstance(obj, str):
+        return '"' + obj.replace('"', '\\"') + '"'
+    elif obj is True:
+        return 'true'
+    elif obj is False:
+        return 'false'
+    elif obj is None:
+        return 'null'
+    else:
+        return str(obj)
+
 
 class GumpDebugger:
     def __init__(self):
@@ -51,7 +71,7 @@ class GumpDebugger:
         }
         # For JSON logging
         self.session_log = {
-            'session_start': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'session_start': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
 
             'gumps': []
         }
@@ -63,7 +83,7 @@ class GumpDebugger:
         if DEBUG_TO_INGAME_MESSAGE:
             Misc.SendMessage(f"[GumpDebug] {prefix}{message}", self.colors[color])
         entry = {
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
             'message': message,
             'color': color,
             'indent': indent
@@ -164,15 +184,39 @@ class GumpDebugger:
         try:
             self.stats['gumps_analyzed'] += 1
             # Prepare gump entry for JSON
+            # Try to extract additional gump metadata
+            gump_serial = None
+            gump_x = None
+            gump_y = None
+            gump_width = None
+            gump_height = None
+            gump_scale = None
+            try:
+                # Razor Enhanced exposes some info via Gumps.GetGumpData
+                gd = None
+                if hasattr(Gumps, 'GetGumpData'):
+                    gd = Gumps.GetGumpData(gump_id)
+                if gd:
+                    gump_serial = getattr(gd, 'Serial', None)
+                    gump_x = getattr(gd, 'X', None)
+                    gump_y = getattr(gd, 'Y', None)
+                    gump_width = getattr(gd, 'Width', None)
+                    gump_height = getattr(gd, 'Height', None)
+                    gump_scale = getattr(gd, 'Scale', None)
+            except Exception as e:
+                self.debug(f"Error extracting gump metadata: {str(e)}", 'error', 2)
             self.current_gump_entry = {
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
                 'gump_id_decimal': gump_id,
                 'gump_id_hex': hex(gump_id),
+                'serial': hex(gump_serial) if gump_serial is not None else None,
+                'position': {'x': gump_x, 'y': gump_y} if gump_x is not None and gump_y is not None else None,
+                'size': {'width': gump_width, 'height': gump_height} if gump_width is not None and gump_height is not None else None,
+                'scale': gump_scale,
                 'text_lines': [],
                 'button_positions': [],
                 'raw_data': None,
                 'positions': [],
- 
             }
             self.session_log['gumps'].append(self.current_gump_entry)
 
@@ -260,11 +304,11 @@ class GumpDebugger:
             if DEBUG_TO_JSON:
                 try:
                     base_dir = os.path.dirname(os.path.abspath(__file__))
-                    dt = datetime.now().strftime("%Y%m%d%H%M%S")
+                    dt = time.strftime("%Y%m%d%H%M%S", time.localtime())
                     filename = f"gump_debug_{dt}.json"
                     file_path = os.path.join(base_dir, filename)
                     with open(file_path, 'w', encoding='utf-8') as f:
-                        json.dump(self.session_log, f, indent=4)
+                        f.write(to_json(self.session_log, indent=4))
                     if DEBUG_TO_INGAME_MESSAGE:
                         Misc.SendMessage(f"[GumpDebug] Wrote debug log to {filename}", 63)
                 except Exception as e:
