@@ -8,13 +8,17 @@ make mana check optional ( "lower mana cost" modifiers might make this fail when
 deal with already casting or existing target 
 
 HOTKEY:: W
-VERSION::20250714
+VERSION::20250722
 """
 
 import time
-DEBUG_MODE = True
+
+DEBUG_MODE = False
 SPELL_INVIS = "Invisibility"
 INVIS_MANA_COST = 20
+
+# Config: make mana check optional
+CHECK_MANA = False  # Set to True to require minimum mana, False to always attempt cast
 
 CAST_TIMEOUT = 3  # seconds
 TARGET_TIMEOUT = 2  # seconds
@@ -24,17 +28,25 @@ MAX_ATTEMPTS = 5  # Safety limit if repeat is enabled
 #//============================================================
 
 def can_cast_invis():
+    if not CHECK_MANA:
+        return True
     return Player.Mana >= INVIS_MANA_COST
 
 
 def debug_message(msg, color=68):
     if DEBUG_MODE:
-        Misc.SendMessage(f"[INVIS] {msg}", color)
+        Misc.SendMessage(f"[SPELL_INVIS] {msg}", color)
 
 
 def cast_invis_self():
     attempts = 0
     while True:
+        # Cancel any existing target cursor or spellcast before casting
+        if Target.HasTarget():
+            debug_message("Target cursor already up, cancelling first.", 33)
+            Target.Cancel()
+            Misc.Pause(100)
+        # Check mana if enabled
         if not can_cast_invis():
             debug_message("Not enough mana to cast Invisibility!", 33)
             return
