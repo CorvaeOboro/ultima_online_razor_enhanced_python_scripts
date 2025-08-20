@@ -45,6 +45,86 @@ import os
 import sys
 from collections import defaultdict, Counter
 
+# ---------------- Normalization and Remapping ----------------
+
+# Map variant/synonym names (lowercased) to a canonical key (also lowercased)
+# Keep keys simple and lower; display is derived separately.
+MATERIAL_NAME_REMAP = {
+    # Flour and sacks
+    'flour': 'open sack of flour',
+    'sack of flour': 'open sack of flour',
+    'open flour sack': 'open sack of flour',
+    'bag of flour': 'open sack of flour',
+    'bags of flour': 'open sack of flour',
+    'sacks of flour': 'open sack of flour',
+    # Water pitchers
+    'water pitcher': 'pitcher of water',
+    'pitcher water': 'pitcher of water',
+    'pitcher of waters': 'pitcher of water',
+    # Honey
+    'honey': 'jar of honey',
+    'jar honey': 'jar of honey',
+    'jars of honey': 'jar of honey',
+    # Raw fish steak(s)
+    'raw fish steaks': 'raw fish steak',
+    # Generic plural to singular handled by the normalizer; add special cases here when needed.
+}
+
+_SMALL_WORDS = {'of', 'and', 'the', 'a', 'an'}
+
+def _simple_singularize(word: str) -> str:
+    """Very simple plural handling for common cases used here.
+    Avoid aggressive stemming; only handle basic trailing 's' and 'ies' -> 'y'.
+    """
+    w = word
+    if len(w) > 3 and w.endswith('ies'):
+        return w[:-3] + 'y'
+    if len(w) > 3 and w.endswith('s') and not w.endswith('ss'):
+        return w[:-1]
+    return w
+
+def _normalize_material_key(name: str) -> str:
+    """Normalize a material name to a canonical, lowercased key for aggregation.
+    Steps:
+    - lower/strip
+    - collapse whitespace
+    - apply manual remap if known
+    - basic plural to singular per-token
+    - re-apply remap after singularization (in case mapping needs singular form)
+    """
+    if not name:
+        return ''
+    s = (str(name) or '').strip().lower()
+    if not s:
+        return ''
+    # collapse whitespace
+    s = ' '.join(s.split())
+    # first-pass remap
+    s = MATERIAL_NAME_REMAP.get(s, s)
+    # simple token-wise singularization
+    tokens = [
+        _simple_singularize(tok) if tok not in _SMALL_WORDS else tok
+        for tok in s.split(' ')
+    ]
+    s2 = ' '.join(tokens)
+    # second-pass remap
+    s2 = MATERIAL_NAME_REMAP.get(s2, s2)
+    return s2
+
+def _canonical_material_display(key: str) -> str:
+    """Convert a canonical key (lowercase) into a display form with title casing,
+    keeping small words in lowercase. This avoids shouting 'Of'/'And'.
+    """
+    if not key:
+        return ''
+    parts = []
+    for i, tok in enumerate((key or '').split(' ')):
+        if tok in _SMALL_WORDS and i != 0:
+            parts.append(tok)
+        else:
+            parts.append(tok.capitalize())
+    return ' '.join(parts)
+
 def _script_parent_paths():
     """Return (project_root, data_dir, wiki_dir) based on this script's location.
     tools/DEV_gump_crafting_json_to_wiki.py -> project_root is parent of tools/
@@ -160,7 +240,12 @@ def _build_category_section(cat, items):
     # Emit header row so the table is sortable
     lines.append('!' + '\n! '.join(headers))
 
-    for it in sorted(items, key=lambda x: (x.get('name') or '').lower()):
+    # Default ordering: by required skill (ascending), then by name
+    items_sorted = sorted(
+        items,
+        key=lambda x: (_skill_val(x.get('skill_required')), (x.get('name') or '').lower())
+    )
+    for it in items_sorted:
         nm = _escape_cell(it.get('name'))
         gid = _escape_cell(it.get('id'))
         skill = _escape_cell(it.get('skill_required'))
@@ -177,18 +262,21 @@ def _build_category_section(cat, items):
     return '\n'.join(lines)
 
 def _build_materials_totals(grouped):
-    # Build global material usage statistics
-    usage = Counter()
-    used_in = defaultdict(list)  # material -> list of (category, item name)
+    # Build global material usage statistics (normalized)
+    usage = Counter()  # canonical_key -> count
+    used_in = defaultdict(set)  # canonical_key -> set of (category, item name)
     for cat, items in grouped.items():
         for it in items:
             nm = it.get('name') or ''
             for m in (it.get('materials') or []):
-                mname = m.get('name') or ''
-                if not mname:
+                mname_raw = m.get('name') or ''
+                if not mname_raw:
                     continue
-                usage[mname] += 1
-                used_in[mname].append((cat, nm))
+                key = _normalize_material_key(mname_raw)
+                if not key:
+                    continue
+                usage[key] += 1
+                used_in[key].add((cat, nm))
 
     lines = []
     lines.append('== Materials Totals ==')
@@ -200,13 +288,14 @@ def _build_materials_totals(grouped):
     lines.append('! Material')
     lines.append('! Count')
     lines.append('! Used In')
-    for mname, cnt in sorted(usage.items(), key=lambda x: (-x[1], x[0].lower())):
+    for key, cnt in sorted(usage.items(), key=lambda x: (-x[1], x[0])):
+        disp = _canonical_material_display(key)
         links = []
-        for (cat, item) in sorted(used_in[mname], key=lambda x: (x[0].lower(), x[1].lower())):
+        for (cat, item) in sorted(used_in[key], key=lambda x: (x[0].lower(), x[1].lower())):
             link = f"[[#{_anchor_for_category(cat)}|{item}]]"
             links.append(link)
         lines.append('|-')
-        lines.append(f"| {mname}")
+        lines.append(f"| {disp}")
         lines.append(f"| {cnt}")
         lines.append(f"| {'; '.join(links)}")
     lines.append('|}')

@@ -34,6 +34,7 @@ extract all the information into nicely organized json file ,
      then extracts the infro from the gump . then repeats for ever permutation .
       for now we will limit it to 1 total item extracted to test , 
 
+STATUS:: in progress , only tuned for cooking , needs verification 
 VERSION = 20250818
 """
 import time
@@ -90,7 +91,7 @@ TROUBLESOME_ITEMS = {
     "Baking":           {"category_button": COOKING_CATEGORIES["Baking"],           "item_info": 3},
     "Barbecue":         {"category_button": COOKING_CATEGORIES["Barbecue"],         "item_info": 3},
     "Chocolatiering":   {"category_button": COOKING_CATEGORIES["Chocolatiering"],   "item_info": 3},
-    "Meals":            {"category_button": COOKING_CATEGORIES["Meals"],            "item_info": 94},
+    "Meals":            {"category_button": COOKING_CATEGORIES["Meals"],            "item_info": 94}, # vegetable pizza Example C
 }
 
 # Discovery probe (general)
@@ -163,29 +164,30 @@ TROUBLESOME_OVERRIDES = {
     ('baking', 'cake batter'): 'name_first',
 }
 
-# EXAMPLE OUTPUT A = Pear Salad ,  Skill Required = 50.0 , Materials = Pear , 1 , Lettuce , 1
+# EXAMPLE OUTPUT A = most common standardized format found for newer items 
+# ITEM Example = Pear Salad ,  Skill Required = 50.0 , Materials = Pear , 1 , Lettuce , 1
 """
-   0 ITEM
-   1 <CENTER>MATERIALS</CENTER>
-   2 <CENTER>OTHER</CENTER>
-   3 <CENTER>COOKING MENU</CENTER>
-   4 MAKE NOW
-   5 MAKE NUMBER
-   6 MAKE MAX
-   7 BACK
-   8 This item may hold its maker's mark
-   9 Cooking
-   10 Success Chance:
-   11 Exceptional Chance:
-   12 Pear Salad                 <- name
-   13 28855                      <- graphic_id (example art id)
-   14 50.0                       <- skill_required
-   15 100.0%                     <- success_percent
-   16 49.3%                      <- exceptional_percent
-   17 Pear                       <- material name #1
-   18 1                          <- material qty #1
-   19 Lettuce                    <- material name #2
-   20 1                          <- material qty #2
+ITEM
+<CENTER>MATERIALS</CENTER>
+<CENTER>OTHER</CENTER>
+<CENTER>COOKING MENU</CENTER>
+MAKE NOW
+MAKE NUMBER
+MAKE MAX
+BACK
+This item may hold its maker's mark
+Cooking
+Success Chance:
+Exceptional Chance:
+Pear Salad                 <- name
+28855                      <- graphic_id (art id)
+50.0                       <- skill_required
+100.0%                     <- success_percent
+49.3%                      <- exceptional_percent
+Pear                       <- material name #1
+1                          <- material qty #1
+Lettuce                    <- material name #2
+1                          <- material qty #2
 """
 
 def handle_example_A(lines: list) -> list:
@@ -269,27 +271,27 @@ def handle_example_A(lines: list) -> list:
  # EXAMPLE OUTPUT B = Preparations - UNbaked quiche , Material = 1 Dough and 1 Egg , 0.0 skill , 69.6% success , 9.6% exceptional , 
 
 """
-0 ITEM
-1 <CENTER>MATERIALS</CENTER>
-2 <CENTER>OTHER</CENTER>
-3 <CENTER>COOKING MENU</CENTER>
-4 MAKE NOW
-5 MAKE NUMBER
-6 MAKE MAX
-7 BACK
-8 unbaked quiche             <- name appears EARLY (before 'Cooking' header),
-                                differs from Example 1 where name was at 12
-9 Cooking                    <- header appears AFTER name here (order differs)
-10 Success Chance:
-11 Exceptional Chance:
-12 Dough                      <- material name #1 appears BEFORE graphic/skill/percents
-13 Eggs                       <- material name #2 contiguous with name #1
-14 4162                       <- graphic_id appears AFTER materials (differs; Example 1 had id before materials)
-15 0.0                        <- skill_required appears AFTER graphic_id (still acceptable)
-16 69.6%                      <- success_percent
-17 9.6%                       <- exceptional_percent
-18 1                          <- material qty #1 (for 'Dough') appears LATE (after percents)
-19 1                          <- material qty #2 (for 'Eggs') appears LATE (after percents)
+ITEM
+<CENTER>MATERIALS</CENTER>
+<CENTER>OTHER</CENTER>
+<CENTER>COOKING MENU</CENTER>
+MAKE NOW
+MAKE NUMBER
+MAKE MAX
+BACK
+unbaked quiche             <- name appears EARLY (before 'Cooking' header),
+                differs from Example 1 where name was at 12
+Cooking                    <- header appears AFTER name here (order differs)
+Success Chance:
+Exceptional Chance:
+Dough                      <- material name #1 appears BEFORE graphic/skill/percents
+Eggs                       <- material name #2 contiguous with name #1
+4162                       <- graphic_id appears AFTER materials 
+0.0                        <- skill_required appears AFTER graphic_id 
+69.6%                      <- success_percent
+9.6%                       <- exceptional_percent
+1                          <- material qty #1 (for 'Dough') appears LATE (after percents)
+1                          <- material qty #2 (for 'Eggs') appears LATE (after percents)
 """
 def handle_example_B(lines: list) -> list:
     """Name-first with early material names and late quantities (e.g., unbaked quiche).
