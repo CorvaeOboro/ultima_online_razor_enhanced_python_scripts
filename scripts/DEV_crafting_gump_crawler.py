@@ -48,8 +48,18 @@ DEBUG_TO_JSON = True
 # Extraction cap (test mode)
 MAX_ITEMS_TO_EXTRACT = 999
 
-# Provide a list of crafting tool item IDs to use (backpack). Example IDs (fill as needed):
-TOOL_ITEM_IDS = [0x097F]  # e.g., [0x0F9D]  # Sewing Kit, Tongs, Mallet/Chisel etc. (set per shard)
+# Global toggle: choose which discipline's settings to use
+# Set to True for Alchemy (Mortar and Pestle), False for Cooking (Skillet)
+USE_ALCHEMY_SETTINGS = True
+
+# Discipline-specific tool IDs
+# 0x0E9B = Mortar and Pestle (Alchemy)
+# 0x097F = Skillet / Frying Pan (Cooking)
+ALCHEMY_TOOL_ITEM_IDS = [0x0E9B]
+COOKING_TOOL_ITEM_IDS = [0x097F]
+
+# Provide a list of crafting tool item IDs to use (backpack). Derived from toggle above.
+TOOL_ITEM_IDS = ALCHEMY_TOOL_ITEM_IDS if USE_ALCHEMY_SETTINGS else COOKING_TOOL_ITEM_IDS
 
 # Output shaping toggles
 # - OUTPUT_BASE: include session/base gump and category scaffolding
@@ -81,9 +91,24 @@ COOKING_CATEGORIES = {
     "Meals": 43,
 }
 
-# Troublesome items (one per category): use to target specific panels quickly in tests
-# Fill 'item_info' with a known button id when available. If None, tests will auto-detect.
-TROUBLESOME_ITEMS = {
+ALCHEMY_CATEGORIES = {
+    "Healing and Curative": 1,
+    "Enhancement": 8,
+    "Misc Potions": 15,
+    "Toxic": 22,
+    "Explosive": 29,
+    "Strange Brew": 36,
+}
+
+# Active discipline-derived config
+DISCIPLINE_NAME = 'Alchemy' if USE_ALCHEMY_SETTINGS else 'Cooking'
+DISCIPLINE_NAME_LOWER = DISCIPLINE_NAME.lower()
+CRAFTING_TYPE = DISCIPLINE_NAME
+CRAFTING_TYPE_KEY = DISCIPLINE_NAME_LOWER
+DISCIPLINE_MENU_LABELS_LOWER = [f"<center>{DISCIPLINE_NAME.lower()} menu</center>", f"{DISCIPLINE_NAME.lower()} menu"]
+
+# Troublesome items per discipline
+COOKING_TROUBLESOME_ITEMS = {
     # Example entries; adjust item_info values after confirming in-game
     "Magical Foods":    {"category_button": COOKING_CATEGORIES["Magical Foods"],    "item_info": 3},
     "Ingredients":      {"category_button": COOKING_CATEGORIES["Ingredients"],      "item_info": 3},
@@ -93,6 +118,22 @@ TROUBLESOME_ITEMS = {
     "Chocolatiering":   {"category_button": COOKING_CATEGORIES["Chocolatiering"],   "item_info": 3},
     "Meals":            {"category_button": COOKING_CATEGORIES["Meals"],            "item_info": 94}, # vegetable pizza Example C
 }
+
+def _build_alchemy_troublesome():
+    try:
+        return { name: {"category_button": btn, "item_info": 3} for name, btn in ALCHEMY_CATEGORIES.items() }
+    except Exception:
+        return {}
+
+ALCHEMY_TROUBLESOME_ITEMS = _build_alchemy_troublesome()
+
+# Active mappings selected by toggle
+ACTIVE_CATEGORIES = ALCHEMY_CATEGORIES if USE_ALCHEMY_SETTINGS else COOKING_CATEGORIES
+TROUBLESOME_ITEMS = ALCHEMY_TROUBLESOME_ITEMS if USE_ALCHEMY_SETTINGS else COOKING_TROUBLESOME_ITEMS
+
+# Troublesome items (one per category): use to target specific panels quickly in tests
+# Fill 'item_info' with a known button id when available. If None, tests will auto-detect.
+ 
 
 # Discovery probe (general)
 BUTTON_ID_MIN = 1
@@ -123,7 +164,7 @@ MAX_MISSING_IN_ROW = 3  # consecutive non-info or unchanged info panels before s
 
 UI_TOKENS_IGNORE = set([
     'ITEM', 'MAKE NOW', 'MAKE NUMBER', 'MAKE MAX', 'BACK',
-    'COOKING', 'COOKING MENU', 'MATERIALS', 'OTHER',
+    DISCIPLINE_NAME.upper(), f'{DISCIPLINE_NAME.upper()} MENU', 'MATERIALS', 'OTHER',
     'SUCCESS CHANCE:', 'EXCEPTIONAL CHANCE:',
     "THIS ITEM MAY HOLD ITS MAKER'S MARK",
     "GLOBAL CHAT HISTORY - SAY [C <DESIRED MESSAGE> TO CHAT!"
@@ -306,7 +347,7 @@ def handle_example_B(lines: list) -> list:
     # name before 'cooking'
     name = None
     try:
-        idx_c = low.index('cooking')
+        idx_c = low.index(DISCIPLINE_NAME_LOWER)
     except Exception:
         idx_c = -1
     search_upto = idx_c if idx_c > 0 else len(toks)
@@ -343,7 +384,7 @@ def handle_example_B(lines: list) -> list:
             if name and t == name:
                 started = True
             continue
-        if t.upper() in UI_TOKENS_IGNORE or t.lower() == 'cooking':
+        if t.upper() in UI_TOKENS_IGNORE or t.lower() == DISCIPLINE_NAME_LOWER:
             continue
         if _is_non_material_token(t):
             continue
@@ -423,7 +464,7 @@ def handle_example_C(lines: list) -> list:
     # Guess name and graphic id
     name_guess, gid_guess, _ = _guess_item_name_and_graphic(tokens)
     # Helpers
-    anchors = {'item', 'materials', 'other', 'menu', 'make', 'back', 'chance', 'cooking'}
+    anchors = {'item', 'materials', 'other', 'menu', 'make', 'back', 'chance', DISCIPLINE_NAME_LOWER}
     def is_name_candidate(s: str) -> bool:
         if not s:
             return False
@@ -551,7 +592,7 @@ def handle_example_D(lines: list) -> list:
     # Material names: scan from start until first number/percent
     names = []
     for t in toks:
-        if t.upper() in UI_TOKENS_IGNORE or t.lower() == 'cooking':
+        if t.upper() in UI_TOKENS_IGNORE or t.lower() == DISCIPLINE_NAME_LOWER:
             continue
         if _is_non_material_token(t):
             continue
@@ -616,10 +657,10 @@ def handle_example_E(lines: list) -> list:
     """
     toks = [_strip_tags(x) for x in (lines or []) if _strip_tags(x)]
     low = [t.lower() for t in toks]
-    # Name: first non-anchor token before 'cooking'
+    # Name: first non-anchor token before discipline header
     name = None
     try:
-        idx_c = low.index('cooking')
+        idx_c = low.index(DISCIPLINE_NAME_LOWER)
     except Exception:
         idx_c = -1
     search_upto = idx_c if idx_c > 0 else len(toks)
@@ -690,6 +731,100 @@ def handle_example_E(lines: list) -> list:
         if i < len(qtys):
             out.append(str(qtys[i]))
     return out
+
+# EXAMPLE F =  ALCHEMY - Total Mana Potion , Material = 8 Eye of Newt , 1 Empty Bottles , 90.0 skill , 83.3% success , 8% exceptional , graphic id = 3853
+"""
+"ITEM",
+"<CENTER>MATERIALS</CENTER>",
+"<CENTER>OTHER</CENTER>",
+"<CENTER>ALCHEMY MENU</CENTER>",
+"MAKE NOW",
+"MAKE NUMBER",
+"MAKE MAX",
+"BACK",
+"Alchemy",
+"Success Chance:",
+"Eye of Newt",
+"Empty Bottles",
+"Total Mana Potion",
+"3853",
+"90.0",
+"83.3%",
+"8",
+"1"
+"""
+def handle_example_F(lines: list) -> list:
+    # Parse an Alchemy item info panel similar to the example provided.
+    # Output order: name, graphic_id, skill, success%, exceptional%, materials interleaved name,qty
+    toks = [_strip_tags(x) for x in (lines or []) if _strip_tags(x)]
+    if not toks:
+        return []
+    # Guess name and graphic id using shared helper
+    name, gid, idx_gid = _guess_item_name_and_graphic(toks)
+    # Skill: first float between 0..150 appearing after gid index
+    skill = None
+    start_idx = (idx_gid + 1) if idx_gid >= 0 else 0
+    for t in toks[start_idx:]:
+        v = _to_float_or_none(t.rstrip('%')) if isinstance(t, str) else None
+        if v is None:
+            continue
+        if 0.0 <= v <= 150.0 and not t.endswith('%'):
+            skill = v
+            break
+    # Percents: collect numeric percents (success, exceptional)
+    percs = []
+    for t in toks:
+        if _is_percent(t):
+            try:
+                percs.append(float(str(t).rstrip('%')))
+            except Exception:
+                continue
+    # Material names: take non-numeric, non-anchor tokens until we hit numbers/percents
+    names = []
+    for t in toks:
+        s = (t or '').strip()
+        if not s:
+            continue
+        if s.upper() in UI_TOKENS_IGNORE or s.lower() == DISCIPLINE_NAME_LOWER:
+            continue
+        if _is_non_material_token(s):
+            continue
+        if _is_percent(s):
+            break
+        if _to_float_or_none(s) is not None or _to_int_or_none(s) is not None:
+            break
+        names.append(s)
+    # Quantities: trailing ints after percents; limit count to names length
+    qtys = []
+    for t in reversed(toks):
+        if len(qtys) >= len(names):
+            break
+        if _is_percent(t):
+            continue
+        fv = _to_float_or_none(t)
+        if fv is not None and abs(fv - int(fv)) < 1e-6:
+            iv = int(fv)
+            if 0 < iv <= 500:
+                qtys.append(iv)
+    qtys = list(reversed(qtys))
+    # Build ordered output
+    out = []
+    if name:
+        out.append(name)
+    if gid is not None:
+        out.append(str(gid))
+    if skill is not None:
+        out.append(str(skill))
+    if len(percs) >= 1:
+        out.append(f"{percs[0]}%")
+    if len(percs) >= 2:
+        out.append(f"{percs[1]}%")
+    for i, nm in enumerate(names):
+        out.append(nm)
+        if i < len(qtys):
+            out.append(str(qtys[i]))
+    return out
+
 
 # ===== Utilities =====
 
@@ -771,7 +906,7 @@ def _extract_name_from_lines(lines: list) -> str:
         if not s:
             continue
         low = s.lower()
-        if any(k in low for k in ['item', 'materials', 'other', 'menu', 'make', 'back', 'chance', 'cooking']):
+        if any(k in low for k in ['item', 'materials', 'other', 'menu', 'make', 'back', 'chance', DISCIPLINE_NAME_LOWER]):
             continue
         return s
     return ''
@@ -793,7 +928,7 @@ def identify_order_type(category: str, lines: list) -> str:
         return 'name_first'
     # Content heuristics
     # If name-like token appears before the word 'cooking', prefer name_first
-    idx_cooking = _index_of(lines, ['cooking'])
+    idx_cooking = _index_of(lines, [DISCIPLINE_NAME_LOWER])
     if idx_cooking > 0:
         # find first non-empty, non-anchor before idx_cooking
         for j in range(max(0, idx_cooking - 4), idx_cooking):
@@ -818,7 +953,7 @@ def build_suggested_by_order_type(lines: list, order_type: str) -> list:
         tokens = list(lines or [])
         name_guess, gid_guess, idx_gid = _guess_item_name_and_graphic(tokens)
         # Collect candidate material names (exclude anchors and the item name)
-        anchors = {'item', 'materials', 'other', 'menu', 'make', 'back', 'chance', 'cooking'}
+        anchors = {'item', 'materials', 'other', 'menu', 'make', 'back', 'chance', DISCIPLINE_NAME_LOWER}
         names = []
         for t in tokens:
             s = (t or '').strip()
@@ -958,7 +1093,7 @@ def _guess_item_name_and_graphic(tokens: list):
     """Guess item name as the last non-anchor token before a large integer that looks like a graphic id.
     Returns: (name, graphic_id, index_of_graphic_id or -1)
     """
-    anchors = {'item', 'materials', 'other', 'menu', 'make', 'back', 'chance', 'cooking'}
+    anchors = {'item', 'materials', 'other', 'menu', 'make', 'back', 'chance', DISCIPLINE_NAME_LOWER}
     idx_gid = -1
     gid = None
     # find first large integer token
@@ -1021,7 +1156,7 @@ def _parse_with_lines(entry: dict, lines: list, category: str):
 
 def build_handler_candidates(category: str, entry: dict) -> list:
     """Return a list of (tag, ordered_tokens) candidates prioritized by category and example patterns.
-    Includes original, normalization-based, order-type heuristic, and example handlers A-E.
+    Includes original, normalization-based, order-type heuristic, and example handlers A-F.
     """
     lines = (entry or {}).get('text_lines') or []
     candidates = []
@@ -1048,8 +1183,12 @@ def build_handler_candidates(category: str, entry: dict) -> list:
         example_funcs = [handle_example_E, handle_example_B, handle_example_A]
     elif cat == 'chocolatiering':
         example_funcs = [handle_example_D, handle_example_A, handle_example_B]
+    elif cat == 'misc potions' and DISCIPLINE_NAME_LOWER == 'alchemy':
+        # Alchemy Misc Potions (e.g., mana potions) follow Example F; prioritize it
+        example_funcs = [handle_example_F, handle_example_A, handle_example_B, handle_example_C, handle_example_D, handle_example_E]
     else:
-        example_funcs = [handle_example_A, handle_example_B, handle_example_C, handle_example_D, handle_example_E]
+        # Default: include Example F as a fallback candidate as well
+        example_funcs = [handle_example_A, handle_example_B, handle_example_C, handle_example_D, handle_example_E, handle_example_F]
     for fn in example_funcs:
         try:
             seq = fn(lines) or []
@@ -1076,6 +1215,8 @@ def test_extract_troublesome_recipes():
     results = {
         'session_start': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
         'tool_item_ids': [hex(tool_item_id) for tool_item_id in TOOL_ITEM_IDS],
+        'crafting_type': CRAFTING_TYPE,
+        'crafting_type_key': CRAFTING_TYPE_KEY,
         'categories': {}
     }
 
@@ -1138,6 +1279,11 @@ def test_extract_troublesome_recipes():
                     except Exception:
                         best_parsed = {}
                 best_parsed['category'] = cat_name
+                # Attach category and item button ids
+                try:
+                    best_parsed['button_category'] = int(cat_btn)
+                except Exception:
+                    best_parsed['button_category'] = None
                 best_parsed['button_info'] = int(item_btn)
                 try:
                     best_parsed['button_make'] = int(item_btn) - 1
@@ -1301,7 +1447,7 @@ def is_sparse_parsed_item(parsed: dict) -> bool:
 
 def build_item_output(parsed: dict, include_percents: bool = None) -> dict:
     """Return an ordered, succinct dict for a parsed item.
-    Order: category, name, id, skill_required, [success_percent, exceptional_percent], materials
+    Order: category, name, id, skill_required, [success_percent, exceptional_percent], buttons, materials
     - id is the zero-padded uppercase hex graphic id (e.g., 0x00F2)
     - include_percents: override global toggle if provided
     """
@@ -1328,7 +1474,10 @@ def build_item_output(parsed: dict, include_percents: bool = None) -> dict:
         val = parsed.get('exceptional_percent')
         if val is not None:
             o['exceptional_percent'] = val
-    # Include button ids (info/make) before materials, if present
+    # Include button ids (category/info/make) before materials, if present
+    val = parsed.get('button_category')
+    if val is not None:
+        o['button_category'] = val
     val = parsed.get('button_info')
     if val is not None:
         o['button_info'] = val
@@ -1620,7 +1769,7 @@ def parse_item_info_gump(entry: dict, category: str = None) -> dict:
                     except Exception:
                         break
                 # Skip UI tokens and obvious non-material labels
-                if tk.upper() in UI_TOKENS_IGNORE or tk.strip().lower() in {'cooking'}:
+                if tk.upper() in UI_TOKENS_IGNORE or tk.strip().lower() in {DISCIPLINE_NAME_LOWER}:
                     k += 1
                     continue
                 if _is_non_material_token(tk):
@@ -1767,7 +1916,7 @@ def normalize_text_by_anchors(text_lines: list) -> dict:
     # Key anchors
     idx_mat = _index_of(lines, ['<center>materials</center>', 'materials'])
     idx_other = _index_of(lines, ['<center>other</center>', 'other'])
-    idx_menu = _index_of(lines, ['<center>cooking menu</center>', 'cooking menu'])
+    idx_menu = _index_of(lines, DISCIPLINE_MENU_LABELS_LOWER)
     idx_skill = _index_of(lines, ['success chance:'])
     idx_exc = _index_of(lines, ['exceptional chance:'])
 
@@ -1781,7 +1930,7 @@ def normalize_text_by_anchors(text_lines: list) -> dict:
             low = t.lower()
             if 'item' == low:
                 continue
-            if 'cooking' in low:
+            if DISCIPLINE_NAME_LOWER in low:
                 continue
             if 'chance' in low or 'make' in low or 'back' == low or 'menu' in low:
                 continue
@@ -1978,6 +2127,8 @@ def crawl_once(max_items=1):
     crawl_results = {
         'session_start': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
         'tool_item_ids': [hex(tool_item_id) for tool_item_id in TOOL_ITEM_IDS],
+        'crafting_type': CRAFTING_TYPE,
+        'crafting_type_key': CRAFTING_TYPE_KEY,
         'base_gump': None,
         'categories': {},
         'known_gumps': {}
@@ -2006,7 +2157,7 @@ def crawl_once(max_items=1):
 
     # Probe categories first, then iterate across all potential item-info buttons
     number_of_items_captured = 0
-    categories_iteration_list = list(COOKING_CATEGORIES.items()) if COOKING_CATEGORIES else [(None, button_id) for button_id in CATEGORY_BUTTONS]
+    categories_iteration_list = list(ACTIVE_CATEGORIES.items()) if ACTIVE_CATEGORIES else [(None, button_id) for button_id in CATEGORY_BUTTONS]
     for category_name, category_button_id in categories_iteration_list:
         # Ensure a gump is present before interacting
         if wait_for_gump(500) == 0:
@@ -2087,6 +2238,10 @@ def crawl_once(max_items=1):
                 parsed_item_details = best_parsed if isinstance(best_parsed, dict) else {}
                 parsed_item_details['category'] = category_key
                 # Track which buttons led here
+                try:
+                    parsed_item_details['button_category'] = int(category_button_id)
+                except Exception:
+                    parsed_item_details['button_category'] = None
                 parsed_item_details['button_info'] = int(item_info_button_id)
                 try:
                     parsed_item_details['button_make'] = int(item_info_button_id) - 1
@@ -2166,7 +2321,9 @@ def save_results(results):
         except Exception:
             pass
         dt = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        filename = f"gump_crafting_{dt}.json"
+        # Prefer the crafting type from results for flexibility; fallback to current toggle
+        ct_key = (results.get('crafting_type_key') if isinstance(results, dict) else None) or CRAFTING_TYPE_KEY
+        filename = f"gump_crafting_{ct_key}_{dt}.json"
         file_path = os.path.join(data_dir, filename)
 
         # Shape the output according to toggles
@@ -2187,12 +2344,18 @@ def save_results(results):
                         items_only.append(build_item_output(parsed))
             except Exception:
                 pass
-            payload = items_only
+            payload = {
+                'crafting_type': results.get('crafting_type') or CRAFTING_TYPE,
+                'crafting_type_key': results.get('crafting_type_key') or CRAFTING_TYPE_KEY,
+                'items': items_only
+            }
         elif OUTPUT_BASE and not OUTPUT_ITEM:
             # Include base/session and category scaffolding without items
             shaped = {
                 'session_start': results.get('session_start'),
                 'tool_item_ids': results.get('tool_item_ids'),
+                'crafting_type': results.get('crafting_type') or CRAFTING_TYPE,
+                'crafting_type_key': results.get('crafting_type_key') or CRAFTING_TYPE_KEY,
                 'base_gump': results.get('base_gump'),
                 'known_gumps': results.get('known_gumps', {})
             }

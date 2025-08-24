@@ -8,7 +8,9 @@ percentage first , colorize by category , display as bar
 change the ULTIMA_CLIENT_LOG_FOLDERPATH to match your client location JournalLogs
 currently tuned for UOUnchained progression ( Mastery , Weekly Quests , Dungeons )
 
-TROUBLESHOOTING:: if import errors, download python and copy the Lib folder contents into Lib folder in RazorEnhanced
+TROUBLESHOOTING:: if import errors, download python (v323) 
+and copy the Lib folder contents into Lib folder in RazorEnhanced
+
 HOTKEY:: StartUp
 VERSION::20250808
 """
@@ -19,7 +21,7 @@ import os # file path reading
 ULTIMA_CLIENT_LOG_FOLDERPATH = r'D:\ULTIMA\UO_Unchained\Data\Client\JournalLogs'
 
 DEBUG_MODE = False  # Set to True to enable in-game debug messages
-
+USE_CUSTOM_TEXT_COLORS = True # Toggle whether to use per-category/mastery colors for text, or a single global color.
 # gump ID= 4294967295  = the max value , randomly select a high number less then max
 GUMP_ID =  3329354321
 
@@ -55,6 +57,9 @@ FONT_COLORS = {
     'gray dark': 0x07AF,   # dark gray
     'black': 0x0000        # black
 }
+
+# Global text color used when USE_CUSTOM_TEXT_COLORS is False
+GLOBAL_TEXT_COLOR = FONT_COLORS['white']
 
 GUMP_HUE_COLORS = {
     'background': FONT_COLORS['black'],
@@ -95,6 +100,17 @@ MASTERY_COLORS = {
     'Shadow': FONT_COLORS['gray dark'],
 }
 
+MONSTER_COLORS = {
+    'Undead': FONT_COLORS['gray'],
+    'Giant': FONT_COLORS['brown'],
+    'Elemental': FONT_COLORS['brown'],
+    'Human': FONT_COLORS['blue'],
+    'Dragon': FONT_COLORS['orange'],
+    'Daemon': FONT_COLORS['red dark'],
+    'Vermin': FONT_COLORS['gray'],
+    'Ogre': FONT_COLORS['brown'],
+    'Paragon': FONT_COLORS['purple'],
+}
 
 # Exclude certain progress types that are not quests (e.g., XP, Max Stones)
 EXCLUDED_PROGRESS_KEYS = ["Xp", "Max Stones"]
@@ -359,7 +375,9 @@ class ProgressTracker:
         # No background for a transparent/overlay look
         width = BAR_WIDTH + 28
         height = self._gump_height()
-        Gumps.AddLabel(g, 12, 8, GUMP_HUE_COLORS['text'], "Progress Tracker")
+        # Header text respects global toggle
+        header_color = GLOBAL_TEXT_COLOR if not USE_CUSTOM_TEXT_COLORS else GUMP_HUE_COLORS['text']
+        Gumps.AddLabel(g, 12, 8, header_color, "Progress Tracker")
         y = 28  # Slightly higher for compactness
         task_list = self.get_task_list()
         if not task_list:
@@ -370,10 +388,19 @@ class ProgressTracker:
             cur, maxval, pct = self.get_progress(task)
             # Determine text color: use MASTERY_COLORS first if mastery match, else fallback to category
             text_color = None
+            # 1) Mastery match
             for mastery, m_color in MASTERY_COLORS.items():
                 if mastery.lower() in task.lower():
                     text_color = m_color
                     break
+            # 2) Monster type match
+            if text_color is None:
+                lower_task = task.lower()
+                for monster, mon_color in MONSTER_COLORS.items():
+                    if monster.lower() in lower_task:
+                        text_color = mon_color
+                        break
+            # 3) Category match or default
             if text_color is None:
                 lower_task = task.lower()
                 for cat, cat_color in CATEGORY_COLORS.items():
@@ -382,6 +409,9 @@ class ProgressTracker:
                         break
                 else:
                     text_color = CATEGORY_COLORS['default']
+            # Apply global override if custom colors are disabled
+            if not USE_CUSTOM_TEXT_COLORS:
+                text_color = GLOBAL_TEXT_COLOR
             bar_color = GUMP_HUE_COLORS['bar']  # You may want to enhance bar color logic later
             # Bar background
             Gumps.AddImageTiled(g, 12, y, BAR_WIDTH, BAR_HEIGHT, 2624)  # Black tiled bar
@@ -406,13 +436,17 @@ class ProgressTracker:
             Gumps.AddLabel(g, 18, y + 1, text_color, label_main)
             num_x = 18 + main_label_width + 4  # 4px gap width 
             # Draw numbers in smaller font or lighter color, offset to the right
-            try:
-                # Use HTML Gump for small font if supported (font size 8)
-                html = f"<center><font size=8 color=gray>{label_nums}</font></center>"
-                Gumps.AddHtmlGump(g, num_x, y + 1, 70, BAR_HEIGHT, html, False, False)
-            except Exception:
-                # Fallback: use a dimmer color for numbers
-                Gumps.AddLabel(g, num_x, y + 1, 922, label_nums)  # 922 = grayish
+            if not USE_CUSTOM_TEXT_COLORS:
+                # Respect global text color for numbers as well
+                Gumps.AddLabel(g, num_x, y + 1, GLOBAL_TEXT_COLOR, label_nums)
+            else:
+                try:
+                    # Use HTML Gump for small font if supported (font size 8)
+                    html = f"<center><font size=8 color=gray>{label_nums}</font></center>"
+                    Gumps.AddHtmlGump(g, num_x, y + 1, 70, BAR_HEIGHT, html, False, False)
+                except Exception:
+                    # Fallback: use a dimmer color for numbers
+                    Gumps.AddLabel(g, num_x, y + 1, 922, label_nums)  # 922 = grayish
             y += BAR_HEIGHT + BAR_SPACING
         Gumps.AddButton(g, BAR_WIDTH + 2, 4, 3600, 3601, 1, 0, 0)  # Close button
         debug(f'[XP Tracker] Sending Gump to Player serial {Player.Serial}')
@@ -483,7 +517,7 @@ def main():
         debug('[XP Tracker] Main loop started')
         log_path = find_newest_log_file(ULTIMA_CLIENT_LOG_FOLDERPATH)
         if not log_path:
-            debug(f'[XP Tracker] No log file found in {log_dir}')
+            debug(f'[XP Tracker] No log file found in {ULTIMA_CLIENT_LOG_FOLDERPATH}')
             return
         debug(f'[XP Tracker] Using log file: {log_path}')
         tracker = LogFileProgressTracker(log_path)

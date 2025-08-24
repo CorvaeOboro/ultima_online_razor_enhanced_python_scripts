@@ -7,7 +7,7 @@
  - include refreshing trap pouch , 
  - include the hue variant range 
  - add check if paralyzed
- - if not paraluzed and not in combat , and there are unhued pouches then we should cast trap on all untrapped pouches 
+ - if not paralyzed and not in combat , and there are unhued pouches then we should cast trap on all untrapped pouches ( like a self restock based on context )
 
 HOTKEY:: D
 VERSION::20250714

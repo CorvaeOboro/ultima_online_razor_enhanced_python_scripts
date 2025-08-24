@@ -58,8 +58,8 @@ SAVE_ONLY_THIS_ONE_SHIELD_ID = 0x1BC4 # Order shield
 RESERVE_TIERS = {
     'TIER1': True,      # Set to True to reserve Tier 1 items
     'TIER2': True,     # Set to True to reserve Tier 2 items
-    'TIER3': True,     # Set to True to reserve Tier 3 items
-    'TIER4': True,     # Set to True to reserve Tier 4 items
+    'TIER3': False,     # Set to True to reserve Tier 3 items
+    'TIER4': False,     # Set to True to reserve Tier 4 items
     'MAGICAL': False   # Set to True to reserve other magical items
 }
 

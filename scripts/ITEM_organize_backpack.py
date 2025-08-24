@@ -13,16 +13,15 @@ Organizes items in the backpack with specific positioning and directional spacin
 These positions are tuned for a "150" container size without scaling items sizes 
 the default is "100" container size so you may want to adjust the x and y values for your settings
 
-TODO:
-- offset the trap pouches vertically
-
-VERSION::20250805
+HOTKEY:: U
+VERSION::20250823
 """
 ORGANIZE_UNKNOWN_ITEMS = True
 ORGANIZE_REAGENTS = True
 ORGANIZE_POTIONS = True
 ORGANIZE_GEMS = True
 ORGANIZE_TOOLS = True
+ORGANIZE_BOOKS = True
 
 DEBUG_MODE = False  # Set to True to enable debug/info messages
 SPACING_OFFSET = 7  # Pixels to offset spacing
@@ -80,21 +79,20 @@ ITEM_GROUPS = {
     },
     "BOOKS": {
         "items": [
-            {"name": "Spellbook", "id": 0x0EFA, "x": 45, "y": 20}
+            {"name": "Spellbook", "id": 0x0EFA, "x": 45, "y": 65}
         ],
         "move_to_char": False,
         "is_spellbook": True  # Special flag for spellbook handling
     },
     "TRAP_POUCHES": {
         "items": [
-            {"name": "Trap Pouch", "id": 0x0E79, "x": 300, "y": 200}
+            {"name": "Trap Pouch", "id": 0x0E79, "x": 300, "y": 120}
         ],
         "move_to_char": False
     },
     "RUNES": {
         "items": [
-            {"name": "Recall Rune", "id": 0x1F14, "x": 300, "y": 0},
-            {"name": "Gate Rune", "id": 0x1F14, "x": 300, "y": 50}  # Same ID, different hue
+            {"name": "Recall Rune", "id": 0x1F14, "x": 300, "y": 80},
         ],
         "move_to_char": False
     },
@@ -161,36 +159,46 @@ def find_items_by_id(item_id, sort_by_hue=False):
     return items
 
 def move_spellbooks(items, base_x, base_y):
-    """Special handling for spellbooks - organize by hue."""
+    """Place spellbooks in a clean grid (rows/columns) to avoid diagonal stacking.
+    - Sorted by hue (then serial) for stable placement
+    """
     if not items:
         return
-    # Group spellbooks by hue
-    hue_groups = {}
-    for item in items:
-        hue = item.Hue if item.Hue > 0 else 0
-        if hue not in hue_groups:
-            hue_groups[hue] = []
-        hue_groups[hue].append(item)
-    # Sort hues for consistent ordering
-    sorted_hues = sorted(hue_groups.keys())
-    # Position variables
-    current_x = base_x
-    current_y = base_y
-    books_per_row = 5
-    book_spacing = 5
-    row_spacing = 10
-    # Place books by hue groups
-    for hue in sorted_hues:
-        books = hue_groups[hue]
-        for i, book in enumerate(books):
-            x = base_x + (i % books_per_row) * book_spacing
-            y = base_y + (i // books_per_row) * row_spacing
-            Items.Move(book.Serial, Player.Backpack.Serial, book.Amount, x, y)
+
+    # Configuration
+    columns = 8
+    h_spacing = 8
+    v_spacing = 10
+
+    # Stable order: by hue, then by serial
+    def hue_key(itm):
+        return (itm.Hue if itm.Hue > 0 else 0, itm.Serial)
+
+    sorted_items = sorted(items, key=hue_key)
+
+    for idx, book in enumerate(sorted_items):
+        try:
+            col = idx % columns
+            row = idx // columns
+            x = base_x + col * h_spacing
+            y = base_y + row * v_spacing
+
+            # Re-fetch by serial to avoid stale references after previous moves
+            fresh = Items.FindBySerial(book.Serial)
+            if not fresh:
+                debug_message(f"Spellbook not found by serial {hex(book.Serial)}; skipping.", 33)
+                continue
+
+            # Use amount 0 (all) for non-stackables; keep target as backpack at specific coords
+            Items.Move(fresh.Serial, Player.Backpack.Serial, 0, x, y)
             Misc.Pause(600)
-            if i > 0 and i % books_per_row == books_per_row - 1:
-                debug_message(f"Placed {i+1} spellbooks of hue {hue}", 65)
-        # After each hue group, move starting y down for the next group if needed
-        base_y += row_spacing
+
+            # Small extra pause after finishing each row to let container settle
+            if col == columns - 1:
+                Misc.Pause(400)
+        except Exception as e:
+            debug_message(f"Error placing spellbook idx={idx} serial={hex(book.Serial)}: {e}", 33)
+    debug_message(f"Placed {len(sorted_items)} spellbooks in grid {columns} per row.", 65)
 
 def move_items(items, target_x, target_y, group_config):
     """Move items to target location with appropriate handling."""
@@ -284,25 +292,41 @@ def organize_backpack():
         debug_message(f"Processing {group_name}...", 65)
         total_items = 0
 
-        for item_def in group_config["items"]:
-            items = find_items_by_id(item_def["id"], sort_by_hue=True)
-            if items:
-                total_items += len(items)
-                debug_message(f"Found {len(items)} {item_def['name']}...", 65)
-                # Each type gets its own stack at its own x/y
-                stack_count = 0
-                current_x = item_def["x"]
-                current_y = item_def["y"]
-                for item in items:
-                    Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, current_x, current_y)
-                    Misc.Pause(600)
-                    stack_count += 1
-                    if stack_count >= MAX_STACK_SIZE:
-                        current_x += SPACING_OFFSET * MAX_STACK_SIZE
-                        stack_count = 0
-                    else:
-                        current_x += SPACING_OFFSET
-                        current_y += SPACING_OFFSET
+        # Special-case: handle spellbooks with dedicated grid function
+        if group_config.get("is_spellbook", False):
+            # Collect all spellbooks using the group's item definitions (usually 0x0EFA)
+            base_x = group_config["items"][0]["x"]
+            base_y = group_config["items"][0]["y"]
+            spellbooks = []
+            for item_def in group_config["items"]:
+                spellbooks.extend(find_items_by_id(item_def["id"], sort_by_hue=True))
+            if spellbooks:
+                total_items = len(spellbooks)
+                debug_message(f"Found {total_items} Spellbooks. Placing in rows of 8...", 65)
+                move_spellbooks(spellbooks, base_x, base_y)
+            else:
+                debug_message("No Spellbooks found.", 65)
+        else:
+            # Default handling for non-spellbook groups
+            for item_def in group_config["items"]:
+                items = find_items_by_id(item_def["id"], sort_by_hue=True)
+                if items:
+                    total_items += len(items)
+                    debug_message(f"Found {len(items)} {item_def['name']}...", 65)
+                    # Each type gets its own stack at its own x/y
+                    stack_count = 0
+                    current_x = item_def["x"]
+                    current_y = item_def["y"]
+                    for item in items:
+                        Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, current_x, current_y)
+                        Misc.Pause(600)
+                        stack_count += 1
+                        if stack_count >= MAX_STACK_SIZE:
+                            current_x += SPACING_OFFSET * MAX_STACK_SIZE
+                            stack_count = 0
+                        else:
+                            current_x += SPACING_OFFSET
+                            current_y += SPACING_OFFSET
 
         if total_items > 0:
             debug_message(f"Finished {group_name}: {total_items} items organized", 65)

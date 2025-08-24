@@ -20,7 +20,6 @@ import time
 import re
 
 DEBUG_MODE = False # debug prints and messages 
-
 # gump ID= 4294967295  = the max value , randomly select a high number gump so its unique
 GUMP_ID =  3411114321
 
@@ -46,14 +45,14 @@ SEGMENT_DIMENSIONS = {
 # Status effect configurations
 STATUS_EFFECTS = {
     "bandage": {
-        "duration": 7000,  # 7 seconds in ms
+        "duration": 7000,  # 7 seconds in ms , this is modified by DEX we are using average
         "color": 168,     # Green
         "flash_color": 53, # Yellow
         "pattern": r"You begin applying the bandages",
     },
     "poison": {
         "duration": 30000,  # 30 seconds in ms
-        "color": 0x01A2,   # Purple (updated, matches DEV_font_color_gump.py)
+        "color": 0x01A2,   # Purple 
         "pattern": r"You have been poisoned",
     },
     "bleed": {
@@ -62,6 +61,9 @@ STATUS_EFFECTS = {
         "pattern": r"You are bleeding",
     }
 }
+
+# Cooldown for saying "[emote oh" when critically low HP (in milliseconds)
+EMOTE_OH_COOLDOWN_MS = 60 * 1000
 
 class ARPGStatusBars:
     def __init__(self):
@@ -72,9 +74,9 @@ class ARPGStatusBars:
         self.status_bar_height = 6  # Height for status effect bars
         self.spacing = 1  # Minimal spacing
         
-        # Position (centered in lower screen)
-        self.x = Player.Position.X - (self.bar_width // 2)  # Center horizontally
-        self.y = 600  # Lower screen area
+        # Position (centered in lower screen) we are keeping these low for laptops or small monitors
+        self.x = 200 # 
+        self.y = 400  # Lower screen areas
         
         # Gump ID (using unique range to avoid conflicts)
         self.gump_id = GUMP_ID
@@ -92,6 +94,8 @@ class ARPGStatusBars:
             "poison": {"active": False, "start_time": 0},
             "bleed": {"active": False, "start_time": 0}
         }
+        # Emote tracking
+        self.last_emote_oh = 0  # timestamp in ms of last "[emote oh"
         
         # Art IDs from global config
         self.art = {
@@ -167,6 +171,37 @@ class ARPGStatusBars:
         """Send debug message if DEBUG_MODE is enabled"""
         if DEBUG_MODE:
             Misc.SendMessage(f"[ARPGUI] {message}", color)
+
+    def say_emote_oh(self):
+        """Say the in-game emote '[emote oh'. Uses chat if available, else sends a client message."""
+        try:
+            if hasattr(Player, 'ChatSay'):
+                try:
+                    Player.ChatSay("[emote oh")
+                    return True
+                except Exception:
+                    pass
+            Misc.SendMessage("[emote oh", 67)
+            return True
+        except Exception:
+            try:
+                print("[ARPGUI] [emote oh")
+            except Exception:
+                pass
+        return False
+
+    def maybe_emote_oh(self, current_hp, max_hp):
+        """Trigger '[emote oh' if below 10% HP and not triggered within cooldown."""
+        try:
+            if max_hp <= 0:
+                return
+            pct = (current_hp / float(max_hp)) if max_hp > 0 else 0.0
+            now_ms = int(time.time() * 1000)
+            if pct < 0.10 and (now_ms - self.last_emote_oh) >= EMOTE_OH_COOLDOWN_MS:
+                if self.say_emote_oh():
+                    self.last_emote_oh = now_ms
+        except Exception as e:
+            self.debug_message(f"maybe_emote_oh error: {e}", 33)
     
     def is_poisoned(self):
         """Check if the player is currently poisoned"""
@@ -335,14 +370,13 @@ class ARPGStatusBars:
                 color = config["flash_color"]
         
         # Draw background (darker version of effect color)
-        Gumps.AddImageTiled(gump, x, y, width, height, 
-                           self.art["bar"]["small"], 
-                           self.segment_colors["depleted"])
+        Gumps.AddImageTiled(gump, x, y, width, height,
+                           self.art["bar"]["small"])
         
         # Draw filled portion
         if filled_width > 0:
             Gumps.AddImageTiled(gump, x, y, filled_width, height,
-                               self.art["bar"]["small"], color)
+                               self.art["bar"]["small"])
             
     def create_gump(self):
         """Create the status bars gump"""
@@ -404,10 +438,10 @@ class ARPGStatusBars:
                 bandage_y = y_pos + self.stamina_height + self.spacing
                 color = self.colors["health"]["high"]  # Bright green, like stamina
                 # Draw background bar (dark)
-                Gumps.AddImageTiled(gump, 5, bandage_y, self.bar_width, self.stamina_height, self.art["bar"]["small"], self.segment_colors["depleted"])
+                Gumps.AddImageTiled(gump, 5, bandage_y, self.bar_width, self.stamina_height, self.art["bar"]["small"])
                 # Draw filled portion (fills as time passes)
                 if bandage_width > 0:
-                    Gumps.AddImageTiled(gump, 5, bandage_y, bandage_width, self.stamina_height, self.art["bar"]["small"], color)
+                    Gumps.AddImageTiled(gump, 5, bandage_y, bandage_width, self.stamina_height, self.art["bar"]["small"])
                 y_pos = bandage_y
 
             # Status effect bars
@@ -433,6 +467,8 @@ class ARPGStatusBars:
             if (current_time - self.last_update) >= self.update_delay:
                 self.check_journal()  # Check for status updates
                 self.last_update = current_time
+                # Low HP emote check before rendering
+                self.maybe_emote_oh(getattr(Player, 'Hits', 0), getattr(Player, 'HitsMax', 0))
                 self.create_gump()
                     
         except Exception as e:

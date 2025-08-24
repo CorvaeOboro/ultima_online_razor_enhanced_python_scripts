@@ -14,7 +14,7 @@ DEBUG_MODE = False  # If False, suppress all Misc.SendMessage output
 RUNEBOOK_ID = 0x0EFA  # Runebook item ID
 RUNEBOOK_NAME = "Runebook"  # Name of the runebook to find
 GUMP_ID = 89  # Runebook gump ID
-RUNE_NUMBER = 12  # Which rune in the runebook to recall to (1-based)
+RUNE_NUMBER = 1  # Which rune in the runebook to recall to (1-based)
 RECALL_BUTTON = 49 + RUNE_NUMBER
 GUMP_TIMEOUT = 10000  # Timeout for gump operations in milliseconds
 

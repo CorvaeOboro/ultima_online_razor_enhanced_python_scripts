@@ -1,12 +1,15 @@
 """
 Development Item Inspector - a Razor Enhanced Python Script for Ultima Online
 
-Returns information of all items in player's backpack and equipment, writes to a JSON file
+Returns information of all items in player's backpack writes to a JSON file
 under the parent `data/` directory of this script.
 
 Outputs information about:
 - Basic item properties (ID, Color, etc)
 - Extended properties (Name, Stats, etc)
+
+Simple mode = only names , dedupe on , no properties = this is useful to check if we have crafting materials 
+Full mode = all properties , no dedupe , all contents 
 
 DOCUMENTATION:
 https://razorenhanced.net/dokuwiki/doku.php?id=item_func
@@ -18,15 +21,17 @@ import json
 import os
 import re
 
+DEBUG_MODE = False     # print each item's details to chat; default off
+
+# Simple
 # Performance/verbosity controls
 THROTTLE_MS = 100            # pause between item inspections
-INCLUDE_PROPERTIES = False   # properties calls are expensive; default off
-INCLUDE_CONTENTS = False     # container deep inspection; default off
-VERBOSE_MESSAGES = False     # print each item's details to chat; default off
-INCLUDE_EQUIPMENT = True     # also gather equipped items if API available
+INCLUDE_PROPERTIES = True   # properties calls are expensive; default off
+INCLUDE_CONTENTS = True     # container deep inspection; default off
+INCLUDE_EQUIPMENT = False     # also gather equipped items if API available
 
 # Output controls
-DEDUP_UNIQUE_GRAPHIC_COLOR = True  # if True, only one per (ItemID, Hue)
+DEDUP_UNIQUE_GRAPHIC_COLOR = False  # if True, only one per (ItemID, Hue)
 
 OUTPUT_SERIAL = False
 OUTPUT_POSITION = False
@@ -34,7 +39,7 @@ OUTPUT_IS_CONTAINER = False
 OUTPUT_CONTAINER = False          # include Container id
 OUTPUT_ROOT_CONTAINER = False     # include RootContainer id
 OUTPUT_WEIGHT = False
-OUTPUT_PROPERTIES = False         # include "Properties" key in JSON
+OUTPUT_PROPERTIES = True         # include "Properties" key in JSON
 OUTPUT_CONTENTS = False           # include "Contents" key in JSON
 
 def fmt_hex4(val) -> str:
@@ -119,12 +124,71 @@ def get_properties(item):
     if not INCLUDE_PROPERTIES:
         return []
     try:
-        Items.WaitForProps(item.Serial, 300)
-        props = Items.GetPropStringList(item.Serial)
-        if not props:
-            return []
-        # Convert from List[string] to Python list
-        return [str(prop) for prop in props]
+        serial = item.Serial
+
+        def to_list(lst):
+            try:
+                return [str(x) for x in (lst or [])]
+            except Exception:
+                return []
+
+        def merge_preserve(existing, new_items):
+            seen = set(existing)
+            for s in new_items:
+                if s and s not in seen:
+                    existing.append(s)
+                    seen.add(s)
+            return existing
+
+        collected = []
+
+        # 1) Quick initial fetch
+        try:
+            Items.WaitForProps(serial, 400)
+            collected = merge_preserve(collected, to_list(Items.GetPropStringList(serial)))
+        except Exception:
+            pass
+
+        # 2) SingleClick retries with increasing waits (helps tooltips like spellbooks)
+        try:
+            attempts = 3
+            waits = [600, 800, 1000]
+            for i in range(attempts):
+                try:
+                    Items.SingleClick(serial)
+                except Exception:
+                    pass
+                try:
+                    Misc.Pause(150)
+                except Exception:
+                    pass
+                try:
+                    Items.WaitForProps(serial, waits[i] if i < len(waits) else 800)
+                    props_list = to_list(Items.GetPropStringList(serial))
+                    collected = merge_preserve(collected, props_list)
+                except Exception:
+                    continue
+                # If we already have a healthy number of lines, stop early
+                if len(collected) >= 6:
+                    break
+        except Exception:
+            pass
+
+        # 3) Index-based fallback to capture hidden lines
+        try:
+            for idx in range(0, 20):
+                try:
+                    v = Items.GetPropValue(serial, idx)
+                except Exception:
+                    v = None
+                if not v:
+                    # some clients return None after last valid index
+                    break
+                collected = merge_preserve(collected, [str(v)])
+        except Exception:
+            pass
+
+        return collected
     except Exception:
         return []
 
@@ -217,7 +281,7 @@ def get_container_contents(container):
 
 def inspect_item(item, is_equipped=False):
     """Perform deep inspection of a single item."""
-    if VERBOSE_MESSAGES:
+    if DEBUG_MODE:
         Misc.SendMessage(f"Inspecting item: {hex(item.Serial)}", 67)
     
     # Build comprehensive item data
@@ -246,20 +310,20 @@ def print_item_data(data, indent=0):
     
     for key, value in data.items():
         if isinstance(value, dict):
-            if VERBOSE_MESSAGES:
+            if DEBUG_MODE:
                 Misc.SendMessage(f"{indent_str}{key}:", 67)
             print_item_data(value, indent + 1)
         elif isinstance(value, list):
-            if VERBOSE_MESSAGES:
+            if DEBUG_MODE:
                 Misc.SendMessage(f"{indent_str}{key}:", 67)
             for item in value:
                 if isinstance(item, dict):
                     print_item_data(item, indent + 1)
                 else:
-                    if VERBOSE_MESSAGES:
+                    if DEBUG_MODE:
                         Misc.SendMessage(f"{indent_str}  {item}", 67)
         else:
-            if VERBOSE_MESSAGES:
+            if DEBUG_MODE:
                 Misc.SendMessage(f"{indent_str}{key}: {value}", 67)
 
 def inspect_backpack():
@@ -333,7 +397,7 @@ def inspect_backpack():
             is_eq = int(item.Serial) in equipped_serials if INCLUDE_EQUIPMENT else False
             item_data = inspect_item(item, is_equipped=is_eq)
             all_items_data.append(item_data)
-            if VERBOSE_MESSAGES:
+            if DEBUG_MODE:
                 print_item_data(item_data)
                 Misc.SendMessage("-" * 40, 67)
         except Exception as e:

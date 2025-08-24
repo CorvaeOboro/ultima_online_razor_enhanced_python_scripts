@@ -11,12 +11,11 @@ Trash , Bank , Salvage , Keep , Quest ,
 this is useful to store item ids for use in other scripts 
 exported .json files are stored in a 'data' subdirectory next to the script
 
-VERSION::20250722
+VERSION::20250808
 """
 import os
 import json
 import shutil
-import time
 
 UI_ACTIVE = True
 UI_POSITION_X = 400
@@ -100,6 +99,29 @@ def ensure_directory(file_path):
         debug_msg(f"Creating directory: {directory}")
         os.makedirs(directory)
 
+def format_hex(value):
+    """Return zero-padded 4-digit uppercase hex with 0x prefix, e.g., 0x00F2."""
+    try:
+        iv = int(value)
+    except Exception:
+        iv = 0
+    return f"0x{iv & 0xFFFF:04X}"
+
+def clean_item_name(name, item):
+    """Remove ONLY the leading amount if it matches the item's Amount property, e.g., '3 Blue Diamond' -> 'Blue Diamond'."""
+    if not name:
+        return name
+    n = str(name)
+    try:
+        amt = int(getattr(item, 'Amount', 0))
+    except Exception:
+        amt = 0
+    if amt > 0:
+        prefix = f"{amt} "
+        if n.startswith(prefix):
+            n = n[len(prefix):]
+    return n.strip()
+
 def format_item_entry(item):
     """Format item properties into a readable string."""
     debug_msg("Formatting item entry...")
@@ -107,26 +129,22 @@ def format_item_entry(item):
     if not item:
         debug_msg("Error: No item provided!", 33)
         return None
-        
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     
     # Get name from properties first
     props = Items.GetPropStringList(item)
     name = "Unknown"
     if props and len(props) > 0:
         name = props[0]  # First property is usually the name
+    name = clean_item_name(name, item)
     
     entry = {
-        "timestamp": timestamp,
         "name": name,
-        "itemID": hex(item.ItemID),
-        "serial": hex(item.Serial),
-        "hue": int(item.Hue),  # Explicitly cast to int
+        "itemID": format_hex(item.ItemID),
+        "hue": format_hex(int(item.Hue)),
         "properties": []
     }
     
-    debug_msg(f"Basic item info: {entry['name']} ({entry['itemID']})")
-    debug_msg(f"Hue type: {type(item.Hue)}")  # Log type of item.Hue
+    debug_msg(f"Basic item info: {entry['name']} ({entry['itemID']}, hue {entry['hue']})")
     
     # Convert properties to regular list
     if props:
@@ -255,32 +273,35 @@ def send_gump():
     gd = Gumps.CreateGump(movable=True)
     Gumps.AddPage(gd, 0)
     
-    # Calculate dimensions
+    # Calculate dimensions (more compact vertical layout)
     width = 300
-    height = (len(list_configs) * 60) + 60
+    row_height = 40
+    top_pad = 40
+    bottom_pad = 20
+    height = (len(list_configs) * row_height) + top_pad + bottom_pad
     
     # Background
     Gumps.AddBackground(gd, 0, 0, width, height, 30546)
     Gumps.AddAlphaRegion(gd, 0, 0, width, height)
     
     # Title
-    Gumps.AddHtml(gd, 20, 20, width-40, 20, "<center><basefont color=#FFFFFF>Item List Developer</basefont></center>", 0, 0)
+    Gumps.AddHtml(gd, 20, 14, width-40, 20, "<center><basefont color=#FFFFFF>Item List Developer</basefont></center>", 0, 0)
     
     # Close button
     Gumps.AddButton(gd, width-25, 5, 4017, 4018, 99, 1, 0)
     Gumps.AddTooltip(gd, r"Close")
     
-    # List buttons
-    y_offset = 50
+    # List buttons (compact spacing)
+    y_offset = top_pad
     for idx, config in enumerate(list_configs, 1):
         # Main button
-        Gumps.AddButton(gd, 20, y_offset, 4006, 4007, idx, 1, 0)
-        Gumps.AddHtml(gd, 50, y_offset, width-70, 20, 
+        Gumps.AddButton(gd, 20, y_offset + 2, 4006, 4007, idx, 1, 0)
+        Gumps.AddHtml(gd, 50, y_offset, width-70, 16, 
                       f"<basefont color=#FFFFFF>{config['name']}</basefont>", 0, 0)
         # Description
-        Gumps.AddHtml(gd, 50, y_offset+20, width-70, 20,
+        Gumps.AddHtml(gd, 50, y_offset + 14, width-70, 16,
                       f"<basefont color=#999999><i>{config['description']}</i></basefont>", 0, 0)
-        y_offset += 60
+        y_offset += row_height
 
     # Send gump
     Gumps.SendGump(GUMP_ID, Player.Serial, UI_POSITION_X, UI_POSITION_Y, gd.gumpDefinition, gd.gumpStrings)

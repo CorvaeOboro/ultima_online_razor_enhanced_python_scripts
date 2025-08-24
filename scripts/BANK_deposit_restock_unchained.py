@@ -26,6 +26,8 @@ RESOURCE_CONTAINER_PRIORITY = 0  # Index of the preferred container in the list
 # POTION RESTOCK
 POTION_RESTOCK = True  # Set to True to enable potion restocking
 POTION_TARGET = 10  # Target amount of potions to maintain in backpack
+# When True, if missing potions can't be pulled from bank, attempt to fill from kegs using empty bottles
+POTION_USE_KEGS = False  # Global toggle to allow/disallow keg usage during restock
 
 # Dictionary of items to deposit: Name -> ItemID
 ITEMS_TO_DEPOSIT = {
@@ -147,7 +149,12 @@ RESOURCES_TO_DEPOSIT = {
     'PowderedIron': 0x573D,
     'MagicalResidue': 0x2DB1,
     'RelicFragment': 0x2DB3,
-
+    'SpiderCarapace': 0x5720,
+    'ArcanicRuneStone': 0x573C,
+    'CrushedGlass': 0x573B,
+    'FireRuby': 0x3197,
+    'BlueDiamond': 0x3198,
+    'WhitePearl': 0x3196,
 }
 
 special_items_dict = {
@@ -203,7 +210,11 @@ def manage_reagents(bankBox):
                 debug_message(f"Warning: No {reagent_name} found in bank!", 33)
 
 def manage_potions(bankBox):
-    """Manage potions based on target amount. If potions are missing, try to create them from kegs and empty bottles."""
+    """Manage potions based on target amount.
+    Behavior:
+    - Pull potions from bank when available.
+    - If still short and POTION_USE_KEGS is True, attempt to fill from kegs using empty bottles.
+    """
     if not POTION_RESTOCK:
         return
         
@@ -234,10 +245,13 @@ def manage_potions(bankBox):
                 Misc.Pause(600)
                 potions_needed -= available
             
-            # If we still need potions, try to make them from kegs and empty bottles
+            # If we still need potions, optionally try to make them from kegs and empty bottles
             if potions_needed > 0:
-                debug_message(f"Still need {potions_needed} {potion_name}. Attempting to create from keg...", 65)
-                create_potions_from_keg(bankBox, potion_id, potion_name, potions_needed)
+                if POTION_USE_KEGS:
+                    debug_message(f"Still need {potions_needed} {potion_name}. Attempting to create from keg...", 65)
+                    create_potions_from_keg(bankBox, potion_id, potion_name, potions_needed)
+                else:
+                    debug_message(f"Still need {potions_needed} {potion_name}, but POTION_USE_KEGS is disabled; skipping keg fill.", 53)
 
 def create_potions_from_keg(bankBox, potion_id, potion_name, amount_needed):
     """Create potions by using a keg and empty bottles from the bank."""

@@ -10,11 +10,12 @@ Requirements:
 Item: Ethereal Horse Statuette (0x20DD)
 
 HOTKEY:: MiddleMouseButton
-VERSION::20250621
+VERSION::20250823
 """
 
 # Mount item ID for Ethereal Horse Statuette
 MOUNT_ID = 0x20DD
+
 SHOW_DEBUG_INFO = True
 
 def debug_msg(msg, color=67):
@@ -92,9 +93,13 @@ def try_dismount():
             debug_msg("Could not access mount object!", 33)
             return False
             
-        # Try using the original mount item ID
-        debug_msg(f"Attempting to dismount using original mount ID: {hex(MOUNT_ID)}", 67)
-        Misc.SendAction(MOUNT_ID, Player.Serial)
+        # Preferred: double-click the ethereal statuette in backpack (toggles dismount)
+        eth_item = find_mount()
+        if eth_item:
+            debug_msg(f"Attempting dismount by using statuette: {hex(eth_item.Serial)}", 67)
+            Items.UseItem(eth_item)
+        else:
+            debug_msg("Ethereal statuette not found in backpack; skipping to fallback.", 33)
         
         # Wait and check state with retry
         for _ in range(3):  # Try up to 3 times
@@ -103,26 +108,24 @@ def try_dismount():
                 debug_msg("Successfully dismounted!", 67)
                 return True
             
-        # Try alternative method
-        debug_msg("First attempt failed, trying alternative method...", 33)
-        # Try to use the mount's current ID
-        debug_msg(f"Attempting to use current mount ID: {hex(mount.ItemID)}", 67)
-        Misc.SendAction(mount.ItemID, mount.Serial)
+        # Fallback: try to use the current mount object directly
+        debug_msg("First attempt failed, trying fallback by using mount object...", 33)
+        debug_msg(f"Attempting to use mount object: serial {hex(mount.Serial)}", 67)
+        Misc.UseObject(mount.Serial)
         Misc.Pause(300)
         
         if not is_mounted():
             debug_msg("Successfully dismounted!", 67)
             return True
             
-        # Last resort - try direct object use
-        debug_msg("Trying final method...", 33)
-        Misc.UseObject(mount.Serial)
-        
-        # Wait and check state again
-        Misc.Pause(300)
-        if not is_mounted():
-            debug_msg("Successfully dismounted!", 67)
-            return True
+        # Last resort - attempt another statuette use in case of laggy first attempt
+        if eth_item:
+            debug_msg("Trying final method: re-use statuette...", 33)
+            Items.UseItem(eth_item)
+            Misc.Pause(300)
+            if not is_mounted():
+                debug_msg("Successfully dismounted!", 67)
+                return True
         
         debug_msg("Failed to dismount after all attempts", 33)
         return False

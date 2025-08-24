@@ -14,6 +14,9 @@ DEBUG_MODE = False
 # CONFIGURABLE: Pause between casts (ms)
 CAST_PAUSE = 600
 
+# Journal text when a spell is already active
+ALREADY_IN_EFFECT_TEXT = "This spell is already in effect"
+
 # Buff names as they appear in Razor Enhanced (case-insensitive)
 BUFFS = [
     ('Magic Reflection', 'Magic Reflection'),
@@ -45,7 +48,7 @@ def has_buff(buff_name):
         return False
 
 # Helper: Cast spell by name and target self if needed
-def cast_spell(spell_name):
+def cast_spell(spell_name, skip_final_pause=False):
     try:
         Spells.Cast(spell_name)
         # Wait up to 2s for target cursor to appear
@@ -63,7 +66,8 @@ def cast_spell(spell_name):
                 Target.TargetExecute(Player.Serial)
         else:
             debug_message('No target cursor appeared for {}!'.format(spell_name), 33)
-        Misc.Pause(CAST_PAUSE)
+        if not skip_final_pause:
+            Misc.Pause(CAST_PAUSE)
     except Exception as e:
        debug_message('Error casting {}: {}'.format(spell_name, e), 33)
 
@@ -71,9 +75,21 @@ def cast_spell(spell_name):
 def main():
     for idx, (buff, spell) in enumerate(zip([b[0] for b in BUFFS], SPELLS)):
         if not has_buff(buff):
+            # For Magic Reflection, clear journal first to detect "already in effect" quickly
+            if spell == 'Magic Reflection':
+                Journal.Clear()
+
             debug_message('Casting {}...'.format(spell), 68)
-            cast_spell(spell)
-            # Wait and recheck
+            # For Magic Reflection, don't pay the cast pause up-front; we'll decide after journal check
+            skip_pause = (spell == 'Magic Reflection')
+            cast_spell(spell, skip_final_pause=skip_pause)
+
+            # If the server reports the spell is already active, skip to the next spell immediately (no extra waits)
+            if spell == 'Magic Reflection' and Journal.Search(ALREADY_IN_EFFECT_TEXT):
+                debug_message('Magic Reflection already in effect. Skipping to next buff.', 44)
+                continue
+
+            # Wait and recheck (only occurs if not already-in-effect, or for other spells)
             Misc.Pause(CAST_PAUSE)
             if has_buff(buff):
                 debug_message('{} buff applied.'.format(buff), 68)
