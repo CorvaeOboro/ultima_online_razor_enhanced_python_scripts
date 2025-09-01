@@ -7,6 +7,7 @@ clicking it triggers the item inspection targeter
 an inspector target reticle , the player selects an item 
 a custom gump displays the item info and the items that can be crafted with it 
 
+** some item properties are not available through api or limited to 4 properties ( spell books dont list their multiple properties )
 TODO: 
 - separate the crafting json logic , focus on core items with mechanics (recall rune) and weapons armor
 - remove the immersive mode toggles , the dev info like hue and item id is hidden now and should be appended to be displayed , there doesnt need to be global toggle for the mode .
@@ -90,14 +91,168 @@ KNOWN_ITEMS = {
         "rename the rune stone by double clicking it",
         "a <basefont color=#8B4513>RuneBook</basefont> may store multiple rune stones , by dropping them onto the book"
     ],
+}
+
+# Enchanting materials with their specific enhancement properties
+KNOWN_ENCHANTING_ITEMS = {
     0x3197: [  # Fire Ruby
         "a gem for enchanting",
-        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for  <basefont color=#FF6B6B>Weapon Damage</basefont> ",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for  <basefont color=#FF6B6B>Weapon Damage</basefont> , and Spellbook <basefont color=#FF6B6B>Fireball</basefont>, and Armor <basefont color=#FF6B6B>Fire Elemental</basefont>",
         "collected from mining and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
-        #"used for imbuing <basefont color=#5CB85C>Strength</basefont> properties onto armor , and <basefont color=#FFB84D>Hit Fireball</basefont> onto weapon ",
-        #"used for crafting the <basefont color=#FF6B6B>Fiery Spellblade</basefont>",
+        #imbuing "used for imbuing <basefont color=#5CB85C>Strength</basefont> properties onto armor , and <basefont color=#FFB84D>Hit Fireball</basefont> onto weapon ",
+        #crafting "used for crafting the <basefont color=#FF6B6B>Fiery Spellblade</basefont>",
+    ],
+    0x573C: [  # Arcanic Rune Stone
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#FF6B6B>Mastery Damage</basefont> (spellbook)",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5748: [  # Bottle Ichor
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#5CB85C>Weapon Life Leech</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x3198: [  # Blue Diamond
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#FFB84D>Boss Damage</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5742: [  # Boura Pelt
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Giant defense</basefont>, and Spellbook <basefont color=#B084FF>Earth Elemental</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x573B: [  # Crushed Glass
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#3FA9FF>Blade Spirits</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",    
+    ],
+    0x5732: [  # Crystalline (BlackrockCrystaline)
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#FFB84D>Surging</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5721: [  # Daemon Claw
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#FF6B6B>Savagery</basefont>, and Armor <basefont color=#8B4513>Daemonic defense</basefont>, and Spellbook <basefont color=#B084FF>Summon Daemon</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x26B4: [  # Delicate Scales
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#5CB85C>Hunter's Luck</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5737: [  # Elven Fletching
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#3FA9FF>Weapon Accuracy</basefont>, and Spellbook <basefont color=#B084FF>Magic Arrow</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x2DB2: [  # Enchanted Essence
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Lower Mana Cost</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5745: [  # Faery Dust
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Curse Resistance</basefont>, and Spellbook <basefont color=#B084FF>Mind Blast</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5726: [  # Fey Wings
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#5CB85C>Evasion</basefont>, and Spellbook <basefont color=#B084FF>Air Elemental</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x572C: [  # Goblin Blood
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Vermin defense</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x572D: [  # Lava Serpent Crust
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Draconic defense</basefont>, and Spellbook <basefont color=#B084FF>Flamestrike</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x0F87: [  # Lucky Coin
+        "a metal coin of luck used for enchanting",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#5CB85C>Crafting Luck</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x3191: [  # Luminescent (FungusLuminescent)
+        "a glowing mushroom of luminescent fungi",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Spell Leech</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+        #imbuing "an Imbuing ingredients to imbue the Hit Point Increase, Mana Increase and Stamina Increase property onto items.",
+        #crafting "used for crafting the <basefont color=#FF6B6B>Darkglow Potion</basefont>",
+    ],
+    0x2DB1: [  # Magical Residue
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Lower Reagent Cost</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x3190: [  # Parasitic Plant
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#B084FF>Summon Surge</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x573D: [  # Powdered Iron
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#FF6B6B>Attack Speed</basefont>, and Spellbook <basefont color=#B084FF>Explosion</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5747: [  # Raptor Teeth
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#FF6B6B>Critical Damage</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x2DB3: [  # Relic Fragment
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#5CB85C>Archeologist</basefont>, and Spellbook <basefont color=#B084FF>Summon Creature</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5736: [  # Seed of Renewel
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#5CB85C>Harvesting Luck</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5744: [  # Silver Snake
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Water Elemental</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5746: [  # Slith Tongue
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Poison Resistance</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5720: [  # Spider Carapace
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Arachnid defense</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5731: [  # Undying Flesh
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Undead defense</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5722: [  # Vial of Vitriol
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#FF6B6B>Mage Killer</basefont>, and Spellbook <basefont color=#B084FF>Harm</basefont>, and Armor <basefont color=#8B4513>Infidel Defense</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x573E: [  # Void Orb
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#B084FF>Paragon Conversion</basefont>, and Spellbook <basefont color=#B084FF>Energy Vortex</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
+    ],
+    0x5749: [  # Reflective wolf eye
+        "an enchanting material",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#B084FF>Reflective</basefont>",
+        "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
 }
+
+# Append enchanting items to the main known items dictionary
+KNOWN_ITEMS.update(KNOWN_ENCHANTING_ITEMS)
 
 # Colors (Razor Enhanced gump label hues)
 COLORS = {
@@ -1089,7 +1244,7 @@ def build_text_sections(target_item, usages: list) -> list:
                 formatted_line = _wrap_line_with_default_color(desc_line, '#BBBBBB')
                 
                 # Split long lines for word wrapping at 30 characters
-                wrapped_lines = _split_line_for_wrapping(formatted_line, max_chars=36)
+                wrapped_lines = _split_line_for_wrapping(formatted_line, max_chars=35)
                 
                 # Create sections for each wrapped line
                 for j, wrapped_line in enumerate(wrapped_lines):

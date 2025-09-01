@@ -1,16 +1,24 @@
 # Ultima Online Classic Razor Enhanced Python Scripts 
 [ultima online classic](https://github.com/ClassicUO/ClassicUO) [razor enhanced](https://github.com/razorenhanced/razorenhanced) python scripts focused on UI customization and ritual magic
 
+<center>
+
 | [DOWNLOAD](https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/archive/refs/heads/main.zip) | [INSTALL](#INSTALL) | 
 |:---:|:---:|
 
+</center>
+
 - each script is self-contained and can be run independently 
 - many of the scripts are work in progress
+
+<center>
 
 | [UI](#UI) | [RITUAL](#RITUAL) | [ITEM](#ITEM) | [MISC](#MISC) | [SPELL](#SPELL) | [TRAIN](#TRAIN) | [GATHER](#GATHER) | [DEV](#DEV) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 
 <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_health_bar_long_comp.gif?raw=true"/>
+
+</center>
 
 ## UI
 - [UI_health_arpg_status_bars.py](scripts/UI_health_arpg_status_bars.py) – large color coded horizontal bars for health, mana , and bandage timer
@@ -20,6 +28,10 @@
 - [UI_spell_hotbar_hotkeys.py](scripts/UI_spell_hotbar_hotkeys.py) – the example Spell hotbar with added hotkey display
 - [UI_experience_progress_tracker.py](scripts/UI_experience_progress_tracker.py) – visualize progression system as progress bar , parsed from journal
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/UI_experience_progress_tracker.png?raw=true"/>
+- [UI_boss_healthbar.py](scripts/UI_boss_healthbar.py) – ARPG-style boss health bar with auto-detection, phase markers, and decorative elements
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_boss_health_bar.png?raw=true"/>
+- [UI_walia_item_inspect.py](scripts/UI_walia_item_inspect.py) – WALIA (What Am I Looking At) item inspection with detailed properties, crafting info, and custom descriptions
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info.png?raw=true"/>
 
 ## RITUAL
 ritual magic 
@@ -34,9 +46,11 @@ ritual magic
 ## ITEM
 - [ITEM_organize_backpack.py](scripts/ITEM_organize_backpack.py) – Organizes backpack items by type into position
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ITEM_organize_backpack.webp?raw=true"/>
+- [ITEM_organize_chest.py](scripts/ITEM_organize_chest.py) – Organizes targeted container by grouping similar items into bins with grid layout
 - [ITEM_filter_junk_salvager.py](scripts/ITEM_filter_junk_salvager.py) – Moves low-tier items to a junk backpack and salvages , filter by type and affixes 
 - [ITEM_weight_manager.py](scripts/ITEM_weight_manager.py) – Drops unfavored items and over maximum reagents
 - [ITEM_transfer_container_to_backpack.py](scripts/ITEM_transfer_container_to_backpack.py) – Moves all items from target container to player
+- [ITEM_mana_restorative.py](scripts/ITEM_mana_restorative.py) – Consumes mana restorative items based on missing mana 
 - [ITEM_drop_gold.py](scripts/ITEM_drop_gold.py) – Drops all gold to ground
 - [ITEM_food_eater.py](scripts/ITEM_food_eater.py) – Eat food until full
 - [ITEM_mount_toggle.py](scripts/ITEM_mount_toggle.py) – Toggles mounting of ethereal horse
@@ -46,7 +60,7 @@ ritual magic
 - [LOOT_treasure.py](scripts/LOOT_treasure.py) – Unlocks, opens, and loot nearby treasure chests
 - [QUEST_turn_in_items.py](scripts/QUEST_turn_in_items.py) – Automate Quest turn-ins 
 - [RECALL_bank.py](scripts/RECALL_bank.py) – Recall bank or home , specific rune # in runebook
-- [COMBAT_pouch.py](scripts/COMBAT_pouch.py) – stun break using trapped pouch
+- [COMBAT_pouch_stunbreak.py](scripts/COMBAT_pouch_stunbreak.py) – stun break using trapped pouch
 - [PICKUP_gold_and_meditate.py](scripts/PICKUP_gold_and_meditate.py) – meditate
 
 ## SPELL
