@@ -1,23 +1,18 @@
 # Ultima Online Classic Razor Enhanced Python Scripts 
 [ultima online classic](https://github.com/ClassicUO/ClassicUO) [razor enhanced](https://github.com/razorenhanced/razorenhanced) python scripts focused on UI customization and ritual magic
 
+| [DOWNLOAD](https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/archive/refs/heads/main.zip) | [INSTALL](#INSTALL) | 
+|:---:|:---:|
+
 - each script is self-contained and can be run independently 
 - many of the scripts are work in progress
 
-# CATEGORIES
-- [UI](#UI) = user interface displays using custom gumps
-- [RITUAL](#RITUAL) = place items in world creating patterns
-- [ITEM](#ITEM) = item and container management
-- [MISC](#MISC) = miscellaneous interaction
-- [SPELL](#SPELL) = spell casting
-- [TRAIN](#TRAIN) = training skills
-- [GATHER](#GATHER) = gather items from the world
-- [DEV](#DEV) = Development tools
+| [UI](#UI) | [RITUAL](#RITUAL) | [ITEM](#ITEM) | [MISC](#MISC) | [SPELL](#SPELL) | [TRAIN](#TRAIN) | [GATHER](#GATHER) | [DEV](#DEV) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 
-# SCRIPTS
+<img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_health_bar_long_comp.gif?raw=true"/>
 
 ## UI
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_health_bar_long_comp.gif?raw=true"/>
 - [UI_health_arpg_status_bars.py](scripts/UI_health_arpg_status_bars.py) – large color coded horizontal bars for health, mana , and bandage timer
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_health_bar_long.gif?raw=true"/>
 - [UI_summon_health_monitor.py](scripts/UI_summon_health_monitor.py) – display the health of summoned creatures
@@ -77,6 +72,11 @@ ritual magic
 - [DEV_item_inspector.py](scripts/DEV_item_inspector.py) – Backpack items and equipment info to JSON
 - [DEV_item_to_list.py](scripts/DEV_item_to_list.py) –  Inspected item exported to categorized JSON 
 - [DEV_font_color_gump.py](scripts/DEV_font_color_gump.py) – UO font hue hex codes in a custom Gump
+
+# INSTALL
+- [download](https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/archive/refs/heads/main.zip) the python scripts and extract the zip into a location of your choice , it will include python .py files in a scripts folder .
+- in game with [RazorEnhanced](https://github.com/razorenhanced/razorenhanced) click on the Scripting tab and ADD the .py files of the scripts you would like to use .
+- once added the scripts will be listed in the Scripting tab , clicking on the script and set the settings like ( AutoStart on Login ) for UI scripts , and may set hotkeys for them in the Hotkeys tab under Scripts .
 
 # TROUBLESHOOTING
 - "import" errors = download [python](https://www.python.org/downloads/) and copy the Lib folder contents into Lib folder in RazorEnhanced

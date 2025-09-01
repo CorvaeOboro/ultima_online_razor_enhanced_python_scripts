@@ -168,6 +168,11 @@ def _normalize_items(json_root):
     # Case 1: already a list of items (OUTPUT_ITEM only mode)
     if isinstance(json_root, list):
         return json_root
+    # Case 1b: flattened dict payload with top-level 'items'
+    if isinstance(json_root, dict):
+        top_items = json_root.get('items')
+        if isinstance(top_items, list):
+            return top_items
     # Case 2: full structure with categories
     items = []
     cats = (json_root or {}).get('categories', {})

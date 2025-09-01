@@ -1,10 +1,12 @@
 """
-Recall to Bank or Home- a Razor Enhanced Python script for Ultima Online
+SPELL Recall to Bank or Home- a Razor Enhanced Python script for Ultima Online
 
 - Finds runebook named 'Runebook' in player's backpack
 - Opens the runebook
 - Uses the specific rune number
 - Activates recall through the gump
+
+TODO: if you are already at the bank , then recall to home 
 
 HOTKEY:: B
 VERSION::20250718

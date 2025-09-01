@@ -3,8 +3,8 @@ Spell Attack Nearest Enemy - a Razor Enhanced Python Script for Ultima Online
 
 Automatically attacks the nearest enemy with offensive spells:
 1. Checks/equips spellbook if needed
-2. Prioritize Energy Bolt first
-3. casts other spells if reagents or mana low
+2. Prioritize Energy Bolt first ( Ebolt > Explosion > Flamestrike > Lightning > Harm > Fireball > Magic Arrow )
+3. casts other spells if reagents missing or mana low
 
 TODO:
 - add spellbook switching , search by property like Energy Bolt
@@ -13,6 +13,10 @@ HOTKEY:: Q
 VERSION::20250707
 """
 
+from System.Collections.Generic import List
+from Scripts.glossary.enemies import GetEnemyNotorieties, GetEnemies
+from Scripts.utilities.mobiles import GetEmptyMobileList
+
 # GLOBAL SETTINGS
 ATTACK_ON = True # default = true , set to false if not using pets 
 MANA_REQUIRED = True # default = true , set to false if have "reduced mana cost"
@@ -20,9 +24,19 @@ REAGENT_REQUIRED = True # default = true , set to false if have "lower reagent c
 DEBUG_ON = False
 #======================================================================
 
-from System.Collections.Generic import List
-from Scripts.glossary.enemies import GetEnemyNotorieties, GetEnemies
-from Scripts.utilities.mobiles import GetEmptyMobileList
+def debug_message(message, color=67):
+    """Centralized debug logging gated by DEBUG_ON.
+
+    All script messages should flow through this function so that toggling
+    DEBUG_ON enables/disables output consistently.
+    """
+    if not DEBUG_ON:
+        return
+    try:
+        Misc.SendMessage(f"[Attack] {message}", color)
+    except Exception:
+        # Fallback to print in case Misc is unavailable (e.g., offline testing)
+        print(f"[Attack] {message}")
 
 class SpellManager:
     def __init__(self):
@@ -119,7 +133,8 @@ class SpellManager:
         """Send a debug message to the game client"""
         if color is None:
             color = self.debug_color
-        Misc.SendMessage(f"[Attack] {message}", color)
+        # Route all messages through the centralized function so DEBUG_ON controls output
+        debug_message(message, color)
     
     def check_spellbook(self):
         """Check if spellbook is equipped, if not try to equip one"""

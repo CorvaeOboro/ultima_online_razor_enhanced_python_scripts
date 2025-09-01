@@ -13,8 +13,14 @@ Organizes items in the backpack with specific positioning and directional spacin
 These positions are tuned for a "150" container size without scaling items sizes 
 the default is "100" container size so you may want to adjust the x and y values for your settings
 
+adjust timing as per shard , in razor's settings "object delay" we set to 200, with autoqueing
+recommended delay is 600 milliseconds , lower delays until issues 
+setting a too low a value can cause "You must wait to perform another action" errors and desync
+
+TODO: replace delay with getlabel 
+
 HOTKEY:: U
-VERSION::20250823
+VERSION::20250824
 """
 ORGANIZE_UNKNOWN_ITEMS = True
 ORGANIZE_REAGENTS = True
@@ -26,6 +32,17 @@ ORGANIZE_BOOKS = True
 DEBUG_MODE = False  # Set to True to enable debug/info messages
 SPACING_OFFSET = 7  # Pixels to offset spacing
 MAX_STACK_SIZE = 999  # Maximum items to stack in one location
+
+# DELAYS (milliseconds)=============================
+PAUSE_SPELLBOOK_MOVE = 200 # Spellbook placement
+PAUSE_SPELLBOOK_ROW_SETTLE = 50
+PAUSE_UNKNOWN_ITEM_MOVE = 200 # Unknown items placement grid
+PAUSE_GROUP_ITEM_MOVE = 200 # General group item movement (non-spellbook)
+# Reagent combining flow (move to character, settle, move back to backpack)
+# this is just too slow , we disabled
+PAUSE_REAGENTS_MOVE_TO_CHAR = 200
+PAUSE_REAGENTS_SETTLE_AFTER_CHAR = 1200
+PAUSE_REAGENTS_MOVE_TO_BACKPACK = 200
 
 # Item Categories with properties
 ITEM_GROUPS = {
@@ -133,8 +150,8 @@ ITEM_GROUPS = {
 UNKNOWN_BOX = {
     'center_x': 80,
     'center_y': 80,
-    'width': 70,
-    'height': 40,
+    'width': 65,
+    'height': 35,
 }
 #//============================================================
 
@@ -191,11 +208,11 @@ def move_spellbooks(items, base_x, base_y):
 
             # Use amount 0 (all) for non-stackables; keep target as backpack at specific coords
             Items.Move(fresh.Serial, Player.Backpack.Serial, 0, x, y)
-            Misc.Pause(600)
+            Misc.Pause(PAUSE_SPELLBOOK_MOVE)
 
             # Small extra pause after finishing each row to let container settle
             if col == columns - 1:
-                Misc.Pause(400)
+                Misc.Pause(PAUSE_SPELLBOOK_ROW_SETTLE)
         except Exception as e:
             debug_message(f"Error placing spellbook idx={idx} serial={hex(book.Serial)}: {e}", 33)
     debug_message(f"Placed {len(sorted_items)} spellbooks in grid {columns} per row.", 65)
@@ -214,10 +231,10 @@ def move_items(items, target_x, target_y, group_config):
         # First move reagents to character
         for item in items:
             Items.Move(item.Serial, Player.Serial, item.Amount, 0, 0)
-            Misc.Pause(600)
+            Misc.Pause(PAUSE_REAGENTS_MOVE_TO_CHAR)
         
         # Then move them to their designated spot in backpack
-        Misc.Pause(1200)  # Extra pause 
+        Misc.Pause(PAUSE_REAGENTS_SETTLE_AFTER_CHAR)  # Extra pause 
         items_on_char = find_items_by_id(items[0].ItemID)
         if items_on_char:
             stack_count = 0
@@ -226,7 +243,7 @@ def move_items(items, target_x, target_y, group_config):
             
             for item in items_on_char:
                 Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, current_x, current_y)
-                Misc.Pause(600)
+                Misc.Pause(PAUSE_REAGENTS_MOVE_TO_BACKPACK)
 
 def get_known_item_ids():
     """Return a set of all known item IDs from ITEM_GROUPS."""
@@ -270,7 +287,7 @@ def move_unknown_items_to_center_box():
         x = center_x + col * (box_width // max(1, best_cols - 1)) if best_cols > 1 else center_x
         y = center_y + row * (box_height // max(1, best_rows - 1)) if best_rows > 1 else center_y
         Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, x, y)
-        Misc.Pause(600)
+        Misc.Pause(PAUSE_UNKNOWN_ITEM_MOVE)
     debug_message(f"Finished moving unknown items to center box.", 65)
 
 def organize_backpack():
@@ -319,7 +336,7 @@ def organize_backpack():
                     current_y = item_def["y"]
                     for item in items:
                         Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, current_x, current_y)
-                        Misc.Pause(600)
+                        Misc.Pause(PAUSE_GROUP_ITEM_MOVE)
                         stack_count += 1
                         if stack_count >= MAX_STACK_SIZE:
                             current_x += SPACING_OFFSET * MAX_STACK_SIZE
