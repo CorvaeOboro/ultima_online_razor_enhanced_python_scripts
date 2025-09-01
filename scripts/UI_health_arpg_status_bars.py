@@ -11,17 +11,25 @@ Creates a custom gump showing health, mana, and stamina in a ARPG-style horizont
 TODO:
 bandage duration 
 add color dict for changing color scheme ( Blue to Orange gradient )
+update to use optional setting.json , this way we can still default the gump locations to be visible on small resolution (laptop) , then have specific favored placement set . maybe this could be visible in first time usage , like a LOCK , that once clicked it hides the editablity and now loads into the placement of gump for your monitor 
+add global toggle for emoting , and features
 
-HOTKEY:: StartUp
-VERSION :: 20250802
+add bandage duration and poison tick timing so we can better visualize 
+
+HOTKEY:: AutoStart on Login
+VERSION :: 20250831
 """
 
 import time
 import re
 
 DEBUG_MODE = False # debug prints and messages 
+
 # gump ID= 4294967295  = the max value , randomly select a high number gump so its unique
 GUMP_ID =  3411114321
+if Gumps.HasGump(GUMP_ID):
+    Gumps.CloseGump(GUMP_ID)
+
 
 # Art IDs for gump elements
 GUMP_ART = {
@@ -62,8 +70,8 @@ STATUS_EFFECTS = {
     }
 }
 
-# Cooldown for saying "[emote oh" when critically low HP (in milliseconds)
-EMOTE_OH_COOLDOWN_MS = 60 * 1000
+# Cooldown for saying "[emote oh" when critically low HP (in milliseconds) , 10 min
+EMOTE_OH_COOLDOWN_MS = 600 * 1000
 
 class ARPGStatusBars:
     def __init__(self):

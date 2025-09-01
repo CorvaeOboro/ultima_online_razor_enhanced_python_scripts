@@ -104,7 +104,7 @@ KNOWN_BOSSES_CUSTOM = {
     "an abomination": "An Abomination", # miniboss in sandstorm
     "a flesh devourer": "-=  I T    T H A T    D E V O U R S  =-", # miniboss in wrong
     "test a harpy": "─ +† Semidar †+ ─", 
-    "a giant rat": "Celestus",
+    "test a giant rat": "Celestus",
 }
 
 # Merge with custom overriding defaults where keys overlap
