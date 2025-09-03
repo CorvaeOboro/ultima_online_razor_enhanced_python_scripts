@@ -26,6 +26,7 @@ import json # maybe we conditionally load this if a crafting_recipe.json is foun
 DEBUG_MODE = False  # Set to True for debugging messages
 SHOW_TECHNICAL_INFO = False  # Set to True to show ItemID, Hue, Serial in results
 SHOW_CLOSE_BUTTON = False  # hiding the close button , its cleaner , right click to close
+HUE_TEXT_COLORIZED_BY_HUE = False  # currently not working , because of needed conversion from hue to html color
 
 DISPLAY = {
     'show_item_graphic': True,
@@ -1370,6 +1371,7 @@ def build_text_sections(target_item, usages: list) -> list:
         weapon_speed_text = None
         weapon_skill_text = None
         weapon_intensity_text = None
+        hue_text = None
         
         # Process each property with slot-aware rendering and separate modifiers from regular properties
         debug_msg(f"PROCESSING {len(property_list[:12])} properties (limited to 12), is_weapon={is_weapon}", COLORS['cat'])
@@ -1382,6 +1384,29 @@ def build_text_sections(target_item, usages: list) -> list:
                 # Check if this is a durability status line (e.g., "durability 46 / 51")
                 import re
                 is_durability_status = re.match(r'durability\s+\d+\s*/\s*\d+', low)
+                
+                # Check for hue property (e.g., "Metallic (#2311)" or "Inferno (#2136)")
+                hue_match = re.match(r'(.+?)\s*\(#(\d+)\)', raw_line)
+                if hue_match:
+                    hue_name, hue_number = hue_match.groups()
+                    hue_number = int(hue_number)
+                    
+                    # Get item's actual hue for verification
+                    item_hue = int(getattr(target_item, 'Hue', 0) or 0)
+                    debug_msg(f"  → HUE PROPERTY: name='{hue_name}', number={hue_number}, item_hue={item_hue}", COLORS['success'])
+                    
+                    # Verify hue matches (allow for some tolerance in case of conversion differences)
+                    if abs(hue_number - item_hue) <= 1:
+                        if HUE_TEXT_COLORIZED_BY_HUE and item_hue > 0:
+                            # Convert hue to hex color (simplified conversion)
+                            hue_hex = f"#{item_hue:04X}FF"  # Add alpha for visibility
+                            hue_text = f"<basefont color={hue_hex}>Hue: {hue_name.strip()} ( {hue_number} )</basefont>"
+                        else:
+                            hue_text = f"<basefont color=#444444>Hue: {hue_name.strip()} ( {hue_number} )</basefont>"
+                        debug_msg(f"  → HUE TEXT: {hue_text}", COLORS['success'])
+                        continue
+                    else:
+                        debug_msg(f"  → HUE MISMATCH: property={hue_number}, item={item_hue}", COLORS['warn'])
                 
                 # Special weapon property handling
                 if is_weapon:
@@ -1627,12 +1652,17 @@ def build_text_sections(target_item, usages: list) -> list:
         sections.append(TextSection([weapon_intensity_text], 'weapon_intensity', 35, separator_before=True))
         debug_msg(f"ADDED SECTION: weapon_intensity (priority 35, 1 line)", COLORS['cat'])
     
-    # 5. Weapon skill section (last priority for weapons)
+    # 5. Hue section (near bottom priority)
+    if hue_text:
+        sections.append(TextSection([hue_text], 'hue_info', 40, separator_before=True))
+        debug_msg(f"ADDED SECTION: hue_info (priority 40, 1 line)", COLORS['cat'])
+    
+    # 6. Weapon skill section (last priority for weapons)
     if is_weapon and weapon_skill_text:
         sections.append(TextSection([weapon_skill_text], 'weapon_skill', 45, separator_before=True))
         debug_msg(f"ADDED SECTION: weapon_skill (priority 45, 1 line)", COLORS['cat'])
     
-    # 6. Technical/dev info section (lowest priority) - shown when SHOW_TECHNICAL_INFO is True
+    # 7. Technical/dev info section (lowest priority) - shown when SHOW_TECHNICAL_INFO is True
     if SHOW_TECHNICAL_INFO:
         dev_lines = []
         dev_lines.append(f"<basefont color=#999999>ItemID: {_fmt_hex4(item_id)}</basefont>")
@@ -1690,8 +1720,15 @@ def show_walia_gump(target_item, usages: list, gump_id=None):
 
     # Narrower layout and compact padding
     gump_width = 320
-    # Dynamic height based on content
-    gump_height = 150 + content_height_px + (max_rows_to_render * 24 if DISPLAY.get('show_crafting', False) else 0)
+    
+    # Dynamic height based on actual content - more precise calculation
+    base_padding = 20  # Top/bottom margins
+    title_space = 60 if DISPLAY.get('show_title', True) else 0  # Title section
+    item_graphic_space = 70 if DISPLAY.get('show_item_graphic', True) else 0  # Item graphic
+    crafting_space = (max_rows_to_render * 24) if DISPLAY.get('show_crafting', False) else 0
+    
+    gump_height = base_padding + title_space + max(item_graphic_space, content_height_px) + crafting_space
+    debug_msg(f"Gump sizing: base={base_padding}, title={title_space}, content={content_height_px}, item_graphic={item_graphic_space}, crafting={crafting_space}, total={gump_height}", COLORS['cat'])
 
     Gumps.AddBackground(gump, 0, 0, gump_width, gump_height, 30546)
     Gumps.AddAlphaRegion(gump, 0, 0, gump_width, gump_height)
@@ -1947,8 +1984,7 @@ def walia_run_once(index: dict):
     try:
         Target.Cancel()
         _pause(100)
-        Target.PromptTarget("Select an item to inspect")
-        sel = Target.PromptTarget()
+        sel = Target.PromptTarget("Select an item to inspect")
     except Exception:
         sel = -1
     if sel is None or sel < 0:
