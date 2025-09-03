@@ -16,21 +16,20 @@
 | [UI](#UI) | [RITUAL](#RITUAL) | [ITEM](#ITEM) | [MISC](#MISC) | [SPELL](#SPELL) | [TRAIN](#TRAIN) | [GATHER](#GATHER) | [DEV](#DEV) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 
-<img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_health_bar_long_comp.gif?raw=true"/>
-
 </center>
 
 ## UI
-- [UI_health_arpg_status_bars.py](scripts/UI_health_arpg_status_bars.py) – large color coded horizontal bars for health, mana , and bandage timer
+user interface custom gumps 
+- [UI_health_arpg_status_bars.py](scripts/UI_health_arpg_status_bars.py) – large color coded horizontal bars for health, mana , and stamina
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_health_bar_long.gif?raw=true"/>
-- [UI_summon_health_monitor.py](scripts/UI_summon_health_monitor.py) – display the health of summoned creatures
+- [UI_summon_health_monitor.py](scripts/UI_summon_health_monitor.py) – display the health of summoned creatures at a consistent position
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_summons_health.png?raw=true"/>
 - [UI_spell_hotbar_hotkeys.py](scripts/UI_spell_hotbar_hotkeys.py) – the example Spell hotbar with added hotkey display
 - [UI_experience_progress_tracker.py](scripts/UI_experience_progress_tracker.py) – visualize progression system as progress bar , parsed from journal
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/UI_experience_progress_tracker.png?raw=true"/>
-- [UI_boss_healthbar.py](scripts/UI_boss_healthbar.py) – ARPG-style boss health bar with auto-detection, phase markers, and decorative elements
+- [UI_boss_healthbar.py](scripts/UI_boss_healthbar.py) – large boss health bar appears at top of screen when nearby known bosses
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_boss_health_bar.png?raw=true"/>
-- [UI_walia_item_inspect.py](scripts/UI_walia_item_inspect.py) – WALIA (What Am I Looking At) item inspection with detailed properties, crafting info, and custom descriptions
+- [UI_walia_item_inspect.py](scripts/UI_walia_item_inspect.py) – WALIA (What Am I Looking At) in-game item inspection to display detailed properties, crafting info, and custom descriptions
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info.png?raw=true"/>
 
 ## RITUAL

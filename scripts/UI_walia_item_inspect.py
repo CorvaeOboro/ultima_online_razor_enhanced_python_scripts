@@ -3,8 +3,7 @@ UI WALIA Item Inspection - a Razor Enhanced Python Script for Ultima Online
 
 WALIA ( What Am I Looking At ) , display item information , expanded
 a custom gump running in background as a button ( book shelf )
-clicking it triggers the item inspection targeter
-an inspector target reticle , the player selects an item 
+clicking it triggers the item inspection targeter, the player selects an item 
 a custom gump displays the item info and the items that can be crafted with it 
 
 ** some item properties are not available through api or limited to 4 properties ( spell books dont list their multiple properties )
@@ -18,10 +17,8 @@ TODO:
 HOTKEY:: AutoStart on Login
 VERSION:: 20250831
 """
-
-import os
-import re
-import time
+import re # regex parsing the text
+import os # reading the crafting json , could remove if hardcoded data
 import json # maybe we conditionally load this if a crafting_recipe.json is found? that way no dependency for general use
 
 DEBUG_MODE = False  # Set to False to silence debug messages
@@ -59,26 +56,39 @@ RESULTS_GUMP_ID = 0x7A11A13 # this iterates upwards so could see results side by
 # Map item properties to richer text for clarity 
 PROPERTY_REMAP = {
     # Accuracy -> Tactics modifier (weapons) — numeric-first formatting
-    'accurate': '+ 5 Tactics ( Accurate )',
-    'surpassingly accurate': '+ 10 Tactics ( Surpassingly Accurate )',
-    'eminently accurate': '+ 15 Tactics ( Eminently Accurate )',
-    'eminently accurately': '+ 15 Tactics ( Eminently Accurate )',  # common typo variant
-    'exceedingly accurate': '+ 20 Tactics ( Exceedingly Accurate )',
-    'supremely accurate': '+ 25 Tactics ( Supremely Accurate )',
+    'accurate': '<basefont color=#5CB85C>+ 5 Tactics</basefont> <basefont color=#FFB84D>( Accurate )</basefont>',
+    'surpassingly accurate': '<basefont color=#5CB85C>+ 10 Tactics</basefont> <basefont color=#FFB84D>( Surpassingly Accurate )</basefont>',
+    'eminently accurate': '<basefont color=#5CB85C>+ 15 Tactics</basefont> <basefont color=#FFB84D>( Eminently Accurate )</basefont>',
+    'eminently accurately': '<basefont color=#5CB85C>+ 15 Tactics</basefont> <basefont color=#FFB84D>( Eminently Accurate )</basefont>',  # common typo variant
+    'exceedingly accurate': '<basefont color=#5CB85C>+ 20 Tactics</basefont> <basefont color=#FFB84D>( Exceedingly Accurate )</basefont>',
+    'supremely accurate': '<basefont color=#5CB85C>+ 25 Tactics</basefont> <basefont color=#FFB84D>( Supremely Accurate )</basefont>',
     # Damage tiers (weapons) — numeric-first formatting
-    'ruin': '+ 1 Damage ( Ruin )',
-    'might': '+ 3 Damage ( Might )',
-    'force': '+ 5 Damage ( Force )',
-    'power': '+ 7 Damage ( Power )',
-    'vanquishing': '+ 9 Damage ( Vanquishing )',
-    'exceptional': '+ 4 Damage ( Exceptional )',
+    'ruin': '<basefont color=#FF6B6B>+ 1 Damage</basefont> <basefont color=#FFB84D>( Ruin )</basefont>',
+    'might': '<basefont color=#FF6B6B>+ 3 Damage</basefont> <basefont color=#FFB84D>( Might )</basefont>',
+    'force': '<basefont color=#FF6B6B>+ 5 Damage</basefont> <basefont color=#FFB84D>( Force )</basefont>',
+    'power': '<basefont color=#FF6B6B>+ 7 Damage</basefont> <basefont color=#FFB84D>( Power )</basefont>',
+    'vanquishing': '<basefont color=#FF6B6B>+ 9 Damage</basefont> <basefont color=#FFB84D>( Vanquishing )</basefont>',
+    'exceptional': '<basefont color=#FF6B6B>+ 4 Damage</basefont> <basefont color=#FFB84D>( Exceptional )</basefont>',
     # Slayer tiers (keep PvM wording, remove PvP mentions) — numeric-first
-    'lesser slaying': '+ 15% vs type ( Lesser Slayer )',
-    'slaying': '+ 20% vs type ( Slayer )',
-    'greater slaying': '+ 25% vs type ( Greater Slayer )',
+    'lesser slaying': '<basefont color=#B084FF>+ 15%</basefont> vs type <basefont color=#FFB84D>( Lesser Slayer )</basefont>',
+    'slaying': '<basefont color=#B084FF>+ 20%</basefont> vs type <basefont color=#FFB84D>( Slayer )</basefont>',
+    'greater slaying': '<basefont color=#B084FF>+ 25%</basefont> vs type <basefont color=#FFB84D>( Greater Slayer )</basefont>',
+    # Durability tiers — numeric-first formatting with light grey numbers and medium grey names
+    'durable': '<basefont color=#888888>+ 5 Durability</basefont> <basefont color=#AAAAAA>( Durable )</basefont>',
+    'substantial': '<basefont color=#888888>+ 10 Durability</basefont> <basefont color=#AAAAAA>( Substantial )</basefont>',
+    'massive': '<basefont color=#888888>+ 15 Durability</basefont> <basefont color=#AAAAAA>( Massive )</basefont>',
+    'fortified': '<basefont color=#888888>+ 20 Durability</basefont> <basefont color=#AAAAAA>( Fortified )</basefont>',
+    'indestructible': '<basefont color=#888888>+ 25 Durability</basefont> <basefont color=#AAAAAA>( Indestructible )</basefont>',
+    # Armor Rating tiers — will be dynamically calculated with "Base + Additional AR (Modifier)" format
+    # These are placeholders - actual values calculated in _compute_ar_modifier_text()
+    'defense': 'PLACEHOLDER_AR_MODIFIER',
+    'guarding': 'PLACEHOLDER_AR_MODIFIER', 
+    'hardening': 'PLACEHOLDER_AR_MODIFIER',
+    'fortification': 'PLACEHOLDER_AR_MODIFIER',
+    'invulnerable': 'PLACEHOLDER_AR_MODIFIER',
     # Durability tiers — now handled dynamically per-slot in _compute_durability_text() because weapons and armor get different durability
     # Armor Rating tiers — now handled dynamically per-slot in _compute_ar_bonus_text() because each item different amount
-    'mastercrafted': 'Mastercrafted',
+    'mastercrafted': '<basefont color=#3FA9FF>Mastercrafted</basefont>',
 }
 
 # Known items with custom descriptions and colored text
@@ -90,6 +100,27 @@ KNOWN_ITEMS = {
         "using <basefont color=#FF6B6B>Mark</basefont> sets the caster's location into the target rune stone",
         "rename the rune stone by double clicking it",
         "a <basefont color=#8B4513>RuneBook</basefont> may store multiple rune stones , by dropping them onto the book"
+    ],
+    0x0996: [  # Mento Seasoning , color =0x005f
+        "a <basefont color=#228B22>Cooking</basefont> ingredient",
+        "used in <basefont color=#32CD32>Bowl of Marinated Rocks</basefont> (Grants 10% physical resistance for 10 min) ",   
+        "used in <basefont color=#228B22>Colorful Salad</basefont>, <basefont color=#228B22>Pork Meal</basefont>",   
+        "collected from <basefont color=#3FA9FF>Humanoid</basefont> enemies",
+    ],
+    0x099F: [  # Samuel Secret Sauce
+        "a <basefont color=#228B22>Cooking</basefont> ingredient",
+        "used in <basefont color=#32CD32>Pixie Leg Feast</basefont> (Grants increased spell surging chance for 15 min) ",   
+        "used in <basefont color=#32CD32>Charcuterie Board</basefont> (Grants 10% magical resistance for 10 min) ",   
+        "used in <basefont color=#228B22>Salmon Meal</basefont>, <basefont color=#228B22>Spicy Fish Bowl</basefont> ",   
+        "collected from <basefont color=#3FA9FF>Humanoid</basefont> enemies",
+    ],
+    0x3199: [  # Brilliant Amber
+        "a rare gem",
+        "collected from <basefont color=#8B4513>Lumberjacking</basefont>",  
+    ],
+    0x4FB6: [  # N token for raffle
+        "a token for raffle",
+        "turn in at the <basefont color=#3FA9FF>Britain</basefont> bank top right corner",  
     ],
 }
 
@@ -262,6 +293,50 @@ COLORS = {
     'warn': 53,        # yellow
     'bad': 33,         # red
     'cat': 90,         # cyan
+    'info': 1153,      # light gray for info messages
+    'success': 63,     # green for success messages
+}
+
+
+# Define which properties are considered "modifiers" that should be displayed first
+MODIFIER_PROPERTIES = {
+    'accurate', 'surpassingly accurate', 'eminently accurate', 'eminently accurately', 
+    'exceedingly accurate', 'supremely accurate',
+    'ruin', 'might', 'force', 'power', 'vanquishing', 'exceptional',
+    'durable', 'substantial', 'massive', 'fortified', 'indestructible',
+    'defense', 'guarding', 'hardening', 'fortification', 'invulnerable',
+}
+
+MATERIAL_PROPERTIES = {
+    'silver', 'shadow', 'copper', 'bronze', 'golden', 'agapite', 'verite', 'valorite',
+    'spined', 'horned', 'barbed',
+    'oak', 'ash', 'yew', 'heartwood', 'bloodwood', 'frostwood'
+}
+
+# Modifier color categories
+MODIFIER_COLORS = {
+    'durability': '#CD853F',  # Light brown for durability modifiers
+    'damage': '#FF8C00',      # Orange for damage modifiers  
+    'skill': '#FFD700',       # Yellow for skill modifiers
+    'default': '#CCCCCC'      # Default gray for other modifiers
+}
+
+# Durability tier bonuses (fixed values for both weapons and armor)
+DURABILITY_TIERS = {
+    'durable': 5,
+    'substantial': 10,
+    'massive': 15,
+    'fortified': 20,
+    'indestructible': 25,
+}
+
+# Armor Rating tier bonuses , these are rough estimates for fallback , the actual data is in ARMOR_DATA_BY_ITEMID
+AR_BONUS_TIERS = {
+    'defense':        {'neck_hands': 0.4, 'arms_head_legs': 0.7, 'body': 2.2, 'shield': 1, 'pct': 5},
+    'guarding':       {'neck_hands': 0.7, 'arms_head_legs': 1.4, 'body': 4.4, 'shield': 1.5, 'pct': 10},
+    'hardening':      {'neck_hands': 1.1, 'arms_head_legs': 2.1, 'body': 6.6, 'shield': 2, 'pct': 15},
+    'fortification':  {'neck_hands': 1.4, 'arms_head_legs': 2.8, 'body': 8.8, 'shield': 4, 'pct': 20},
+    'invulnerable':   {'neck_hands': 1.8, 'arms_head_legs': 3.5, 'body': 11.0, 'shield': 7, 'pct': 25},
 }
 
 # Hex colors for HTML text rendering based on tiers
@@ -288,206 +363,207 @@ _LAST_TARGET_NAME = None
 _LAST_USAGES = None
 
 #//=============================================================================
-# Equipment slot mapping (by ItemID)
-# Source: mirrored from scripts/ITEM_filter_junk_salvager.py item catalogs
-# Slots: head, neck, body, legs, arms, hand, weapon1h, weapon2h, shield
-# Note: Handedness for some weapons needs verification , some may be wrong
-EQUIP_SLOT_BY_ITEMID = {
+# Equipment data mapping (by ItemID)
+# Includes: Type, Layer, Base AR, AR modifiers, DEX penalty
+# Source: Incomplete DATA_item_armor_data_to_wiki.py results ( 137 / 432 ) items recorded ~30%
+ARMOR_DATA_BY_ITEMID = {
+    # Comprehensive armor data from testing analysis
+    # Format: item_id: {'type': str, 'layer': str, 'name': str, 'base_ar': int, 'ar_modifiers': dict, 'dex_penalty': int}
+    
+    # --- Platemail Armor ---
+    0x140C: {'type': 'Platemail', 'layer': 'Head', 'name': 'bascinet', 'base_ar': 3, 'ar_modifiers': {}, 'dex_penalty': 0},
+    0x1408: {'type': 'Platemail', 'layer': 'Head', 'name': 'close helmet', 'base_ar': 4, 'ar_modifiers': {'Defense': 6, 'Guarding': 7}, 'dex_penalty': 0},
+    0x1C04: {'type': 'Platemail', 'layer': 'InnerTorso', 'name': 'female plate', 'base_ar': 10, 'ar_modifiers': {'Defense': 16, 'Hardening': 19}, 'dex_penalty': -5},
+    0x140A: {'type': 'Platemail', 'layer': 'Head', 'name': 'helmet', 'base_ar': 4, 'ar_modifiers': {'Defense': 6, 'Hardening': 8}, 'dex_penalty': 0},
+    0x140E: {'type': 'Platemail', 'layer': 'Head', 'name': 'norse helm', 'base_ar': 4, 'ar_modifiers': {}, 'dex_penalty': 0},
+    0x1F0B: {'type': 'Platemail', 'layer': 'Head', 'name': 'orc helm', 'base_ar': 0, 'ar_modifiers': {'Guarding': 6}, 'dex_penalty': 0},
+    0x1412: {'type': 'Platemail', 'layer': 'Head', 'name': 'plate helm', 'base_ar': 4, 'ar_modifiers': {'Defense': 7, 'Fortification': 9, 'Guarding': 7}, 'dex_penalty': -1},
+    0x1410: {'type': 'Platemail', 'layer': 'Arms', 'name': 'platemail arms', 'base_ar': 5, 'ar_modifiers': {'Defense': 7, 'Fortification': 9, 'Guarding': 8}, 'dex_penalty': -2},
+    0x1413: {'type': 'Platemail', 'layer': 'Gloves', 'name': 'platemail gloves', 'base_ar': 2, 'ar_modifiers': {'Fortification': 4, 'Guarding': 4}, 'dex_penalty': -2},
+    0x1414: {'type': 'Platemail', 'layer': 'Neck', 'name': 'platemail gorget', 'base_ar': 2, 'ar_modifiers': {'Defense': 3}, 'dex_penalty': -1},
+    0x1411: {'type': 'Platemail', 'layer': 'Pants', 'name': 'platemail legs', 'base_ar': 7, 'ar_modifiers': {'Fortification': 14, 'Guarding': 11}, 'dex_penalty': -6},
+    0x2779: {'type': 'Platemail', 'layer': 'Neck', 'name': 'platemail mempo', 'base_ar': 0, 'ar_modifiers': {'Defense': 1}, 'dex_penalty': 0},
+    0x1415: {'type': 'Platemail', 'layer': 'InnerTorso', 'name': 'platemail tunic', 'base_ar': 11, 'ar_modifiers': {'Defense': 16, 'Fortification': 22, 'Guarding': 18}, 'dex_penalty': -8},
+    
+    # --- Bone Armor ---
+    0x144F: {'type': 'Bone', 'layer': 'InnerTorso', 'name': 'bone armor', 'base_ar': 11, 'ar_modifiers': {'Defense': 16, 'Guarding': 18}, 'dex_penalty': -6},
+    0x144E: {'type': 'Bone', 'layer': 'Arms', 'name': 'bone arms', 'base_ar': 0, 'ar_modifiers': {'Defense': 7}, 'dex_penalty': -2},
+    0x1450: {'type': 'Bone', 'layer': 'Gloves', 'name': 'bone gloves', 'base_ar': 2, 'ar_modifiers': {'Guarding': 4, 'Hardening': 4}, 'dex_penalty': -1},
+    0x1451: {'type': 'Bone', 'layer': 'Head', 'name': 'bone helmet', 'base_ar': 0, 'ar_modifiers': {'Hardening': 8}, 'dex_penalty': 0},
+    0x1452: {'type': 'Bone', 'layer': 'Pants', 'name': 'bone leggings', 'base_ar': 0, 'ar_modifiers': {'Defense': 10}, 'dex_penalty': -4},
+    
+    # --- Chainmail Armor ---
+    0x13BB: {'type': 'Chainmail', 'layer': 'Head', 'name': 'chainmail coif', 'base_ar': 4, 'ar_modifiers': {}, 'dex_penalty': 0},
+    0x13BE: {'type': 'Chainmail', 'layer': 'Pants', 'name': 'chainmail leggings', 'base_ar': 6, 'ar_modifiers': {}, 'dex_penalty': -3},
+    0x13BF: {'type': 'Chainmail', 'layer': 'InnerTorso', 'name': 'chainmail tunic', 'base_ar': 10, 'ar_modifiers': {'Defense': 15, 'Guarding': 17}, 'dex_penalty': -5},
+    
+    # --- Leather Armor ---
+    0x1C06: {'type': 'Leather', 'layer': 'InnerTorso', 'name': 'female leather armor', 'base_ar': 5, 'ar_modifiers': {'Defense': 10, 'Fortification': 15, 'Guarding': 12}, 'dex_penalty': 0},
+    0x1C0A: {'type': 'Leather', 'layer': 'InnerTorso', 'name': 'leather bustier', 'base_ar': 5, 'ar_modifiers': {'Defense': 10}, 'dex_penalty': 0},
+    0x1DB9: {'type': 'Leather', 'layer': 'Head', 'name': 'leather cap', 'base_ar': 2, 'ar_modifiers': {}, 'dex_penalty': 0},
+    0x13C6: {'type': 'Leather', 'layer': 'Gloves', 'name': 'leather gloves', 'base_ar': 1, 'ar_modifiers': {'Defense': 2, 'Fortification': 3}, 'dex_penalty': 0},
+    0x13C7: {'type': 'Leather', 'layer': 'Neck', 'name': 'leather gorget', 'base_ar': 1, 'ar_modifiers': {'Defense': 2, 'Guarding': 2}, 'dex_penalty': 0},
+    0x13CB: {'type': 'Leather', 'layer': 'Pants', 'name': 'leather leggings', 'base_ar': 3, 'ar_modifiers': {'Guarding': 7}, 'dex_penalty': 0},
+    0x277A: {'type': 'Leather', 'layer': 'Neck', 'name': 'leather mempo', 'base_ar': 0, 'ar_modifiers': {'Hardening': 2}, 'dex_penalty': 0},
+    0x1C00: {'type': 'Leather', 'layer': 'Pants', 'name': 'leather shorts', 'base_ar': 3, 'ar_modifiers': {'Hardening': 8}, 'dex_penalty': 0},
+    0x1C08: {'type': 'Leather', 'layer': 'Pants', 'name': 'leather skirt', 'base_ar': 3, 'ar_modifiers': {'Defense': 6, 'Fortification': 9, 'Guarding': 7, 'Hardening': 8}, 'dex_penalty': 0},
+    0x13CD: {'type': 'Leather', 'layer': 'Arms', 'name': 'leather sleeves', 'base_ar': 2, 'ar_modifiers': {'Defense': 4, 'Fortification': 6, 'Hardening': 6, 'Invulnerable': 7}, 'dex_penalty': 0},
+    0x13CC: {'type': 'Leather', 'layer': 'InnerTorso', 'name': 'leather tunic', 'base_ar': 5, 'ar_modifiers': {'Defense': 10}, 'dex_penalty': 0},
+    
+    # --- Ringmail Armor ---
+    0x13EB: {'type': 'Ringmail', 'layer': 'Gloves', 'name': 'ringmail gloves', 'base_ar': 2, 'ar_modifiers': {}, 'dex_penalty': -1},
+    0x13F0: {'type': 'Ringmail', 'layer': 'Pants', 'name': 'ringmail leggings', 'base_ar': 5, 'ar_modifiers': {'Defense': 8}, 'dex_penalty': -1},
+    0x13EE: {'type': 'Ringmail', 'layer': 'Arms', 'name': 'ringmail sleeves', 'base_ar': 0, 'ar_modifiers': {'Defense': 6, 'Guarding': 6}, 'dex_penalty': -1},
+    0x13EC: {'type': 'Ringmail', 'layer': 'InnerTorso', 'name': 'ringmail tunic', 'base_ar': 8, 'ar_modifiers': {}, 'dex_penalty': -2},
+    
+    # --- Studded Armor ---
+    0x1C02: {'type': 'Studded', 'layer': 'InnerTorso', 'name': 'studded armor', 'base_ar': 6, 'ar_modifiers': {'Hardening': 14}, 'dex_penalty': 0},
+    0x1C0C: {'type': 'Studded', 'layer': 'InnerTorso', 'name': 'studded bustier', 'base_ar': 6, 'ar_modifiers': {'Hardening': 14}, 'dex_penalty': 0},
+    0x13D5: {'type': 'Studded', 'layer': 'Gloves', 'name': 'studded gloves', 'base_ar': 1, 'ar_modifiers': {'Guarding': 3}, 'dex_penalty': 0},
+    0x13D6: {'type': 'Studded', 'layer': 'Neck', 'name': 'studded gorget', 'base_ar': 1, 'ar_modifiers': {'Defense': 2}, 'dex_penalty': 0},
+    0x13DA: {'type': 'Studded', 'layer': 'Pants', 'name': 'studded leggings', 'base_ar': 4, 'ar_modifiers': {}, 'dex_penalty': 0},
+    0x279D: {'type': 'Studded', 'layer': 'Neck', 'name': 'studded mempo', 'base_ar': 0, 'ar_modifiers': {'Guarding': 2}, 'dex_penalty': 0},
+    0x13DC: {'type': 'Studded', 'layer': 'Arms', 'name': 'studded sleeves', 'base_ar': 2, 'ar_modifiers': {'Defense': 5, 'Guarding': 5}, 'dex_penalty': 0},
+    0x13DB: {'type': 'Studded', 'layer': 'InnerTorso', 'name': 'studded tunic', 'base_ar': 8, 'ar_modifiers': {'Defense': 11, 'Hardening': 14}, 'dex_penalty': 0},
+    
+    # --- Other Armor ---
+    0x1718: {'type': 'Other', 'layer': 'Head', 'name': "wizard's hat", 'base_ar': 0, 'ar_modifiers': {'Defense': 5}, 'dex_penalty': 0},
+    
     # --- Shields ---
-    0x1B72: 'shield', 0x1B73: 'shield', 0x1B74: 'shield', 0x1B75: 'shield',
-    0x1B76: 'shield', 0x1B77: 'shield', 0x1B78: 'shield', 0x1B79: 'shield',
-    0x1B7A: 'shield', 0x1B7B: 'shield', 0x1BC3: 'shield', 0x1BC4: 'shield',
-    0x1BC5: 'shield', 0x4201: 'shield', 0x4200: 'shield', 0x4202: 'shield',
-    0x4203: 'shield', 0x4204: 'shield', 0x4205: 'shield', 0x4206: 'shield',
-    0x4207: 'shield', 0x4208: 'shield', 0x4228: 'shield', 0x4229: 'shield',
-    0x422A: 'shield', 0x422C: 'shield', 0x7817: 'shield', 0x7818: 'shield',
-    0xA649: 'shield',
+    0x1BC4: {'type': 'Shield', 'layer': 'LeftHand', 'name': 'Order shield', 'base_ar': 0, 'ar_modifiers': {'Fortification': 27}, 'dex_penalty': 0},
+    0x1B72: {'type': 'Shield', 'layer': 'LeftHand', 'name': 'bronze shield', 'base_ar': 1, 'ar_modifiers': {'Defense': 1, 'Hardening': 1}, 'dex_penalty': 0},
+    0x1B73: {'type': 'Shield', 'layer': 'LeftHand', 'name': 'buckler', 'base_ar': 1, 'ar_modifiers': {}, 'dex_penalty': 0},
+    0x1B76: {'type': 'Shield', 'layer': 'LeftHand', 'name': 'heater shield', 'base_ar': 1, 'ar_modifiers': {}, 'dex_penalty': 0},
+    0x1B77: {'type': 'Shield', 'layer': 'LeftHand', 'name': 'metal kite shield', 'base_ar': 1, 'ar_modifiers': {'Hardening': 1}, 'dex_penalty': 0},
+    0x1B74: {'type': 'Shield', 'layer': 'LeftHand', 'name': 'metal shield', 'base_ar': 1, 'ar_modifiers': {'Defense': 1}, 'dex_penalty': 0},
+    0x1B78: {'type': 'Shield', 'layer': 'LeftHand', 'name': 'tear kite shield', 'base_ar': 1, 'ar_modifiers': {'Hardening': 1}, 'dex_penalty': 0},
+    0x1B7A: {'type': 'Shield', 'layer': 'LeftHand', 'name': 'wooden shield', 'base_ar': 1, 'ar_modifiers': {'Hardening': 1}, 'dex_penalty': 0},
+}
 
-    # --- Armor: Leather ---
-    0x13CD: 'arms',  # Leather Sleeves
-    0x13CB: 'legs',  # Leather Leggings
-    0x13CC: 'body',  # Leather Tunic
-    0x13C6: 'hand',  # Leather Gloves
-    0x1DB9: 'head',  # Leather Cap
-    0x1C08: 'legs',  # Leather Skirt (treated as legs)
-    0x1C06: 'body',  # Leather Armor (Female)
-    0x277A: 'neck',  # Leather Mempo
-    0x1C00: 'legs',  # Leather Shorts
-    0x1C0A: 'body',  # Leather Bustier
+# Weapon data dictionary (by ItemID)
+# Format: item_id: {'type': str, 'hands': str, 'name': str, 'skill': str}
+WEAPON_DATA_BY_ITEMID = {
+    # --- Axes ---
+    0x0F49: {'type': 'Axe', 'hands': '1h', 'name': 'axe', 'skill': 'Swordsmanship'},
+    0x0F47: {'type': 'Axe', 'hands': '2h', 'name': 'battle axe', 'skill': 'Swordsmanship'},
+    0x0F4B: {'type': 'Axe', 'hands': '2h', 'name': 'double axe', 'skill': 'Swordsmanship'},
+    0x0F45: {'type': 'Axe', 'hands': '2h', 'name': "executioner's axe", 'skill': 'Swordsmanship'},
+    0x0F43: {'type': 'Axe', 'hands': '1h', 'name': 'hatchet', 'skill': 'Swordsmanship'},
+    0x13FB: {'type': 'Axe', 'hands': '2h', 'name': 'large battle axe', 'skill': 'Swordsmanship'},
+    0x1443: {'type': 'Axe', 'hands': '2h', 'name': 'two handed axe', 'skill': 'Swordsmanship'},
+    0x13B0: {'type': 'Axe', 'hands': '1h', 'name': 'war axe', 'skill': 'Swordsmanship'},
 
-    # --- Armor: Platemail ---
-    0x1415: 'body',  # Plate Mail Chest
-    0x1411: 'legs',  # Plate Mail Legs
-    0x1414: 'neck',  # Plate Mail Gorget
-    0x1413: 'hand',  # Plate Mail Gloves
-    0x2779: 'neck',  # Platemail Mempo
-    0x140A: 'head',  # Helmet
-    0x140C: 'head',  # Bascinet
-    0x140E: 'head',  # Norse Helm
-    0x1408: 'head',  # Close Helm
-    0x1412: 'head',  # Plate Helm
-    0x1C04: 'body',  # Platemail Female
-    0x1410: 'arms',  # Platemail Arms
+    # --- Swords ---
+    0x0F5E: {'type': 'Sword', 'hands': '1h', 'name': 'broadsword', 'skill': 'Swordsmanship'},
+    0x1441: {'type': 'Sword', 'hands': '1h', 'name': 'cutlass', 'skill': 'Swordsmanship'},
+    0x13FF: {'type': 'Sword', 'hands': '1h', 'name': 'katana', 'skill': 'Swordsmanship'},
+    0x0F61: {'type': 'Sword', 'hands': '1h', 'name': 'longsword', 'skill': 'Swordsmanship'},
+    0x13B6: {'type': 'Sword', 'hands': '1h', 'name': 'scimitar', 'skill': 'Swordsmanship'},
+    0x13B9: {'type': 'Sword', 'hands': '1h', 'name': 'viking sword', 'skill': 'Swordsmanship'},
 
-    # --- Armor: Chainmail ---
-    0x13BF: 'body',  # Chainmail Tunic
-    0x13BE: 'legs',  # Chainmail Leggings
-    0x13BB: 'head',  # Chainmail Coif
-    0x13C0: 'body',  # Chainmail Tunic (Alt)
-    0x13C3: 'arms',  # Chainmail Sleeves
-    0x13C4: 'hand',  # Chainmail Gloves
-    0x13F0: 'legs',  # Chainmail Leggings (Alt)
+    # --- Maces & Staves ---
+    0x13B4: {'type': 'Mace', 'hands': '1h', 'name': 'club', 'skill': 'Mace Fighting'},
+    0x143D: {'type': 'Mace', 'hands': '1h', 'name': 'hammer pick', 'skill': 'Mace Fighting'},
+    0x0F5C: {'type': 'Mace', 'hands': '1h', 'name': 'mace', 'skill': 'Mace Fighting'},
+    0x143B: {'type': 'Mace', 'hands': '2h', 'name': 'maul', 'skill': 'Mace Fighting'},
+    0x1439: {'type': 'Mace', 'hands': '2h', 'name': 'war hammer', 'skill': 'Mace Fighting'},
+    0x1407: {'type': 'Mace', 'hands': '1h', 'name': 'war mace', 'skill': 'Mace Fighting'},
+    0x0DF0: {'type': 'Staff', 'hands': '2h', 'name': 'black staff', 'skill': 'Mace Fighting'},
+    0x13F8: {'type': 'Staff', 'hands': '2h', 'name': 'gnarled staff', 'skill': 'Mace Fighting'},
+    0x0E89: {'type': 'Staff', 'hands': '2h', 'name': 'quarter staff', 'skill': 'Mace Fighting'},
 
-    # --- Armor: Bone ---
-    0x144F: 'body',  # Bone Armor Chest
-    0x1452: 'legs',  # Bone Leggings
-    0x144E: 'arms',  # Bone Arms
-    0x1450: 'hand',  # Bone Gloves (Alt)
-    0x1451: 'head',  # Bone Helmet
-    # Note: file also listed some shield IDs under Bone; those are mapped above
+    # --- Fencing ---
+    0x0EC3: {'type': 'Fencing', 'hands': '1h', 'name': 'cleaver', 'skill': 'Fencing'},
+    0x0EC4: {'type': 'Fencing', 'hands': '1h', 'name': 'skinning knife', 'skill': 'Fencing'},
+    0x13F6: {'type': 'Fencing', 'hands': '1h', 'name': 'butcher knife', 'skill': 'Fencing'},
+    0x0F52: {'type': 'Fencing', 'hands': '1h', 'name': 'dagger', 'skill': 'Fencing'},
+    0x0F62: {'type': 'Fencing', 'hands': '2h', 'name': 'spear', 'skill': 'Fencing'},
+    0x1403: {'type': 'Fencing', 'hands': '2h', 'name': 'short spear', 'skill': 'Fencing'},
+    0x1405: {'type': 'Fencing', 'hands': '1h', 'name': 'war fork', 'skill': 'Fencing'},
+    0x1401: {'type': 'Fencing', 'hands': '1h', 'name': 'kryss', 'skill': 'Fencing'},
 
-    # --- Armor: Ringmail ---
-    0x13EC: 'body',  # Ringmail Tunic
-    0x13EE: 'arms',  # Ringmail Sleeves
-    0x13EB: 'hand',  # Ringmail Gloves
-    0x13F0: 'legs',  # Ringmail Leggings
-    0x13C0: 'body',  # Ring Mail Tunic (dup from alt)
-    0x13C3: 'arms',  # Ring Mail Sleeves (dup)
-    0x13C4: 'hand',  # Ring Mail Gloves (dup)
+    # --- Archery ---
+    0x13B2: {'type': 'Bow', 'hands': '2h', 'name': 'bow', 'skill': 'Archery'},
+    0x13B1: {'type': 'Bow', 'hands': '2h', 'name': 'bow', 'skill': 'Archery'},
+    0x26C2: {'type': 'Bow', 'hands': '2h', 'name': 'composite bow', 'skill': 'Archery'},
+    0x0F50: {'type': 'Crossbow', 'hands': '2h', 'name': 'crossbow', 'skill': 'Archery'},
+    0x13FD: {'type': 'Crossbow', 'hands': '2h', 'name': 'heavy crossbow', 'skill': 'Archery'},
+    0x26C3: {'type': 'Crossbow', 'hands': '2h', 'name': 'repeating crossbow', 'skill': 'Archery'},
+    0x2D1F: {'type': 'Bow', 'hands': '2h', 'name': 'magical shortbow', 'skill': 'Archery'},
 
-    # --- Armor: Studded ---
-    0x13C7: 'neck',  # Studded Leather Gorget
-    0x13DB: 'body',  # Studded Leather Tunic
-    0x13D4: 'arms',  # Studded Leather Sleeves
-    0x13DA: 'hand',  # Studded Leather Gloves
-    0x13D6: 'legs',  # Studded Leather Leggings
-    0x279D: 'neck',  # Studded Mempo
-    0x13D5: 'hand',  # Studded Gloves
-    0x13DC: 'arms',  # Studded Sleeves
-    0x1C0C: 'body',  # Studded Bustier
-    0x1C02: 'body',  # Studded Armor (Female)
-
-    # --- Weapons: Axes ---
-    0x0F49: 'weapon1h',  # Axe 
-    0x0F47: 'weapon2h',  # Battle Axe
-    0x0F4B: 'weapon2h',  # Double Axe
-    0x0F45: 'weapon2h',  # Executioner's Axe
-    0x0F43: 'weapon1h',  # Hatchet
-    0x13FB: 'weapon2h',  # Large Battle Axe
-    0x1443: 'weapon2h',  # Two Handed Axe
-    0x13B0: 'weapon1h',  # War Axe
-
-    # --- Weapons: Swords ---
-    0x0F5E: 'weapon1h',  # Broadsword
-    0x1441: 'weapon1h',  # Cutlass
-    0x13FF: 'weapon1h',  # Katana
-    0x0F61: 'weapon1h',  # Longsword
-    0x13B6: 'weapon1h',  # Scimitar
-    0x13B9: 'weapon1h',  # Viking Sword
-
-    # --- Weapons: Maces & Staves ---
-    0x13B4: 'weapon1h',  # Club
-    0x143D: 'weapon1h',  # Hammer Pick
-    0x0F5C: 'weapon1h',  # Mace
-    0x143B: 'weapon2h',  # Maul
-    0x1439: 'weapon2h',  # War Hammer
-    0x1407: 'weapon1h',  # War Mace
-    0x0DF0: 'weapon2h',  # Black Staff
-    0x13F8: 'weapon2h',  # Gnarled Staff
-    0x0E89: 'weapon2h',  # Quarter Staff
-
-    # --- Weapons: Fencing ---
-    0x0EC3: 'weapon1h',  # Cleaver
-    0x0EC4: 'weapon1h',  # Skinning Knife
-    0x13F6: 'weapon1h',  # Butcher Knife
-    0x0F52: 'weapon1h',  # Dagger
-    0x0F62: 'weapon2h',  # Spear
-    0x1403: 'weapon2h',  # Short Spear
-    0x1405: 'weapon1h',  # War Fork
-    0x1401: 'weapon1h',  # Kryss
-
-    # --- Weapons: Archery ---
-    0x13B2: 'weapon2h',  # Bow
-    0x13B1: 'weapon2h',  # Bow (Alternate)
-    0x26C2: 'weapon2h',  # Composite Bow
-    0x0F50: 'weapon2h',  # Crossbow
-    0x13FD: 'weapon2h',  # Heavy Crossbow
-    0x26C3: 'weapon2h',  # Repeating Crossbow
-    0x2D1F: 'weapon2h',  # Magical Shortbow
-
-    # --- Weapons: Unknown/mixed (best-effort) ---
-    0x0E86: 'weapon1h',  # Pickaxe 
-    0x0DF2: 'weapon1h',  # Magic Wand (assume 1H)
-    0x26BC: 'weapon1h',  # Scepter (assume 1H)
-    0x0F4D: 'weapon2h',  # Bardiche
-    0x143E: 'weapon2h',  # Halberd
-    0x26BA: 'weapon2h',  # Scythe
-    0x26BD: 'weapon2h',  # Bladed Staff
-    0x26BF: 'weapon2h',  # Double Bladed Staff
-    0x26BE: 'weapon2h',  # Pike
-    0x0E87: 'weapon2h',  # Pitchfork (treated 2H)
-    0x0E81: 'weapon2h',  # Shepherd's Crook (staff-like)
-    0x26BB: 'weapon2h',  # Bone Harvester
-    0x26C5: 'weapon2h',  # Bone Harvester (Alt)
-    0x26C1: 'weapon1h',  # Crescent Blade (assume 1H)
-    0x1400: 'weapon1h',  # Kryss (Alt)
-    0x26C0: 'weapon2h',  # Lance
-    0x27A8: 'weapon1h',  # Bokuto (assume 1H)
-    0x27A9: 'weapon2h',  # Daisho (often 2H)
-    0x27AD: 'weapon1h',  # Kama (assume 1H)
-    0x27A7: 'weapon2h',  # Lajatang
-    0x27A2: 'weapon2h',  # No-Dachi
-    0x27AE: 'weapon1h',  # Nunchaku
-    0x27AF: 'weapon1h',  # Sai
-    0x27AB: 'weapon1h',  # Tekagi
-    0x27A3: 'weapon1h',  # Tessen (assume 1H)
-    0x27A6: 'weapon2h',  # Tetsubo
-    0x27A4: 'weapon1h',  # Wakizashi (assume 1H)
-    0x27A5: 'weapon2h',  # Yumi (bow)
-    0x2D21: 'weapon1h',  # Assassin Spike
-    0x2D24: 'weapon1h',  # Diamond Mace
-    0x2D1E: 'weapon2h',  # Elven Composite Longbow
-    0x2D35: 'weapon1h',  # Elven Machete
-    0x2D20: 'weapon1h',  # Elven Spellblade
-    0x2D22: 'weapon1h',  # Leafblade
-    0x2D2B: 'weapon2h',  # Magical Shortbow (Alt)
-    0x2D28: 'weapon2h',  # Ornate Axe
-    0x2D33: 'weapon1h',  # Radiant Scimitar
-    0x2D32: 'weapon1h',  # Rune Blade
-    0x2D2F: 'weapon2h',  # War Cleaver
-    0x2D25: 'weapon2h',  # Wild Staff
-    0x406B: 'weapon2h',  # Soul Glaive (throwing, treated 2H)
-    0x406C: 'weapon2h',  # Cyclone (throwing)
-    0x4067: 'weapon2h',  # Boomerang (throwing)
-    0x08FE: 'weapon1h',  # Bloodblade (assume 1H)
-    0x0903: 'weapon1h',  # Disc Mace
-    0x090B: 'weapon1h',  # Dread Sword
-    0x0904: 'weapon2h',  # Dual Pointed Spear
-    0x08FD: 'weapon2h',  # Dual Short Axes
-    0x48B2: 'weapon2h',  # Gargish Axe
-    0x48B4: 'weapon2h',  # Gargish Bardiche
-    0x48B0: 'weapon2h',  # Gargish Battle Axe
-    0x48C6: 'weapon2h',  # Gargish Bone Harvester
-    0x48B6: 'weapon1h',  # Gargish Butcher Knife
-    0x48AE: 'weapon1h',  # Gargish Cleaver
-    0x0902: 'weapon1h',  # Gargish Dagger
-    0x48D0: 'weapon2h',  # Gargish Daisho
-    0x48B8: 'weapon2h',  # Gargish Gnarled Staff
-    0x48BA: 'weapon1h',  # Gargish Katana
-    0x48BC: 'weapon1h',  # Gargish Kryss
-    0x48CA: 'weapon2h',  # Gargish Lance
-    0x48C2: 'weapon2h',  # Gargish Maul
-    0x48C8: 'weapon2h',  # Gargish Pike
-    0x48C4: 'weapon2h',  # Gargish Scythe
-    0x0908: 'weapon1h',  # Gargish Talwar
-    0x48CE: 'weapon1h',  # Gargish Tekagi
-    0x48CC: 'weapon1h',  # Gargish Tessen
-    0x48C0: 'weapon2h',  # Gargish War Hammer
-    0x0905: 'weapon2h',  # Glass Staff
-    0x090C: 'weapon1h',  # Glass Sword
-    0x0906: 'weapon2h',  # Serpentstone Staff
-    0x0907: 'weapon1h',  # Shortblade
-    0x0900: 'weapon1h',  # Stone War Sword
+    # --- Mixed/Special ---
+    0x0E86: {'type': 'Tool', 'hands': '1h', 'name': 'pickaxe', 'skill': 'Mining'},
+    0x0DF2: {'type': 'Wand', 'hands': '1h', 'name': 'magic wand', 'skill': 'Magery'},
+    0x26BC: {'type': 'Scepter', 'hands': '1h', 'name': 'scepter', 'skill': 'Mace Fighting'},
+    0x0F4D: {'type': 'Polearm', 'hands': '2h', 'name': 'bardiche', 'skill': 'Swordsmanship'},
+    0x143E: {'type': 'Polearm', 'hands': '2h', 'name': 'halberd', 'skill': 'Swordsmanship'},
+    0x26BA: {'type': 'Polearm', 'hands': '2h', 'name': 'scythe', 'skill': 'Mace Fighting'},
+    0x26BD: {'type': 'Staff', 'hands': '2h', 'name': 'bladed staff', 'skill': 'Swordsmanship'},
+    0x26BF: {'type': 'Staff', 'hands': '2h', 'name': 'double bladed staff', 'skill': 'Swordsmanship'},
+    0x26BE: {'type': 'Polearm', 'hands': '2h', 'name': 'pike', 'skill': 'Fencing'},
+    0x0E87: {'type': 'Tool', 'hands': '2h', 'name': 'pitchfork', 'skill': 'Fencing'},
+    0x0E81: {'type': 'Staff', 'hands': '2h', 'name': "shepherd's crook", 'skill': 'Mace Fighting'},
+    0x26BB: {'type': 'Polearm', 'hands': '2h', 'name': 'bone harvester', 'skill': 'Swordsmanship'},
+    0x26C5: {'type': 'Polearm', 'hands': '2h', 'name': 'bone harvester', 'skill': 'Swordsmanship'},
+    0x26C1: {'type': 'Sword', 'hands': '1h', 'name': 'crescent blade', 'skill': 'Swordsmanship'},
+    0x1400: {'type': 'Fencing', 'hands': '1h', 'name': 'kryss', 'skill': 'Fencing'},
+    0x26C0: {'type': 'Polearm', 'hands': '2h', 'name': 'lance', 'skill': 'Fencing'},
+    0x27A8: {'type': 'Sword', 'hands': '1h', 'name': 'bokuto', 'skill': 'Swordsmanship'},
+    0x27A9: {'type': 'Sword', 'hands': '2h', 'name': 'daisho', 'skill': 'Swordsmanship'},
+    0x27AD: {'type': 'Fencing', 'hands': '1h', 'name': 'kama', 'skill': 'Fencing'},
+    0x27A7: {'type': 'Fencing', 'hands': '2h', 'name': 'lajatang', 'skill': 'Fencing'},
+    0x27A2: {'type': 'Sword', 'hands': '2h', 'name': 'no-dachi', 'skill': 'Swordsmanship'},
+    0x27AE: {'type': 'Fencing', 'hands': '1h', 'name': 'nunchaku', 'skill': 'Fencing'},
+    0x27AF: {'type': 'Fencing', 'hands': '1h', 'name': 'sai', 'skill': 'Fencing'},
+    0x27AB: {'type': 'Fencing', 'hands': '1h', 'name': 'tekagi', 'skill': 'Fencing'},
+    0x27A3: {'type': 'Fencing', 'hands': '1h', 'name': 'tessen', 'skill': 'Fencing'},
+    0x27A6: {'type': 'Mace', 'hands': '2h', 'name': 'tetsubo', 'skill': 'Mace Fighting'},
+    0x27A4: {'type': 'Sword', 'hands': '1h', 'name': 'wakizashi', 'skill': 'Swordsmanship'},
+    0x27A5: {'type': 'Bow', 'hands': '2h', 'name': 'yumi', 'skill': 'Archery'},
+    0x2D21: {'type': 'Fencing', 'hands': '1h', 'name': 'assassin spike', 'skill': 'Fencing'},
+    0x2D24: {'type': 'Mace', 'hands': '1h', 'name': 'diamond mace', 'skill': 'Mace Fighting'},
+    0x2D1E: {'type': 'Bow', 'hands': '2h', 'name': 'elven composite longbow', 'skill': 'Archery'},
+    0x2D35: {'type': 'Sword', 'hands': '1h', 'name': 'elven machete', 'skill': 'Swordsmanship'},
+    0x2D20: {'type': 'Sword', 'hands': '1h', 'name': 'elven spellblade', 'skill': 'Swordsmanship'},
+    0x2D22: {'type': 'Sword', 'hands': '1h', 'name': 'leafblade', 'skill': 'Swordsmanship'},
+    0x2D2B: {'type': 'Bow', 'hands': '2h', 'name': 'magical shortbow', 'skill': 'Archery'},
+    0x2D28: {'type': 'Axe', 'hands': '2h', 'name': 'ornate axe', 'skill': 'Swordsmanship'},
+    0x2D33: {'type': 'Sword', 'hands': '1h', 'name': 'radiant scimitar', 'skill': 'Swordsmanship'},
+    0x2D32: {'type': 'Sword', 'hands': '1h', 'name': 'rune blade', 'skill': 'Swordsmanship'},
+    0x2D2F: {'type': 'Axe', 'hands': '2h', 'name': 'war cleaver', 'skill': 'Swordsmanship'},
+    0x2D25: {'type': 'Staff', 'hands': '2h', 'name': 'wild staff', 'skill': 'Mace Fighting'},
+    0x406B: {'type': 'Throwing', 'hands': '2h', 'name': 'soul glaive', 'skill': 'Throwing'},
+    0x406C: {'type': 'Throwing', 'hands': '2h', 'name': 'cyclone', 'skill': 'Throwing'},
+    0x4067: {'type': 'Throwing', 'hands': '2h', 'name': 'boomerang', 'skill': 'Throwing'},
+    0x08FE: {'type': 'Sword', 'hands': '1h', 'name': 'bloodblade', 'skill': 'Swordsmanship'},
+    0x0903: {'type': 'Mace', 'hands': '1h', 'name': 'disc mace', 'skill': 'Mace Fighting'},
+    0x090B: {'type': 'Sword', 'hands': '1h', 'name': 'dread sword', 'skill': 'Swordsmanship'},
+    0x0904: {'type': 'Fencing', 'hands': '2h', 'name': 'dual pointed spear', 'skill': 'Fencing'},
+    0x08FD: {'type': 'Axe', 'hands': '2h', 'name': 'dual short axes', 'skill': 'Swordsmanship'},
+    0x48B2: {'type': 'Axe', 'hands': '2h', 'name': 'gargish axe', 'skill': 'Swordsmanship'},
+    0x48B4: {'type': 'Polearm', 'hands': '2h', 'name': 'gargish bardiche', 'skill': 'Swordsmanship'},
+    0x48B0: {'type': 'Axe', 'hands': '2h', 'name': 'gargish battle axe', 'skill': 'Swordsmanship'},
+    0x48C6: {'type': 'Polearm', 'hands': '2h', 'name': 'gargish bone harvester', 'skill': 'Swordsmanship'},
+    0x48B6: {'type': 'Fencing', 'hands': '1h', 'name': 'gargish butcher knife', 'skill': 'Fencing'},
+    0x48AE: {'type': 'Fencing', 'hands': '1h', 'name': 'gargish cleaver', 'skill': 'Fencing'},
+    0x0902: {'type': 'Fencing', 'hands': '1h', 'name': 'gargish dagger', 'skill': 'Fencing'},
+    0x48D0: {'type': 'Sword', 'hands': '2h', 'name': 'gargish daisho', 'skill': 'Swordsmanship'},
+    0x48B8: {'type': 'Staff', 'hands': '2h', 'name': 'gargish gnarled staff', 'skill': 'Mace Fighting'},
+    0x48BA: {'type': 'Sword', 'hands': '1h', 'name': 'gargish katana', 'skill': 'Swordsmanship'},
+    0x48BC: {'type': 'Fencing', 'hands': '1h', 'name': 'gargish kryss', 'skill': 'Fencing'},
+    0x48CA: {'type': 'Polearm', 'hands': '2h', 'name': 'gargish lance', 'skill': 'Fencing'},
+    0x48C2: {'type': 'Mace', 'hands': '2h', 'name': 'gargish maul', 'skill': 'Mace Fighting'},
+    0x48C8: {'type': 'Polearm', 'hands': '2h', 'name': 'gargish pike', 'skill': 'Fencing'},
+    0x48C4: {'type': 'Polearm', 'hands': '2h', 'name': 'gargish scythe', 'skill': 'Mace Fighting'},
+    0x0908: {'type': 'Sword', 'hands': '1h', 'name': 'gargish talwar', 'skill': 'Swordsmanship'},
+    0x48CE: {'type': 'Fencing', 'hands': '1h', 'name': 'gargish tekagi', 'skill': 'Fencing'},
+    0x48CC: {'type': 'Fencing', 'hands': '1h', 'name': 'gargish tessen', 'skill': 'Fencing'},
+    0x48C0: {'type': 'Mace', 'hands': '2h', 'name': 'gargish war hammer', 'skill': 'Mace Fighting'},
+    0x0905: {'type': 'Staff', 'hands': '2h', 'name': 'glass staff', 'skill': 'Mace Fighting'},
+    0x090C: {'type': 'Sword', 'hands': '1h', 'name': 'glass sword', 'skill': 'Swordsmanship'},
+    0x0906: {'type': 'Staff', 'hands': '2h', 'name': 'serpentstone staff', 'skill': 'Mace Fighting'},
+    0x0907: {'type': 'Sword', 'hands': '1h', 'name': 'shortblade', 'skill': 'Swordsmanship'},
+    0x0900: {'type': 'Sword', 'hands': '1h', 'name': 'stone war sword', 'skill': 'Swordsmanship'},
 }
 
 # Remap common crafting material names to backpack tooltip names
@@ -521,12 +597,77 @@ def debug_msg(message, color=90):
         except Exception:
             pass
 
-def get_equip_slot(item_id):
-    """Return equip slot for an item id, or None if unknown."""
+def get_modifier_color_category(property_text):
+    """Determine the color category for a modifier based on its content."""
+    text_lower = property_text.lower()
+    
+    # Durability modifiers (light brown)
+    if any(word in text_lower for word in ['durability', 'durable', 'substantial', 'massive', 'fortified', 'indestructible']):
+        return 'durability'
+    
+    # Damage modifiers (orange)
+    if any(word in text_lower for word in ['damage', 'ruin', 'might', 'force', 'power', 'vanquishing']):
+        return 'damage'
+    
+    # Skill modifiers (yellow) - includes tactics, skills, and other stat bonuses
+    if any(word in text_lower for word in ['tactics', 'skill', 'accurate', 'anatomy', 'archery', 'fencing', 'mace', 'swords', 'wrestling']):
+        return 'skill'
+    
+    # Default for other modifiers
+    return 'default'
+
+def format_modifier_text(property_text):
+    """Format modifier text with appropriate colors and extract numeric values."""
+    color_category = get_modifier_color_category(property_text)
+    color = MODIFIER_COLORS[color_category]
+    
+    # Extract numeric values and format them prominently
+    import re
+    
+    # Look for patterns like "+5", "+ 10", "20", etc.
+    number_match = re.search(r'[+\-]?\s*(\d+)', property_text)
+    if number_match:
+        number = number_match.group(1)
+        # Replace the number in the text with colored version
+        formatted_text = re.sub(
+            r'([+\-]?\s*)(\d+)',
+            f'<basefont color={color}>\\1{number}</basefont>',
+            property_text,
+            count=1
+        )
+        return formatted_text
+    else:
+        # No number found, just color the whole text
+        return f'<basefont color={color}>{property_text}</basefont>'
+
+def get_armor_data(item_id):
+    """Return armor data for an item id, or None if unknown."""
     try:
-        return EQUIP_SLOT_BY_ITEMID.get(int(item_id))
+        return ARMOR_DATA_BY_ITEMID.get(int(item_id))
     except Exception:
-        return EQUIP_SLOT_BY_ITEMID.get(item_id)
+        return ARMOR_DATA_BY_ITEMID.get(item_id)
+
+def get_weapon_data(item_id):
+    """Return weapon data for an item id, or None if unknown."""
+    try:
+        return WEAPON_DATA_BY_ITEMID.get(int(item_id))
+    except Exception:
+        return WEAPON_DATA_BY_ITEMID.get(item_id)
+
+def get_equip_slot(item_id):
+    """Return equip layer for an item id, or None if unknown."""
+    armor_data = get_armor_data(item_id)
+    if armor_data:
+        return armor_data.get('layer')
+    return None
+
+def is_weapon(item_id):
+    """Check if an item is a weapon."""
+    return get_weapon_data(item_id) is not None
+
+def is_armor(item_id):
+    """Check if an item is armor or shield."""
+    return get_armor_data(item_id) is not None
 
 def get_weapon_abilities(item_id):
     """Get weapon abilities for an item using Razor Enhanced API.
@@ -716,10 +857,8 @@ def build_material_index(items: list) -> dict:
 # Razor Enhanced helpers -----------------------------
 
 def _pause(ms):
-    try:
-        Misc.Pause(int(ms))
-    except Exception:
-        time.sleep(ms/1000.0)
+    Misc.Pause(int(ms))
+
 
 def _clean_leading_amount(name: str, amount: int) -> str:
     try:
@@ -919,13 +1058,13 @@ def _property_color_for_line(raw_lower: str) -> str:
     """Return HTML hex color for a given property line (lowercased)."""
     try:
         if not raw_lower:
-            return '#CCCCCC'
+            return '#888888'  # Medium grey for regular properties
         if raw_lower.startswith('durability'):
-            return '#AAAAAA'  # grey for durability
+            return '#888888'  # Medium grey for durability
         # Add more rules as needed
     except Exception:
         pass
-    return '#CCCCCC'
+    return '#888888'  # Medium grey for all regular properties
 
 def _wrap_line_with_default_color(line: str, default_color: str = '#BBBBBB') -> str:
     """Wrap a line with default color, preserving existing basefont tags."""
@@ -1114,21 +1253,14 @@ def _compute_ar_bonus_text(equip_slot: str, raw_lower: str) -> str or None:
     if not equip_slot or not raw_lower:
         return None
     # Identify AR tier keyword
-    tiers = {
-        'defense':        {'neck_hands': 0.4, 'arms_head_legs': 0.7, 'body': 2.2, 'shield': 1, 'pct': 5},
-        'guarding':       {'neck_hands': 0.7, 'arms_head_legs': 1.4, 'body': 4.4, 'shield': 1.5, 'pct': 10},
-        'hardening':      {'neck_hands': 1.1, 'arms_head_legs': 2.1, 'body': 6.6, 'shield': 2, 'pct': 15},
-        'fortification':  {'neck_hands': 1.4, 'arms_head_legs': 2.8, 'body': 8.8, 'shield': 4, 'pct': 20},
-        'invulnerable': {'neck_hands': 1.8, 'arms_head_legs': 3.5, 'body': 11.0, 'shield': 7, 'pct': 25},
-    }
     found = None
-    for key in tiers.keys():
+    for key in AR_BONUS_TIERS.keys():
         if key in raw_lower:
             found = key
             break
     if not found:
         return None
-    t = tiers[found]
+    t = AR_BONUS_TIERS[found]
     # Map slot to appropriate bucket
     slot = (equip_slot or '').lower()
     if slot in ('neck', 'hand'):
@@ -1153,20 +1285,13 @@ def _compute_durability_text(equip_slot: str, raw_lower: str) -> str or None:
     """Return durability text tailored for armor vs weapons. None if not a durability tier line."""
     if not raw_lower:
         return None
-    tiers_fixed = {
-        'durable': 5,
-        'substantial': 10,
-        'massive': 15,
-        'fortified': 20,
-        'indestructible': 25,
-    }
     # Exceptional is percent-based per spec
     if 'exceptional' == raw_lower.strip():
         if _is_weapon_slot(equip_slot):
             return '+ 20% durability ( Exceptional )'
         else:
             return '+ 20% durability ( Exceptional )'
-    for k, val in tiers_fixed.items():
+    for k, val in DURABILITY_TIERS.items():
         if k in raw_lower:
             if _is_weapon_slot(equip_slot):
                 return f"+ {val} durability ( {k.capitalize()} )"
@@ -1174,12 +1299,52 @@ def _compute_durability_text(equip_slot: str, raw_lower: str) -> str or None:
                 return f"+ {val} durability ( {k.capitalize()} )"
     return None
 
+def _compute_ar_modifier_text(item_id: int, modifier_name: str) -> str:
+    """Compute AR modifier text in 'Base + Additional AR (Modifier)' format."""
+    if item_id not in ARMOR_DATA_BY_ITEMID:
+        return f"<basefont color=#888888>+ AR</basefont> <basefont color=#AAAAAA>( {modifier_name.capitalize()} )</basefont>"
+    
+    armor_data = ARMOR_DATA_BY_ITEMID[item_id]
+    base_ar = armor_data.get('base_ar', 0)
+    ar_modifiers = armor_data.get('ar_modifiers', {})
+    
+    # Find the total AR for this specific modifier (stored value is total, not bonus)
+    modifier_total_ar = ar_modifiers.get(modifier_name.capitalize(), 0)
+    
+    if modifier_total_ar > 0:
+        # Calculate the actual bonus by subtracting base AR from total AR
+        modifier_bonus = modifier_total_ar - base_ar
+        return f"<basefont color=#3FA9FF>{base_ar} + {modifier_bonus} AR</basefont> <basefont color=#AAAAAA>( {modifier_name.capitalize()} )</basefont>"
+    else:
+        return f"<basefont color=#888888>+ AR</basefont> <basefont color=#AAAAAA>( {modifier_name.capitalize()} )</basefont>"
+
 def _equip_slot_and_type(item_id: int) -> tuple:
-    """Return (slot, friendly_type). friendly_type is one of Armor, Weapon, Shield, Unknown."""
+    """Return (slot, friendly_type). friendly_type includes detailed armor/weapon info."""
     try:
         slot = get_equip_slot(int(item_id) if item_id is not None else 0)
     except Exception:
         slot = None
+    
+    # Check armor data first for detailed info
+    if item_id in ARMOR_DATA_BY_ITEMID:
+        armor_data = ARMOR_DATA_BY_ITEMID[item_id]
+        armor_type = armor_data['type']
+        layer = armor_data['layer']
+        if armor_type == 'Shield':
+            typ = f"Shield ({layer})"
+        else:
+            typ = f"{armor_type} ( {layer} )"
+        return slot, typ
+    
+    # Check weapon data
+    if item_id in WEAPON_DATA_BY_ITEMID:
+        weapon_data = WEAPON_DATA_BY_ITEMID[item_id]
+        weapon_type = weapon_data['type']
+        hands = weapon_data['hands']
+        typ = f"{weapon_type} ({hands.upper()})"
+        return slot, typ
+    
+    # Fallback to generic slot-based detection
     s = (slot or '').lower()
     if s in ('weapon1h', 'weapon2h'):
         typ = 'Weapon' + (' (2H)' if s == 'weapon2h' else ' (1H)')
@@ -1200,59 +1365,186 @@ def build_text_sections(target_item, usages: list) -> list:
     item_id = int(getattr(target_item, 'ItemID', 0) or 0)
     equip_slot, friendly_type = _equip_slot_and_type(item_id)
     
-    # 1. Item properties section (highest priority)
-    property_lines = []
+    # 1. Item properties section (highest priority) - separated into modifiers, regular properties, and durability status
+    modifier_lines = []
+    regular_lines = []
+    durability_lines = []
     try:
         Items.WaitForProps(getattr(target_item, 'Serial', 0), 400)
         property_list = Items.GetPropStringList(getattr(target_item, 'Serial', 0)) or []
+        debug_msg(f"RAW PROPERTIES: Found {len(property_list)} properties", COLORS['cat'])
+        for i, prop in enumerate(property_list):
+            debug_msg(f"  [{i}] {repr(prop)}", COLORS['cat'])
+        
         # Skip name line if duplicates title
         if property_list and property_list[0].strip().lower() == (item_display_name or '').strip().lower():
             property_list = property_list[1:]
+            debug_msg(f"SKIPPED duplicate name line, {len(property_list)} properties remaining", COLORS['cat'])
         
-        # Process each property with slot-aware rendering
-        for prop in property_list[:12]:  # Limit to prevent overflow
-            raw_line = str(prop).strip()
-            low = raw_line.lower()
-            
-            # Apply slot-aware transformations
-            slot_ar_text = _compute_ar_bonus_text(equip_slot, low)
-            slot_dura_text = _compute_durability_text(equip_slot, low)
-            
-            if slot_ar_text:
-                final_text = slot_ar_text
-            elif slot_dura_text:
-                final_text = slot_dura_text
-            else:
-                final_text = PROPERTY_REMAP.get(low, raw_line)
-            
-            # Escape HTML but preserve existing color formatting
-            safe_text = final_text.replace('<','&lt;').replace('>','&gt;') if '<basefont' not in final_text else final_text
-            color = _property_color_for_line(low)
-            property_lines.append(f"<basefont color={color}>{safe_text}</basefont>")
+        # Process each property with slot-aware rendering and separate modifiers from regular properties
+        debug_msg(f"PROCESSING {len(property_list[:12])} properties (limited to 12)", COLORS['cat'])
+        for prop_idx, prop in enumerate(property_list[:12]):  # Limit to prevent overflow
+            try:
+                raw_line = str(prop).strip()
+                low = raw_line.lower()
+                debug_msg("\n--- PROPERTY {}: {} ---".format(prop_idx+1, repr(raw_line)), COLORS['cat'])
+                
+                # Check if this is a durability status line (e.g., "durability 46 / 51")
+                import re
+                is_durability_status = re.match(r'durability\s+\d+\s*/\s*\d+', low)
+                
+                # Check if this looks like a modifier FIRST (before slot-aware transformations)
+                # Exclude durability status lines from being treated as modifiers
+                is_modifier = (low in MODIFIER_PROPERTIES or 
+                              re.search(r'[+\-]\s*\d+', raw_line) or
+                              any(keyword in low for keyword in ['damage', 'tactics', 'skill', 'accurate']))
+                
+                debug_msg(f"  Is durability status: {bool(is_durability_status)}", COLORS['cat'])
+                debug_msg(f"  Is modifier: {is_modifier} (in MODIFIER_PROPERTIES: {low in MODIFIER_PROPERTIES})", COLORS['cat'])
+                if re.search(r'[+\-]\s*\d+', raw_line):
+                    debug_msg("    Has +/- numbers: {}".format(re.search(r'[+\-]\s*\d+', raw_line).group()), COLORS['cat'])
+                modifier_keywords = [kw for kw in ['damage', 'tactics', 'skill', 'accurate'] if kw in low]
+                if modifier_keywords:
+                    debug_msg(f"    Has modifier keywords: {modifier_keywords}", COLORS['cat'])
+                
+                # Apply slot-aware transformations (only for non-modifiers)
+                slot_ar_text = _compute_ar_bonus_text(equip_slot, low) if not is_modifier else None
+                slot_dura_text = _compute_durability_text(equip_slot, low) if not is_modifier else None
+                debug_msg(f"  Slot AR text: {repr(slot_ar_text)}", COLORS['cat'])
+                debug_msg(f"  Slot Dura text: {repr(slot_dura_text)}", COLORS['cat'])
+                
+                if slot_ar_text:
+                    debug_msg(f"    Processing slot AR text: {repr(slot_ar_text)}", COLORS['cat'])
+                    final_text = slot_ar_text
+                    # AR bonuses are regular properties
+                    color = _property_color_for_line(low)
+                    debug_msg(f"    AR color: {repr(color)}", COLORS['cat'])
+                    safe_text = final_text.replace('<','&lt;').replace('>','&gt;') if '<basefont' not in final_text else final_text
+                    formatted_line = f"<basefont color={color}>{safe_text}</basefont>"
+                    regular_lines.append(formatted_line)
+                    debug_msg("  → REGULAR (AR): " + repr(formatted_line), COLORS['success'])
+                elif slot_dura_text:
+                    final_text = slot_dura_text
+                    # Durability is a regular property
+                    color = _property_color_for_line(low)
+                    safe_text = final_text.replace('<','&lt;').replace('>','&gt;') if '<basefont' not in final_text else final_text
+                    formatted_line = f"<basefont color={color}>{safe_text}</basefont>"
+                    regular_lines.append(formatted_line)
+                    debug_msg("  → REGULAR (Dura): " + repr(formatted_line), COLORS['success'])
+                elif is_durability_status:
+                    # This is a durability status line - format with grey color
+                    safe_text = raw_line.replace('<','&lt;').replace('>','&gt;')
+                    formatted_line = f"<basefont color=#888888>{safe_text}</basefont>"
+                    durability_lines.append(formatted_line)
+                    debug_msg("  → DURABILITY STATUS: " + repr(formatted_line), COLORS['info'])
+                elif is_modifier:
+                    # This is a modifier property - use remapped text with HTML colors or format with colored text
+                    if low in PROPERTY_REMAP:
+                        # Check if this is an AR modifier placeholder that needs dynamic calculation
+                        if PROPERTY_REMAP[low] == 'PLACEHOLDER_AR_MODIFIER':
+                            final_text = _compute_ar_modifier_text(item_id, low)
+                        else:
+                            final_text = PROPERTY_REMAP[low]
+                        # Don't escape HTML for remapped properties since they have color formatting
+                        modifier_lines.append(final_text)
+                        debug_msg("  → MODIFIER (Remapped): " + repr(final_text), COLORS['warn'])
+                    else:
+                        # Format modifier with appropriate color category
+                        formatted_text = format_modifier_text(raw_line)
+                        modifier_lines.append(formatted_text)
+                        debug_msg("  → MODIFIER (Formatted): " + repr(formatted_text), COLORS['warn'])
+                else:
+                    # Regular property - apply default color and escape HTML
+                    final_text = PROPERTY_REMAP.get(low, raw_line)
+                    safe_text = final_text.replace('<','&lt;').replace('>','&gt;') if '<basefont' not in final_text else final_text
+                    color = _property_color_for_line(low)
+                    formatted_line = f"<basefont color={color}>{safe_text}</basefont>"
+                    regular_lines.append(formatted_line)
+                    debug_msg("  → REGULAR (Default): " + repr(formatted_line), COLORS['success'])
+                    
+            except Exception as prop_error:
+                debug_msg(f"  ERROR processing property {prop_idx+1}: {prop_error}", COLORS['bad'])
+                continue
         
-        if property_lines:
-            sections.append(TextSection(property_lines, 'properties', 10))
+        debug_msg("\nPROPERTY SEPARATION RESULTS:", COLORS['cat'])
+        debug_msg(f"  Modifier lines ({len(modifier_lines)}):", COLORS['cat'])
+        for i, line in enumerate(modifier_lines):
+            debug_msg(f"    [{i}] {repr(line)}", COLORS['cat'])
+        debug_msg(f"  Regular lines ({len(regular_lines)}):", COLORS['cat'])
+        for i, line in enumerate(regular_lines):
+            debug_msg(f"    [{i}] {repr(line)}", COLORS['cat'])
+        debug_msg(f"  Durability lines ({len(durability_lines)}):", COLORS['cat'])
+        for i, line in enumerate(durability_lines):
+            debug_msg(f"    [{i}] {repr(line)}", COLORS['cat'])
+        
+        # Add modifier properties first (priority 10)
+        if modifier_lines:
+            sections.append(TextSection(modifier_lines, 'modifiers', 10))
+            debug_msg(f"ADDED SECTION: modifiers (priority 10, {len(modifier_lines)} lines)", COLORS['warn'])
+        
+        # Add regular properties after modifiers (priority 15) with separator if modifiers exist
+        if regular_lines:
+            separator_needed = bool(modifier_lines)
+            sections.append(TextSection(regular_lines, 'properties', 15, separator_before=separator_needed))
+            debug_msg(f"ADDED SECTION: properties (priority 15, {len(regular_lines)} lines, separator: {separator_needed})", COLORS['success'])
+            
     except Exception as e:
         debug_msg(f"Error processing properties: {e}", COLORS['warn'])
+    
+    # Add total AR section for armor items (priority 5 - above modifiers)
+    if item_id in ARMOR_DATA_BY_ITEMID:
+        armor_data = ARMOR_DATA_BY_ITEMID[item_id]
+        base_ar = armor_data.get('base_ar', 0)
+        ar_modifiers = armor_data.get('ar_modifiers', {})
+        
+        # Calculate total AR - find the highest AR modifier that matches current item properties
+        total_ar = base_ar
+        current_ar_modifier = None
+        current_ar_bonus = 0
+        
+        # Check which AR modifier is currently active on this item by looking at processed properties
+        for prop_line in (modifier_lines + regular_lines):
+            for modifier_name, modifier_total_ar in ar_modifiers.items():
+                if modifier_name.lower() in prop_line.lower():
+                    if modifier_total_ar > current_ar_bonus:  # Use highest AR modifier if multiple
+                        current_ar_modifier = modifier_name
+                        current_ar_bonus = modifier_total_ar
+                        total_ar = modifier_total_ar  # Use the total AR directly since it's stored as total
+                        break
+        
+        if total_ar > 0:
+            total_ar_line = f"<basefont color=#CCCCCC>{total_ar} AR </basefont>"
+            sections.append(TextSection([total_ar_line], 'total_ar', 5))
+            debug_msg(f"ADDED SECTION: total_ar (priority 5, 1 lines) - Base: {base_ar}, Modifier: {current_ar_modifier}({current_ar_bonus}), Total: {total_ar}", COLORS['info'])
+    
+    # Add durability status last (priority 25) with separator if other sections exist - OUTSIDE try block
+    if durability_lines:
+        separator_needed = bool(modifier_lines or regular_lines)
+        sections.append(TextSection(durability_lines, 'durability', 25, separator_before=separator_needed))
+        debug_msg(f"ADDED SECTION: durability (priority 25, {len(durability_lines)} lines, separator: {separator_needed})", COLORS['info'])
     
     # 2. Known item descriptions section (high priority) - EACH LINE AS SEPARATE SECTION WITH PROPER COLOR WRAPPING
     try:
         if item_id in KNOWN_ITEMS:
-            debug_msg(f"Adding {len(KNOWN_ITEMS[item_id])} known item descriptions as separate sections")
+            debug_msg(f"Adding {len(KNOWN_ITEMS[item_id])} known item descriptions as separate sections", COLORS['cat'])
             for i, desc_line in enumerate(KNOWN_ITEMS[item_id]):
+                debug_msg(f"  Known desc [{i}]: {repr(desc_line)}", COLORS['cat'])
                 # Wrap line with default color, preserving existing basefont tags
                 formatted_line = _wrap_line_with_default_color(desc_line, '#BBBBBB')
+                debug_msg(f"    Formatted: {repr(formatted_line)}", COLORS['cat'])
                 
                 # Split long lines for word wrapping at 30 characters
                 wrapped_lines = _split_line_for_wrapping(formatted_line, max_chars=35)
+                debug_msg(f"    Wrapped into {len(wrapped_lines)} lines", COLORS['cat'])
                 
                 # Create sections for each wrapped line
                 for j, wrapped_line in enumerate(wrapped_lines):
                     priority = 20 + i + (j * 0.1)  # Maintain order with sub-priorities for wrapped lines
                     # Add separator before each new description entry (not just the first one)
-                    separator_needed = (j == 0 and (i == 0 and bool(property_lines) or i > 0))
+                    separator_needed = (j == 0 and (i == 0 and bool(modifier_lines or regular_lines) or i > 0))
                     section_id = f'known_desc_{i}_{j}' if len(wrapped_lines) > 1 else f'known_desc_{i}'
                     sections.append(TextSection([wrapped_line], section_id, priority, separator_before=separator_needed))
+                    debug_msg(f"    ADDED SECTION: {section_id} (priority {priority}, separator: {separator_needed})", COLORS['cat'])
     except Exception as e:
         debug_msg(f"Error adding known descriptions: {e}", COLORS['warn'])
     
@@ -1271,6 +1563,7 @@ def build_text_sections(target_item, usages: list) -> list:
     
     if equipment_lines:
         sections.append(TextSection(equipment_lines, 'equipment_type', 30, separator_before=True))
+        debug_msg(f"ADDED SECTION: equipment_type (priority 30, {len(equipment_lines)} lines)", COLORS['cat'])
     
     # 4. Technical/dev info section (lowest priority)
     if not IMMERSIVE_MODE:
@@ -1287,6 +1580,7 @@ def build_text_sections(target_item, usages: list) -> list:
         
         if dev_lines:
             sections.append(TextSection(dev_lines, 'dev_info', 90, separator_before=True))
+            debug_msg(f"ADDED SECTION: dev_info (priority 90, {len(dev_lines)} lines)", COLORS['cat'])
     
     # 5. Crafting description section (if enabled)
     if DISPLAY.get('show_description', True) and DISPLAY.get('show_crafting', False):
@@ -1294,9 +1588,20 @@ def build_text_sections(target_item, usages: list) -> list:
         if description_text:
             craft_lines = [f"<basefont color=#CCCCCC><i>{description_text}</i></basefont>"]
             sections.append(TextSection(craft_lines, 'crafting_desc', 80, separator_before=True))
+            debug_msg(f"ADDED SECTION: crafting_desc (priority 80, {len(craft_lines)} lines)", COLORS['cat'])
     
     # Sort by priority
+    debug_msg("\nSECTION ORDERING:", COLORS['cat'])
+    debug_msg(f"  Before sorting ({len(sections)} sections):", COLORS['cat'])
+    for i, section in enumerate(sections):
+        debug_msg(f"    [{i}] {section.category} (priority {section.priority}, {len(section.lines)} lines, separator: {section.separator_before})", COLORS['cat'])
+    
     sections.sort(key=lambda x: x.priority)
+    
+    debug_msg(f"  After sorting:", COLORS['cat'])
+    for i, section in enumerate(sections):
+        debug_msg(f"    [{i}] {section.category} (priority {section.priority}, {len(section.lines)} lines, separator: {section.separator_before})", COLORS['cat'])
+    
     return sections
 
 def show_walia_gump(target_item, usages: list):
@@ -1401,10 +1706,17 @@ def show_walia_gump(target_item, usages: list):
     current_y = text_y + 2
     text_offset_right_px = 4
     
-    for section in text_sections:
+    debug_msg("\nFINAL HTML RENDERING:", COLORS['cat'])
+    debug_msg(f"  Rendering {len(text_sections)} sections starting at Y={current_y}", COLORS['cat'])
+    
+    for section_idx, section in enumerate(text_sections):
+        debug_msg("\n  Section [{}]: {} (priority {})".format(section_idx, section.category, section.priority), COLORS['cat'])
+        debug_msg(f"    Lines: {len(section.lines)}, Separator: {section.separator_before}, Y: {current_y}", COLORS['cat'])
+        
         if section.separator_before and current_y > text_y + 2:
             # Add separator line
             separator_html = "<basefont color=#444444>─────────</basefont>"
+            debug_msg(f"    Adding separator at Y={current_y}: {repr(separator_html)}", COLORS['cat'])
             Gumps.AddHtml(
                 gump,
                 text_x + text_offset_right_px,
@@ -1419,8 +1731,14 @@ def show_walia_gump(target_item, usages: list):
         
         # Render section content
         section_html = section.to_html()
+        debug_msg(f"    Generated HTML ({len(section_html) if section_html else 0} chars): {repr(section_html[:100])}{'...' if section_html and len(section_html) > 100 else ''}", COLORS['cat'])
+        
         if section_html:
             section_height = len(section.lines) * 18
+            debug_msg(f"    Rendering at Y={current_y}, height={section_height}", COLORS['cat'])
+            for line_idx, line in enumerate(section.lines):
+                debug_msg(f"      Line [{line_idx}]: {repr(line)}", COLORS['cat'])
+            
             Gumps.AddHtml(
                 gump,
                 text_x + text_offset_right_px,
@@ -1629,6 +1947,7 @@ def walia_run_once(index: dict):
 
 def main():
     # Load latest crafting crawl and build the material index once
+    # this needs rework for crafting recipes , currently focused on equipment
     debug_msg("Starting WALIA")
     _, data_dir = _script_root_paths()
     src = _find_latest_crafting_json(data_dir)

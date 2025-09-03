@@ -32,14 +32,16 @@ DELAY_MS = 100
 GUMP_LOCATIONS = {
     # Custom Shard Gumps (Unchained)
     0xafb24ef0: {"name": "Unchained Toolbar", "x": 400, "y": 825},
-    0x431beab3: {"name": "Wilderness Progress", "x": 255, "y": 800},
-    0x39d3bcad: {"name": "Deceit Progress", "x": 255, "y": 850},
+    0x431beab3: {"name": "Dungeon Progress", "x": 255, "y": 815},
+    0x39d3bcad: {"name": "Wilderness Progress", "x": 255, "y": 850},
+    0x7d050c60: {"name": "Expedition Progress", "x": 255, "y": 850},
     0x4a3bd2b1: {"name": "chat", "x": 0, "y": 920},
     0xbacf07e2: {"name": "spell proc bar", "x": 400, "y": 645},
     # custom UI gumps 
     0xc671ea51: {"name": "Progress Tracker", "x": 0, "y": 755},
     3411114321: {"name": "Health Bar", "x": 465, "y": 715},
     3229191321: {"name": "Summon Monitor", "x": 790, "y": 720},
+    0xc0798c99: {"name": "Summon Monitor", "x": 790, "y": 720},
     0x7a11a12: {"name": "Walia Info", "x": 350, "y": 760},
     # other custom gumps
     0xbeefdade: {"name": "Durability percents", "x": 350, "y": 760},
