@@ -1,28 +1,31 @@
 """
 UI WALIA Item Inspection - a Razor Enhanced Python Script for Ultima Online
 
-WALIA ( What Am I Looking At ) , display item information , expanded
+WALIA ( What Am I Looking At ) , display item information , formatted with extra details
 a custom gump running in background as a button ( book shelf )
-clicking it triggers the item inspection targeter, the player selects an item 
+clicking the info bookshelf button triggers the item inspection targeter then select an item 
 a custom gump displays the item info and the items that can be crafted with it 
 
 ** some item properties are not available through api or limited to 4 properties ( spell books dont list their multiple properties )
+
 TODO: 
-- separate the crafting json logic , focus on core items with mechanics (recall rune) and weapons armor
-- remove the immersive mode toggles , the dev info like hue and item id is hidden now and should be appended to be displayed , there doesnt need to be global toggle for the mode .
-- armor values are off , consider displaying more generalized percentage , ideally we want to show true armor value total + modifiers , consider the base item + material ( valorite ) + crafting modifiers ( exceptional ) + property modifier ( invulnerable )
-- add base armor values to all items display it on first line 
-- increase the gump id of results gump so that we can create multiple results , consider some range that we cycle through so wont clash with other ids 
-- 
+- armor values update ( currently only 30% of modifier combinations known)
+- add materials handling
+- remove the crafting json logic ( we are adding data directly to the script currently )
+- focus on core items with mechanics ( recall rune ) and weapons and armor
+
+** issues = item properties through api limited to 4 ? therefore the display is not displaying the full properties **
+
 HOTKEY:: AutoStart on Login
-VERSION:: 20250831
+VERSION:: 20250902
 """
 import re # regex parsing the text
 import os # reading the crafting json , could remove if hardcoded data
 import json # maybe we conditionally load this if a crafting_recipe.json is found? that way no dependency for general use
 
-DEBUG_MODE = False  # Set to False to silence debug messages
-IMMERSIVE_MODE = False # this is always on now , the dev stuff is hidden , with button on ui to toggle it on
+DEBUG_MODE = False  # Set to True for debugging messages
+SHOW_TECHNICAL_INFO = False  # Set to True to show ItemID, Hue, Serial in results
+SHOW_CLOSE_BUTTON = False  # hiding the close button , its cleaner , right click to close
 
 DISPLAY = {
     'show_item_graphic': True,
@@ -41,35 +44,37 @@ DISPLAY = {
     'show_crafting_message': False,
 }
 
-# Position of the small floating launcher button
+# Gump positions
 LAUNCHER_X = 200
 LAUNCHER_Y = 200
-
-# Default position of the results window
 RESULTS_X = 200
 RESULTS_Y = 250
 
 # Separate gump IDs for the small launcher button and the results window
 LAUNCHER_GUMP_ID = 0x7A11A12
-RESULTS_GUMP_ID = 0x7A11A13 # this iterates upwards so could see results side by side
+RESULTS_GUMP_ID_BASE = 0x7A11A13 # base ID for cycling results gumps
+RESULTS_GUMP_ID_MAX_OFFSET = 10 # cycle through 10 different IDs (0-9)
+
+# Runtime state for cycling gump IDs
+_CURRENT_GUMP_OFFSET = 0
 
 # Map item properties to richer text for clarity 
 PROPERTY_REMAP = {
-    # Accuracy -> Tactics modifier (weapons) — numeric-first formatting
+    # Accuracy -> Tactics modifier (weapons) — numeric-first formatting , yellow color
     'accurate': '<basefont color=#5CB85C>+ 5 Tactics</basefont> <basefont color=#FFB84D>( Accurate )</basefont>',
     'surpassingly accurate': '<basefont color=#5CB85C>+ 10 Tactics</basefont> <basefont color=#FFB84D>( Surpassingly Accurate )</basefont>',
     'eminently accurate': '<basefont color=#5CB85C>+ 15 Tactics</basefont> <basefont color=#FFB84D>( Eminently Accurate )</basefont>',
     'eminently accurately': '<basefont color=#5CB85C>+ 15 Tactics</basefont> <basefont color=#FFB84D>( Eminently Accurate )</basefont>',  # common typo variant
     'exceedingly accurate': '<basefont color=#5CB85C>+ 20 Tactics</basefont> <basefont color=#FFB84D>( Exceedingly Accurate )</basefont>',
     'supremely accurate': '<basefont color=#5CB85C>+ 25 Tactics</basefont> <basefont color=#FFB84D>( Supremely Accurate )</basefont>',
-    # Damage tiers (weapons) — numeric-first formatting
+    # Damage tiers (weapons) — numeric-first formatting , red color
     'ruin': '<basefont color=#FF6B6B>+ 1 Damage</basefont> <basefont color=#FFB84D>( Ruin )</basefont>',
     'might': '<basefont color=#FF6B6B>+ 3 Damage</basefont> <basefont color=#FFB84D>( Might )</basefont>',
     'force': '<basefont color=#FF6B6B>+ 5 Damage</basefont> <basefont color=#FFB84D>( Force )</basefont>',
     'power': '<basefont color=#FF6B6B>+ 7 Damage</basefont> <basefont color=#FFB84D>( Power )</basefont>',
     'vanquishing': '<basefont color=#FF6B6B>+ 9 Damage</basefont> <basefont color=#FFB84D>( Vanquishing )</basefont>',
     'exceptional': '<basefont color=#FF6B6B>+ 4 Damage</basefont> <basefont color=#FFB84D>( Exceptional )</basefont>',
-    # Slayer tiers (keep PvM wording, remove PvP mentions) — numeric-first
+    # Slayer tiers — numeric-first , orange
     'lesser slaying': '<basefont color=#B084FF>+ 15%</basefont> vs type <basefont color=#FFB84D>( Lesser Slayer )</basefont>',
     'slaying': '<basefont color=#B084FF>+ 20%</basefont> vs type <basefont color=#FFB84D>( Slayer )</basefont>',
     'greater slaying': '<basefont color=#B084FF>+ 25%</basefont> vs type <basefont color=#FFB84D>( Greater Slayer )</basefont>',
@@ -79,7 +84,7 @@ PROPERTY_REMAP = {
     'massive': '<basefont color=#888888>+ 15 Durability</basefont> <basefont color=#AAAAAA>( Massive )</basefont>',
     'fortified': '<basefont color=#888888>+ 20 Durability</basefont> <basefont color=#AAAAAA>( Fortified )</basefont>',
     'indestructible': '<basefont color=#888888>+ 25 Durability</basefont> <basefont color=#AAAAAA>( Indestructible )</basefont>',
-    # Armor Rating tiers — will be dynamically calculated with "Base + Additional AR (Modifier)" format
+    # Armor Rating tiers — will be dynamically calculated with "Base + Additional AR (Modifier)"  since this is unique to each item
     # These are placeholders - actual values calculated in _compute_ar_modifier_text()
     'defense': 'PLACEHOLDER_AR_MODIFIER',
     'guarding': 'PLACEHOLDER_AR_MODIFIER', 
@@ -361,6 +366,13 @@ _LAST_TARGET_SERIAL = None
 _LAST_TARGET_ITEMID = None
 _LAST_TARGET_NAME = None
 _LAST_USAGES = None
+
+def get_next_results_gump_id():
+    """Get the next cycling RESULTS_GUMP_ID and increment the counter."""
+    global _CURRENT_GUMP_OFFSET
+    current_id = RESULTS_GUMP_ID_BASE + _CURRENT_GUMP_OFFSET
+    _CURRENT_GUMP_OFFSET = (_CURRENT_GUMP_OFFSET + 1) % RESULTS_GUMP_ID_MAX_OFFSET
+    return current_id
 
 #//=============================================================================
 # Equipment data mapping (by ItemID)
@@ -700,35 +712,6 @@ def get_item_properties(item_serial, delay=500):
         debug_msg(f"Error getting properties for serial {item_serial}: {e}", COLORS['warn'])
     return []
 
-def apply_display_preset(immersive: bool):
-    """Apply preset for immersive vs dev/technical display."""
-    global IMMERSIVE_MODE, DISPLAY
-    IMMERSIVE_MODE = bool(immersive)
-    if IMMERSIVE_MODE:
-        DISPLAY.update({
-            'show_item_graphic': True,
-            'show_item_id': False,
-            'show_item_hue': False,
-            'show_item_serial': False,
-            'show_category': False,
-            'show_makes': False,
-            'show_rarity': False,
-            'show_description': True,
-        })
-    else:
-        DISPLAY.update({
-            'show_item_graphic': True,
-            'show_item_id': True,
-            'show_item_hue': True,
-            'show_item_serial': False,
-            'show_category': True,
-            'show_makes': True,
-            'show_rarity': True,
-            'show_description': True,
-        })
-
-# Initialize to immersive by default (DEV off)
-apply_display_preset(True)
 
 def _singularize(word: str) -> str:
     if len(word) > 3 and word.endswith('s'):
@@ -1381,8 +1364,15 @@ def build_text_sections(target_item, usages: list) -> list:
             property_list = property_list[1:]
             debug_msg(f"SKIPPED duplicate name line, {len(property_list)} properties remaining", COLORS['cat'])
         
+        # Check if this is a weapon for special processing
+        is_weapon = item_id in WEAPON_DATA_BY_ITEMID
+        weapon_damage_text = None
+        weapon_speed_text = None
+        weapon_skill_text = None
+        weapon_intensity_text = None
+        
         # Process each property with slot-aware rendering and separate modifiers from regular properties
-        debug_msg(f"PROCESSING {len(property_list[:12])} properties (limited to 12)", COLORS['cat'])
+        debug_msg(f"PROCESSING {len(property_list[:12])} properties (limited to 12), is_weapon={is_weapon}", COLORS['cat'])
         for prop_idx, prop in enumerate(property_list[:12]):  # Limit to prevent overflow
             try:
                 raw_line = str(prop).strip()
@@ -1392,6 +1382,41 @@ def build_text_sections(target_item, usages: list) -> list:
                 # Check if this is a durability status line (e.g., "durability 46 / 51")
                 import re
                 is_durability_status = re.match(r'durability\s+\d+\s*/\s*\d+', low)
+                
+                # Special weapon property handling
+                if is_weapon:
+                    # Extract weapon damage (e.g., "weapon damage 8 - 32")
+                    damage_match = re.match(r'weapon damage (\d+) - (\d+)', low)
+                    if damage_match:
+                        min_dmg, max_dmg = damage_match.groups()
+                        weapon_damage_text = f"<basefont color=#FF6B6B>{min_dmg} - {max_dmg} damage</basefont>"
+                        debug_msg(f"  → WEAPON DAMAGE: {weapon_damage_text}", COLORS['success'])
+                        continue
+                    
+                    # Extract weapon speed (e.g., "weapon speed 30")
+                    speed_match = re.match(r'weapon speed (\d+)', low)
+                    if speed_match:
+                        speed = speed_match.group(1)
+                        weapon_speed_text = f"<basefont color=#FFB84D>{speed} speed</basefont>"
+                        debug_msg(f"  → WEAPON SPEED: {weapon_speed_text}", COLORS['success'])
+                        continue
+                    
+                    # Extract skill required (e.g., "skill required: mace fighting")
+                    skill_match = re.match(r'skill required: (.+)', low)
+                    if skill_match:
+                        skill = skill_match.group(1)
+                        weapon_skill_text = f"<basefont color=#666666>Skill: {skill.title()}</basefont>"
+                        debug_msg(f"  → WEAPON SKILL: {weapon_skill_text}", COLORS['success'])
+                        continue
+                    
+                    # Extract magical intensity (e.g., "Magical Intensity: 0 (Common)")
+                    intensity_match = re.match(r'magical intensity: \d+ \((.+)\)', low)
+                    if intensity_match:
+                        tier = intensity_match.group(1).lower()
+                        tier_color = NAME_TIER_COLORS.get(tier, '#DDDDDD')
+                        weapon_intensity_text = f"<basefont color={tier_color}>Magical Intensity: {raw_line.split(': ', 1)[1]}</basefont>"
+                        debug_msg(f"  → WEAPON INTENSITY: {weapon_intensity_text}", COLORS['success'])
+                        continue
                 
                 # Check if this looks like a modifier FIRST (before slot-aware transformations)
                 # Exclude durability status lines from being treated as modifiers
@@ -1443,6 +1468,13 @@ def build_text_sections(target_item, usages: list) -> list:
                         # Check if this is an AR modifier placeholder that needs dynamic calculation
                         if PROPERTY_REMAP[low] == 'PLACEHOLDER_AR_MODIFIER':
                             final_text = _compute_ar_modifier_text(item_id, low)
+                        # Special handling for "exceptional" - different for weapons vs armor
+                        elif low == 'exceptional':
+                            if is_weapon:
+                                final_text = '<basefont color=#FF6B6B>+ 4 Damage</basefont> <basefont color=#FFB84D>( Exceptional )</basefont>'
+                            else:
+                                # For armor, exceptional gives durability bonus
+                                final_text = '<basefont color=#888888>+ 20% Durability</basefont> <basefont color=#AAAAAA>( Exceptional )</basefont>'
                         else:
                             final_text = PROPERTY_REMAP[low]
                         # Don't escape HTML for remapped properties since they have color formatting
@@ -1477,14 +1509,28 @@ def build_text_sections(target_item, usages: list) -> list:
         for i, line in enumerate(durability_lines):
             debug_msg(f"    [{i}] {repr(line)}", COLORS['cat'])
         
-        # Add modifier properties first (priority 10)
+        # Add weapon damage/speed section first for weapons (priority 5)
+        if is_weapon and (weapon_damage_text or weapon_speed_text):
+            weapon_combat_lines = []
+            if weapon_damage_text and weapon_speed_text:
+                # Combine damage and speed on one line
+                weapon_combat_lines.append(f"{weapon_damage_text}   {weapon_speed_text}")
+            elif weapon_damage_text:
+                weapon_combat_lines.append(weapon_damage_text)
+            elif weapon_speed_text:
+                weapon_combat_lines.append(weapon_speed_text)
+            
+            sections.append(TextSection(weapon_combat_lines, 'weapon_combat', 5))
+            debug_msg(f"ADDED SECTION: weapon_combat (priority 5, {len(weapon_combat_lines)} lines)", COLORS['warn'])
+        
+        # Add modifier properties (priority 10)
         if modifier_lines:
             sections.append(TextSection(modifier_lines, 'modifiers', 10))
             debug_msg(f"ADDED SECTION: modifiers (priority 10, {len(modifier_lines)} lines)", COLORS['warn'])
         
         # Add regular properties after modifiers (priority 15) with separator if modifiers exist
         if regular_lines:
-            separator_needed = bool(modifier_lines)
+            separator_needed = bool(modifier_lines) or bool(is_weapon and (weapon_damage_text or weapon_speed_text))
             sections.append(TextSection(regular_lines, 'properties', 15, separator_before=separator_needed))
             debug_msg(f"ADDED SECTION: properties (priority 15, {len(regular_lines)} lines, separator: {separator_needed})", COLORS['success'])
             
@@ -1553,42 +1599,50 @@ def build_text_sections(target_item, usages: list) -> list:
     if equip_slot or friendly_type != 'Unknown':
         equipment_lines.append(f"<basefont color=#BBBBBB>Type: {friendly_type}</basefont>")
         
-        # Weapon abilities
-        if _is_weapon_slot(equip_slot):
+        # Weapon abilities - check weapon data dictionary directly
+        debug_msg(f"Checking weapon abilities: equip_slot='{equip_slot}', item_id={item_id} (0x{item_id:04X})", COLORS['cat'])
+        
+        # Check if item is in weapon data
+        is_weapon = item_id in WEAPON_DATA_BY_ITEMID
+        weapon_data = WEAPON_DATA_BY_ITEMID.get(item_id)
+        debug_msg(f"Weapon lookup: is_weapon={is_weapon}, weapon_data={weapon_data}", COLORS['cat'])
+        
+        if is_weapon:
+            debug_msg(f"Item is weapon, getting abilities...", COLORS['cat'])
             primary_ability, secondary_ability = get_weapon_abilities(item_id)
+            debug_msg(f"Raw API result: primary='{primary_ability}', secondary='{secondary_ability}'", COLORS['cat'])
             if primary_ability:
                 equipment_lines.append(f"<basefont color=#FFD700>Primary: {primary_ability}</basefont>")
             if secondary_ability:
                 equipment_lines.append(f"<basefont color=#87CEEB>Secondary: {secondary_ability}</basefont>")
+        else:
+            debug_msg(f"Item is not in weapon data dictionary", COLORS['cat'])
     
     if equipment_lines:
         sections.append(TextSection(equipment_lines, 'equipment_type', 30, separator_before=True))
         debug_msg(f"ADDED SECTION: equipment_type (priority 30, {len(equipment_lines)} lines)", COLORS['cat'])
     
-    # 4. Technical/dev info section (lowest priority)
-    if not IMMERSIVE_MODE:
+    # 4. Weapon intensity section (second-to-last priority for weapons)
+    if is_weapon and weapon_intensity_text:
+        sections.append(TextSection([weapon_intensity_text], 'weapon_intensity', 35, separator_before=True))
+        debug_msg(f"ADDED SECTION: weapon_intensity (priority 35, 1 line)", COLORS['cat'])
+    
+    # 5. Weapon skill section (last priority for weapons)
+    if is_weapon and weapon_skill_text:
+        sections.append(TextSection([weapon_skill_text], 'weapon_skill', 45, separator_before=True))
+        debug_msg(f"ADDED SECTION: weapon_skill (priority 45, 1 line)", COLORS['cat'])
+    
+    # 6. Technical/dev info section (lowest priority) - shown when SHOW_TECHNICAL_INFO is True
+    if SHOW_TECHNICAL_INFO:
         dev_lines = []
-        if DISPLAY.get('show_item_id', True):
-            dev_lines.append(f"<basefont color=#999999>ItemID: {_fmt_hex4(item_id)}</basefont>")
-        if DISPLAY.get('show_item_hue', True):
-            dev_lines.append(f"<basefont color=#999999>Hue: {getattr(target_item,'Hue',0)}</basefont>")
-        if DISPLAY.get('show_item_serial', True):
-            try:
-                dev_lines.append(f"<basefont color=#999999>Serial: {hex(getattr(target_item,'Serial',0))}</basefont>")
-            except Exception:
-                pass
+        dev_lines.append(f"<basefont color=#999999>ItemID: {_fmt_hex4(item_id)}</basefont>")
+        if item_hue > 0:
+            dev_lines.append(f"<basefont color=#999999>Hue: {item_hue}</basefont>")
+        dev_lines.append(f"<basefont color=#999999>Serial: {item_serial}</basefont>")
         
         if dev_lines:
-            sections.append(TextSection(dev_lines, 'dev_info', 90, separator_before=True))
-            debug_msg(f"ADDED SECTION: dev_info (priority 90, {len(dev_lines)} lines)", COLORS['cat'])
-    
-    # 5. Crafting description section (if enabled)
-    if DISPLAY.get('show_description', True) and DISPLAY.get('show_crafting', False):
-        description_text = _build_item_description(item_display_name, usages)
-        if description_text:
-            craft_lines = [f"<basefont color=#CCCCCC><i>{description_text}</i></basefont>"]
-            sections.append(TextSection(craft_lines, 'crafting_desc', 80, separator_before=True))
-            debug_msg(f"ADDED SECTION: crafting_desc (priority 80, {len(craft_lines)} lines)", COLORS['cat'])
+            sections.append(TextSection(dev_lines, 'technical_info', 50))
+            debug_msg(f"ADDED SECTION: technical_info (priority 50, {len(dev_lines)} lines)", COLORS['cat'])
     
     # Sort by priority
     debug_msg("\nSECTION ORDERING:", COLORS['cat'])
@@ -1604,7 +1658,7 @@ def build_text_sections(target_item, usages: list) -> list:
     
     return sections
 
-def show_walia_gump(target_item, usages: list):
+def show_walia_gump(target_item, usages: list, gump_id=None):
     debug_msg(f"Showing results gump; usages={len(usages) if usages else 0}")
 
     # Build modular text sections
@@ -1655,35 +1709,29 @@ def show_walia_gump(target_item, usages: list):
         
         title_html = f"<center><basefont color={name_hex_color}><big><b>{title_text}</b></big></basefont></center>"
         title_y = 10
-        Gumps.AddHtml(gump, 10, title_y, gump_width - 20, 30, title_html, 0, 0)
-        content_top_y = title_y + 32  # space for larger title
+        
+        # Check if title is long enough to wrap to second line
+        # Estimate: ~25-30 characters per line for <big><b> text in 300px width
+        title_length = len(title_text)
+        title_wraps = title_length > 20  # Conservative threshold for line wrapping
+        
+        # Adjust title height and spacing if it wraps
+        if title_wraps:
+            title_height = 50  # Extra height for wrapped title
+            content_spacing = 52  # Extra spacing below title
+            debug_msg(f"Long title detected ({title_length} chars), using wrapped layout", COLORS['cat'])
+        else:
+            title_height = 30  # Normal title height
+            content_spacing = 32  # Normal spacing below title
+            debug_msg(f"Normal title length ({title_length} chars), using standard layout", COLORS['cat'])
+        
+        Gumps.AddHtml(gump, 10, title_y, gump_width - 20, title_height, title_html, 0, 0)
+        content_top_y = title_y + content_spacing
 
-    # DEV toggle button anchored in the lower-right area
-    dev_mode_on = (not IMMERSIVE_MODE)
-    dev_toggle_label = "DEV: ON" if dev_mode_on else "DEV: OFF"
-    button_width = 20
-    button_height = 20
-    show_dev_text_flag = DISPLAY.get('show_dev_text', False)
-    if show_dev_text_flag:
-        # Reserve space for label to the right of the button and keep label's right edge flush with the gump edge
-        label_width = 96
-        label_padding = 4
-        dev_button_x = max(0, gump_width - (button_width + label_padding + label_width))
-        dev_button_y = max(0, gump_height - button_height)
-        Gumps.AddButton(gump, dev_button_x, dev_button_y, 9212, 9213, 77, 1, 0)
-        label_x = dev_button_x + button_width + label_padding
-        label_y = dev_button_y + 2
-        # Darker grey label
-        Gumps.AddHtml(gump, label_x, label_y, label_width, 20, f"<basefont color=#555555>{dev_toggle_label}</basefont>", 0, 0)
-    else:
-        # No label: place the button so it touches the lower-right corner
-        dev_button_x = max(0, gump_width - button_width)
-        dev_button_y = max(0, gump_height - button_height)
-        Gumps.AddButton(gump, dev_button_x, dev_button_y, 9212, 9213, 77, 1, 0)
 
     # Item graphic on left
     if DISPLAY.get('show_item_graphic', True):
-        item_top_y = content_top_y + 4
+        item_top_y = content_top_y + 8  # Increased spacing from 4 to 8
         # Try to apply hue if enabled and API supports it; otherwise fallback to no hue
         try:
             if DISPLAY.get('apply_item_hue', True):
@@ -1803,12 +1851,15 @@ def show_walia_gump(target_item, usages: list):
                 # Align with text panel to reduce excess padding
                 Gumps.AddHtml(gump, text_x, row_y, text_width, 22, message_text, 0, 0)
 
-    # Close button
-    Gumps.AddButton(gump, gump_width-30, 8, 4017, 4018, 1, 1, 0)
-    Gumps.AddTooltip(gump, "Close")
+    # Close button (optional based on global setting)
+    if SHOW_CLOSE_BUTTON:
+        Gumps.AddButton(gump, gump_width-30, 8, 4017, 4018, 1, 1, 0)
+        Gumps.AddTooltip(gump, "Close")
 
-    # Send gump
-    Gumps.SendGump(RESULTS_GUMP_ID, Player.Serial, RESULTS_X, RESULTS_Y, gump.gumpDefinition, gump.gumpStrings)
+    # Send gump with cycling ID (or reuse provided ID for DEV toggle)
+    current_gump_id = gump_id if gump_id is not None else get_next_results_gump_id()
+    Gumps.SendGump(current_gump_id, Player.Serial, RESULTS_X, RESULTS_Y, gump.gumpDefinition, gump.gumpStrings)
+    return current_gump_id
 
 def send_launcher_gump():
     """Create and send a tiny floating gump with a single inspect button."""
@@ -1867,31 +1918,24 @@ def process_launcher_input(index: dict) -> bool:
     return True
 
 def process_results_input():
-    """Handle clicks from the results gump (e.g., DEV toggle)."""
-    Gumps.WaitForGump(RESULTS_GUMP_ID, 50)
-    gd = Gumps.GetGumpData(RESULTS_GUMP_ID)
-    if not gd:
-        return
-    if gd.buttonid == 77:
-        debug_msg("DEV toggle pressed", COLORS['cat'])
-        apply_display_preset(immersive=not IMMERSIVE_MODE)
-        # Reopen the last results with new display settings (inline)
-        try:
-            it = None
-            if _LAST_TARGET_SERIAL:
-                it = Items.FindBySerial(_LAST_TARGET_SERIAL)
-            if it is None:
-                class _Shim:
-                    pass
-                it = _Shim()
-                setattr(it, 'Serial', _LAST_TARGET_SERIAL or 0)
-                setattr(it, 'ItemID', _LAST_TARGET_ITEMID or 0)
-                setattr(it, 'Hue', 0)
-                setattr(it, 'Amount', 1)
-                setattr(it, 'Name', _LAST_TARGET_NAME or "")
-            show_walia_gump(it, _LAST_USAGES or [])
-        except Exception as e:
-            debug_msg(f"Failed to reopen results: {e}", COLORS['bad'])
+    """Handle clicks from any of the cycling results gumps (close button only)."""
+    # Check all possible cycling gump IDs
+    for offset in range(RESULTS_GUMP_ID_MAX_OFFSET):
+        gump_id = RESULTS_GUMP_ID_BASE + offset
+        if not Gumps.HasGump(gump_id):
+            continue
+            
+        Gumps.WaitForGump(gump_id, 5)  # Short wait for each
+        gd = Gumps.GetGumpData(gump_id)
+        if not gd or gd.buttonid <= 0:
+            continue
+            
+        # Process the button press and consume it
+        if gd.buttonid == 1:
+            # Close button pressed - close the gump
+            debug_msg("Close button pressed", COLORS['info'])
+            Gumps.CloseGump(gump_id)
+            return
 
 def walia_run_once(index: dict):
     # Prompt for a target using Razor Enhanced Target system
