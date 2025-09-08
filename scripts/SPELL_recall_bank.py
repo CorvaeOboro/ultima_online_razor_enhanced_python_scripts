@@ -6,17 +6,24 @@ SPELL Recall to Bank or Home- a Razor Enhanced Python script for Ultima Online
 - Uses the specific rune number
 - Activates recall through the gump
 
-TODO: if you are already at the bank , then recall to home 
+FEATURE: Location-based switching - recalls to home when at bank, recalls to bank when away 
 
 HOTKEY:: B
 VERSION::20250718
 """
 DEBUG_MODE = False  # If False, suppress all Misc.SendMessage output
 
+# Location-based switching configuration
+LOCATION_BASED_SWITCH = True  # Enable/disable location-based rune selection
+BANK_COORDINATES = (1416, 1687)  # Bank location coordinates
+BANK_RANGE = 10  # Range to consider "near" the bank
+HOME_RUNE_NUMBER = 14  # Rune number to use when at bank (recall to home)
+BANK_RUNE_NUMBER = 1  # Rune number to use when not at bank (recall to bank)
+
 RUNEBOOK_ID = 0x0EFA  # Runebook item ID
 RUNEBOOK_NAME = "Runebook"  # Name of the runebook to find
 GUMP_ID = 89  # Runebook gump ID
-RUNE_NUMBER = 1  # Which rune in the runebook to recall to (1-based)
+RUNE_NUMBER = 1  # Default rune number (will be overridden by location logic if enabled)
 RECALL_BUTTON = 49 + RUNE_NUMBER
 GUMP_TIMEOUT = 10000  # Timeout for gump operations in milliseconds
 
@@ -25,6 +32,34 @@ def debug_message(msg, color=33):
     """Send a status/debug message if DEBUG_MODE is enabled."""
     if DEBUG_MODE:
         Misc.SendMessage(f"[RECALL] {msg}", color)
+
+def is_near_bank():
+    """Check if player is near the bank coordinates"""
+    if not LOCATION_BASED_SWITCH:
+        return False
+        
+    player_x = Player.Position.X
+    player_y = Player.Position.Y
+    bank_x, bank_y = BANK_COORDINATES
+    
+    # Calculate distance using simple Euclidean distance
+    distance = ((player_x - bank_x) ** 2 + (player_y - bank_y) ** 2) ** 0.5
+    
+    debug_message(f"Player position: ({player_x}, {player_y}), Bank: ({bank_x}, {bank_y}), Distance: {distance:.1f}", 66)
+    
+    return distance <= BANK_RANGE
+
+def get_target_rune_number():
+    """Determine which rune to use based on location"""
+    if not LOCATION_BASED_SWITCH:
+        return RUNE_NUMBER
+        
+    if is_near_bank():
+        debug_message(f"Near bank - using HOME rune #{HOME_RUNE_NUMBER}", 67)
+        return HOME_RUNE_NUMBER
+    else:
+        debug_message(f"Not near bank - using BANK rune #{BANK_RUNE_NUMBER}", 67)
+        return BANK_RUNE_NUMBER
 
 def find_runebook():
     """Find the named runebook in player's backpack"""
@@ -50,15 +85,17 @@ def use_runebook():
     if not runebook:
         return False
         
+    # Determine which rune to use based on location
+    target_rune = get_target_rune_number()
+    target_button = 49 + target_rune
+        
     # Use runebook
     Items.UseItem(runebook)
     
     # Wait for and handle gump
     if Gumps.WaitForGump(GUMP_ID, GUMP_TIMEOUT):
-        # Dynamically determine recall button based on RUNE_NUMBER
-        gump_recall_button = RECALL_BUTTON
-        debug_message(f"Activating recall for rune {RUNE_NUMBER} (button {RECALL_BUTTON})...", 66)
-        Gumps.SendAction(GUMP_ID, gump_recall_button)
+        debug_message(f"Activating recall for rune {target_rune} (button {target_button})...", 66)
+        Gumps.SendAction(GUMP_ID, target_button)
         
         # Wait for recall to complete
         Misc.Pause(3000)

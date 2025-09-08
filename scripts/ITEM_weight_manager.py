@@ -2,7 +2,7 @@
 Item Weight Manager - a Razor Enhanced Python Script for Ultima Online
 
 Drops items from your backpack to the ground 
-Always drop list , and Maintain minimum list
+adjust "Always drop" list , and "Maintain minimum" list
 
 1. Dropping all disposable items:
     - Resources (leather, ingots, boards, cut cloth leather, etc.)
@@ -10,19 +10,59 @@ Always drop list , and Maintain minimum list
     - Pagan reagents
     - Empty bottles , Poison and Lesser potions
 2. Maintaining minimum counts for:
-    - Regular reagents (200 each)
+    - Magery reagents (200 each)
     - Heal and Cure potions (10 each)
     - Utility potions (5 each)
 
+TODO:
+add spoons and other water pitcher , other unfavored crafting outputs
+
 HOTKEY:: X
-VERSION::20250806
+VERSION::20250907
 """
 
 # Global debug mode switch
 DEBUG_MODE = False  # Set to True to enable debug/info messages
 
 # Configuration
+ENABLE_MANAGED_ITEMS = True  # Set to True to process MANAGED_ITEMS, False to ignore them completely
 MAX_REAGENT_COUNT = 200  # Maximum number of reagents to keep
+
+# Potion Quality Management
+ENABLE_POTION_QUALITY_FILTER = True  # Set to True to only keep Greater quality potions
+KEEP_POTION_QUALITIES = ["Greater"]  # List of potion qualities to keep (others will be dropped)
+
+# Disposable Item Category Toggles
+DROP_MAGIC_SCROLLS = True  # Set to True to drop magic scrolls
+DROP_PAGAN_REAGENTS = True  # Set to True to drop pagan reagents
+DROP_RAW_RESOURCES = True  # Set to True to drop raw resources (ores, leather, etc.)
+DROP_CRAFTED_RESOURCES = True  # Set to True to drop crafted resources (boards, ingots, etc.)
+DROP_FOOD_ITEMS = True  # Set to True to drop food items
+DROP_MISCELLANEOUS_ITEMS = True  # Set to True to drop miscellaneous items
+
+# Item Exclusions - Items that should never be dropped even if they match disposable categories
+EXCLUDED_ITEMS = [
+    {"name": "Blue Fish Steak", "id": 0x097B, "hue": 0x0825},  # Special blue fish steaks to keep
+]
+
+# Items to manage count (keep minimum amount)
+MANAGED_ITEMS = [
+    # Regular Reagents
+    {"name": "Black Pearl", "id": 0x0F7A, "min_count": MAX_REAGENT_COUNT},
+    {"name": "Blood Moss", "id": 0x0F7B, "min_count": MAX_REAGENT_COUNT},
+    {"name": "Garlic", "id": 0x0F84, "min_count": MAX_REAGENT_COUNT},
+    {"name": "Ginseng", "id": 0x0F85, "min_count": MAX_REAGENT_COUNT},
+    {"name": "Mandrake Root", "id": 0x0F86, "min_count": MAX_REAGENT_COUNT},
+    {"name": "Nightshade", "id": 0x0F88, "min_count": MAX_REAGENT_COUNT},
+    {"name": "Spider's Silk", "id": 0x0F8D, "min_count": MAX_REAGENT_COUNT},
+    {"name": "Sulfurous Ash", "id": 0x0F8C, "min_count": MAX_REAGENT_COUNT},
+    
+    # Potions
+    {"name": "Heal Potion", "id": 0x0F0C, "min_count": 10},
+    {"name": "Cure Potion", "id": 0x0F07, "min_count": 10},
+    {"name": "Total Refresh Potion", "id": 0x0F0B, "min_count": 5},
+    {"name": "Strength Potion", "id": 0x0F09, "min_count": 5},
+]
 
 # ============================================================================
 # DISPOSABLE ITEM CATEGORIES
@@ -174,8 +214,7 @@ CRAFTED_RESOURCES = [
     {"name": "Valorite Ingot", "id": 0x1BEF, "hue": None},
 ]
 
-
-# Food Items - All consumable food items from food eater script
+# Food Items - consumable food items 
 FOOD_ITEMS = [
     # Fruits
     {"name": "Peach", "id": 0x09D2, "hue": None},
@@ -209,49 +248,133 @@ FOOD_ITEMS = [
     {"name": "Bacon", "id": 0x097E, "hue": None},
 ]
 
-# Miscellaneous Items - Empty bottles, potions, and other items
-MISCELLANEOUS_ITEMS = [
-    {"name": "Empty Bottle", "id": 0x0F0E, "hue": None},
+# Potion Items - All potion types that may have quality variations
+POTION_ITEMS = [
+    {"name": "Heal Potion", "id": 0x0F0C, "hue": None},
+    {"name": "Cure Potion", "id": 0x0F07, "hue": None},
+    {"name": "Mana Potion", "id": 0x0F0D, "hue": None},
+    {"name": "Total Refresh Potion", "id": 0x0F0B, "hue": None},
+    {"name": "Strength Potion", "id": 0x0F09, "hue": None},
+    {"name": "Agility Potion", "id": 0x0F08, "hue": None},
+    {"name": "Magic Resist Potion", "id": 0x0F06, "hue": None},
     {"name": "Poison Potion", "id": 0x0F0A, "hue": None},
 ]
 
-# ============================================================================
-# COMBINED DISPOSABLE ITEMS LIST
-# ============================================================================
-
-# Items to always drop (no count management) - Combined from all categories
-DISPOSABLE_ITEMS = (
-    MAGIC_SCROLLS +
-    PAGAN_REAGENTS +
-    RAW_RESOURCES +
-    CRAFTED_RESOURCES +
-    FOOD_ITEMS +
-    MISCELLANEOUS_ITEMS
-)
-
-# Items to manage count (keep minimum amount)
-MANAGED_ITEMS = [
-    # Regular Reagents
-    {"name": "Black Pearl", "id": 0x0F7A, "min_count": MAX_REAGENT_COUNT},
-    {"name": "Blood Moss", "id": 0x0F7B, "min_count": MAX_REAGENT_COUNT},
-    {"name": "Garlic", "id": 0x0F84, "min_count": MAX_REAGENT_COUNT},
-    {"name": "Ginseng", "id": 0x0F85, "min_count": MAX_REAGENT_COUNT},
-    {"name": "Mandrake Root", "id": 0x0F86, "min_count": MAX_REAGENT_COUNT},
-    {"name": "Nightshade", "id": 0x0F88, "min_count": MAX_REAGENT_COUNT},
-    {"name": "Spider's Silk", "id": 0x0F8D, "min_count": MAX_REAGENT_COUNT},
-    {"name": "Sulfurous Ash", "id": 0x0F8C, "min_count": MAX_REAGENT_COUNT},
-    
-    # Potions
-    {"name": "Heal Potion", "id": 0x0F0C, "min_count": 10},
-    {"name": "Cure Potion", "id": 0x0F07, "min_count": 10},
-    {"name": "Total Refresh Potion", "id": 0x0F0B, "min_count": 5},
-    {"name": "Strength Potion", "id": 0x0F09, "min_count": 5},
+# Miscellaneous Items - Empty bottles, potions, and other items
+MISCELLANEOUS_ITEMS = [
+    {"name": "Empty Bottle", "id": 0x0F0E, "hue": None},
+    {"name": "Water Pitcher", "id": 0x1F9D, "hue": None},
 ]
+
+# Items to always drop (no count management) - Generated dynamically based on toggles
+# This will be populated at runtime by get_enabled_disposable_items()
+DISPOSABLE_ITEMS = []
+
+def get_enabled_disposable_items():
+    """Generate the disposable items list based on enabled categories."""
+    enabled_items = []
+    
+    if DROP_MAGIC_SCROLLS:
+        enabled_items.extend(MAGIC_SCROLLS)
+        debug_message(f"Added {len(MAGIC_SCROLLS)} magic scrolls to disposable list", 67)
+    
+    if DROP_PAGAN_REAGENTS:
+        enabled_items.extend(PAGAN_REAGENTS)
+        debug_message(f"Added {len(PAGAN_REAGENTS)} pagan reagents to disposable list", 67)
+    
+    if DROP_RAW_RESOURCES:
+        enabled_items.extend(RAW_RESOURCES)
+        debug_message(f"Added {len(RAW_RESOURCES)} raw resources to disposable list", 67)
+    
+    if DROP_CRAFTED_RESOURCES:
+        enabled_items.extend(CRAFTED_RESOURCES)
+        debug_message(f"Added {len(CRAFTED_RESOURCES)} crafted resources to disposable list", 67)
+    
+    if DROP_FOOD_ITEMS:
+        enabled_items.extend(FOOD_ITEMS)
+        debug_message(f"Added {len(FOOD_ITEMS)} food items to disposable list", 67)
+    
+    if DROP_MISCELLANEOUS_ITEMS:
+        enabled_items.extend(MISCELLANEOUS_ITEMS)
+        debug_message(f"Added {len(MISCELLANEOUS_ITEMS)} miscellaneous items to disposable list", 67)
+    
+    debug_message(f"Total disposable items enabled: {len(enabled_items)}", 67)
+    return enabled_items
+
 
 def debug_message(message, color=67):
     """Send a message if DEBUG_MODE is enabled"""
     if DEBUG_MODE:
-        Misc.SendMessage(f"[WeightMgr] {message}", color)
+        Misc.SendMessage(f"[ITEM_weight_manager.py] {message}", color)
+
+def get_item_name(item):
+    """Get the actual name of an item by examining its properties."""
+    try:
+        # Try to get the item name from properties
+        if hasattr(item, 'Name') and item.Name:
+            return item.Name
+        
+        # Fallback: try to get name from property string
+        prop_string = Items.GetPropStringList(item.Serial)
+        if prop_string and len(prop_string) > 0:
+            return prop_string[0]  # First line is usually the item name
+        
+        return "Unknown Item"
+    except:
+        return "Unknown Item"
+
+def get_potion_quality(item):
+    """Extract potion quality from item name (e.g., 'Greater', 'Lesser', etc.)."""
+    try:
+        item_name = get_item_name(item)
+        if not item_name:
+            return "Unknown"
+        
+        # Common potion quality prefixes
+        qualities = ["Greater", "Lesser", "Total", "Deadly", "Lethal"]
+        
+        for quality in qualities:
+            if quality.lower() in item_name.lower():
+                return quality
+        
+        # If no quality prefix found, assume it's a basic/regular potion
+        return "Regular"
+    except:
+        return "Unknown"
+
+def should_keep_potion(item):
+    """Determine if a potion should be kept based on its quality."""
+    if not ENABLE_POTION_QUALITY_FILTER:
+        return True  # Keep all potions if filtering is disabled
+    
+    quality = get_potion_quality(item)
+    should_keep = quality in KEEP_POTION_QUALITIES
+    
+    debug_message(f"Potion quality check: '{get_item_name(item)}' -> Quality: '{quality}' -> Keep: {should_keep}", 67)
+    return should_keep
+
+def is_potion_item(item_id):
+    """Check if an item ID corresponds to a potion."""
+    return any(potion["id"] == item_id for potion in POTION_ITEMS)
+
+def is_excluded_item(item):
+    """Check if an item should be excluded from dropping based on ID and hue."""
+    try:
+        for excluded in EXCLUDED_ITEMS:
+            # Check if item ID matches
+            if item.ItemID == excluded["id"]:
+                # If exclusion has a specific hue, check it matches
+                if excluded.get("hue") is not None:
+                    if item.Hue == excluded["hue"]:
+                        debug_message(f"Excluding {excluded['name']} (ID: 0x{excluded['id']:04X}, Hue: 0x{excluded['hue']:04X})", 67)
+                        return True
+                # If no specific hue required, exclude all variants
+                else:
+                    debug_message(f"Excluding {excluded['name']} (ID: 0x{excluded['id']:04X}, any hue)", 67)
+                    return True
+        return False
+    except:
+        return False
 
 def get_nearby_tiles():
     """Get a list of nearby tile offsets in a spiral pattern."""
@@ -364,23 +487,45 @@ def find_existing_items():
             if count > 0:
                 existing_items[str(item_info["id"])] = count
     
-    # Check managed items
-    for item_info in MANAGED_ITEMS:
-        count = Items.ContainerCount(Player.Backpack.Serial, item_info["id"], -1)
-        if count > item_info.get("min_count", 0):
-            existing_items[str(item_info["id"])] = count
+    # Check managed items (only if enabled)
+    if ENABLE_MANAGED_ITEMS:
+        for item_info in MANAGED_ITEMS:
+            count = Items.ContainerCount(Player.Backpack.Serial, item_info["id"], -1)
+            if count > item_info.get("min_count", 0):
+                existing_items[str(item_info["id"])] = count
+    
+    # Check potion items for quality filtering
+    if ENABLE_POTION_QUALITY_FILTER:
+        for potion_info in POTION_ITEMS:
+            count = Items.ContainerCount(Player.Backpack.Serial, potion_info["id"], -1)
+            if count > 0:
+                existing_items[f"potion_{potion_info['id']}"] = count
     
     return existing_items
 
 def manage_all_items():
     """Main function to manage all item counts."""
-    debug_message("Starting item count management...", 67)
+    global DISPOSABLE_ITEMS
+    
+    # Generate the disposable items list based on enabled categories
+    DISPOSABLE_ITEMS = get_enabled_disposable_items()
+    
+    debug_message(f"Starting item count management... (Managed Items: {'Enabled' if ENABLE_MANAGED_ITEMS else 'Disabled'})", 67)
+    debug_message(f"Category Status: Scrolls={DROP_MAGIC_SCROLLS}, Pagan={DROP_PAGAN_REAGENTS}, Raw={DROP_RAW_RESOURCES}, Crafted={DROP_CRAFTED_RESOURCES}, Food={DROP_FOOD_ITEMS}, Misc={DROP_MISCELLANEOUS_ITEMS}", 67)
     
     # First do a bulk check of all items
     existing_items = find_existing_items()
     if not existing_items:
         debug_message("No items to manage!", 67)
         return
+    
+    # Handle potion quality filtering first (if enabled)
+    if ENABLE_POTION_QUALITY_FILTER:
+        for potion_info in POTION_ITEMS:
+            potion_key = f"potion_{potion_info['id']}"
+            if potion_key in existing_items:
+                manage_potion_quality(potion_info)
+                Misc.Pause(100)
     
     # Handle disposable items that exist
     for item_info in DISPOSABLE_ITEMS:
@@ -391,11 +536,14 @@ def manage_all_items():
             drop_all_items(item_info)
             Misc.Pause(100)
     
-    # Handle managed items that exceed minimum
-    for item_info in MANAGED_ITEMS:
-        if str(item_info["id"]) in existing_items:
-            manage_item_count(item_info)
-            Misc.Pause(100)
+    # Handle managed items that exceed minimum (only if enabled)
+    if ENABLE_MANAGED_ITEMS:
+        for item_info in MANAGED_ITEMS:
+            if str(item_info["id"]) in existing_items:
+                manage_item_count(item_info)
+                Misc.Pause(100)
+    else:
+        debug_message("Managed items processing is disabled", 67)
     
     debug_message("Item count management complete!", 67)
 
@@ -411,11 +559,18 @@ def drop_all_items(item_info):
         if not isinstance(items, list):
             items = [items]
         
-        count = len(items)
+        # Filter out excluded items
+        items_to_drop = [item for item in items if not is_excluded_item(item)]
+        
+        if not items_to_drop:
+            debug_message(f"All {item_info['name']} items are excluded from dropping", 67)
+            return
+        
+        count = len(items_to_drop)
         debug_message(f"Dropping {count} {item_info['name']} (specific hue)", 67)
         
         # Drop each stack separately
-        for item in items:
+        for item in items_to_drop:
             try_drop_items(item, item.Amount if hasattr(item, 'Amount') else 1)
             Misc.Pause(100)
     else:
@@ -425,13 +580,22 @@ def drop_all_items(item_info):
         if not all_variants:
             return
         
-        total_count = sum(item.Amount if hasattr(item, 'Amount') else 1 for item in all_variants)
-        debug_message(f"Dropping {total_count} {item_info['name']} ({len(all_variants)} stacks with different hues)", 67)
+        # Filter out excluded items
+        items_to_drop = [item for item in all_variants if not is_excluded_item(item)]
+        
+        if not items_to_drop:
+            debug_message(f"All {item_info['name']} items are excluded from dropping", 67)
+            return
+        
+        total_count = sum(item.Amount if hasattr(item, 'Amount') else 1 for item in items_to_drop)
+        excluded_count = len(all_variants) - len(items_to_drop)
+        
+        debug_message(f"Dropping {total_count} {item_info['name']} ({len(items_to_drop)} stacks, {excluded_count} excluded)", 67)
         
         # Drop each variant stack separately
-        for item in all_variants:
+        for item in items_to_drop:
             amount = item.Amount if hasattr(item, 'Amount') else 1
-            debug_message(f"  Dropping {amount} items from stack (hue: {item.Hue})", 67)
+            debug_message(f"  Dropping {amount} items from stack (hue: 0x{item.Hue:04X})", 67)
             try_drop_items(item, amount)
             Misc.Pause(100)
 
@@ -479,6 +643,40 @@ def manage_item_count(item_info):
             if final_to_drop > 0 and updated_variants:
                 try_drop_items(updated_variants[0], final_to_drop)
 
-# Run the manager
+def manage_potion_quality(potion_info):
+    """Manage potion quality by dropping unwanted quality potions."""
+    # Find ALL variants of this potion ItemID (all hues)
+    all_variants = find_all_item_variants(potion_info["id"], Player.Backpack.Serial)
+    
+    if not all_variants:
+        return
+    
+    potions_to_drop = []
+    potions_to_keep = []
+    
+    # Categorize potions by quality
+    for item in all_variants:
+        if should_keep_potion(item):
+            potions_to_keep.append(item)
+        else:
+            potions_to_drop.append(item)
+    
+    if potions_to_drop:
+        total_to_drop = sum(item.Amount if hasattr(item, 'Amount') else 1 for item in potions_to_drop)
+        total_to_keep = sum(item.Amount if hasattr(item, 'Amount') else 1 for item in potions_to_keep)
+        
+        debug_message(f"Potion quality filter for {potion_info['name']}: Keeping {total_to_keep}, Dropping {total_to_drop}", 67)
+        
+        # Drop each unwanted potion
+        for item in potions_to_drop:
+            amount = item.Amount if hasattr(item, 'Amount') else 1
+            quality = get_potion_quality(item)
+            debug_message(f"  Dropping {amount} {quality} {potion_info['name']} (hue: {item.Hue})", 67)
+            try_drop_items(item, amount)
+            Misc.Pause(100)
+    else:
+        debug_message(f"No unwanted quality potions found for {potion_info['name']}", 67)
+
+
 if __name__ == "__main__":
     manage_all_items()

@@ -18,8 +18,11 @@ meat version , since the farmer was replaced by butcher
 VERSION = 20250802
 """
 import math
+import time
+import random
 
 DEBUG_MODE = False
+SAFE_MODE = False  # extra-conservative pacing and movement
 
 # Phase toggles for each component
 PLACE_COMPONENTS = {
@@ -93,11 +96,39 @@ FEAST_CONFIG = {
     }
 }
 
-# Constants
-PAUSE_DURATION = 500       # General pause between actions
-PAUSE_DURATION_PLACE = 800  # Pause after placing item
+# Constants (enhanced from gems script)
+PAUSE_DURATION = 350        # General pause between actions (ms)
+PAUSE_DURATION_PLACE = 550  # Pause after placing item (ms)
 MAX_DISTANCE = 2
-PATHFINDING_RETRY = 3
+
+# Movement tuning (graceful handling)
+GOTO_BASE_DELAY = 250       # base delay between movement attempts (ms)
+GOTO_MAX_RETRIES = 1        # minimal retries
+WIGGLE_RADII = [0]          # in SAFE_MODE we only try exact tile
+WIGGLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
+WALK_REPEATS_PER_DIR = 2    # attempts per direction
+
+# Center bias tuning (keep minimal to avoid backtracking)
+CENTER_BIAS_ENABLED = True
+CENTER_NUDGE_DISTANCE = 3
+CENTER_NUDGE_STEPS = 2
+
+# Placement tuning
+PLACE_MAX_RETRIES = 1
+PLACE_BACKOFF_BASE = 250
+POINT_TIMEOUT_MS = 1500
+POINT_BREATHER_MS = 250
+
+# Global throttling / jitter to protect client and server
+RATE_MIN_GAP_MS = 350
+LOOP_YIELD_MS = 40
+JITTER_MS = 50
+LAST_ACTION_MS = 0
+
+# Phase fail-safe and dedupe
+MAX_PHASE_FAILURES = 6
+PLACED_COORDS_BY_ITEM = {}
+BAD_COORDS = set()
 
 def debug_message(msg, color=0):
     if DEBUG_MODE:
@@ -105,6 +136,37 @@ def debug_message(msg, color=0):
             Misc.SendMessage(msg, color)
         except Exception:
             print(msg)
+
+def now_ms():
+    return int(time.time() * 1000)
+
+def pause_ms(ms):
+    Misc.Pause(int(ms + random.randint(0, JITTER_MS)))
+
+def throttle(min_gap_ms=RATE_MIN_GAP_MS):
+    global LAST_ACTION_MS
+    t = now_ms()
+    if LAST_ACTION_MS == 0:
+        LAST_ACTION_MS = t
+        return
+    elapsed = t - LAST_ACTION_MS
+    if elapsed < min_gap_ms:
+        Misc.Pause(min_gap_ms - elapsed)
+    LAST_ACTION_MS = now_ms()
+
+def is_safe_ground(x, y, game_map=None):
+    if game_map is None:
+        game_map = Player.Map
+    if (x, y) in BAD_COORDS:
+        return False
+    try:
+        land_id = Statics.GetLandID(x, y, game_map)
+    except Exception:
+        return False
+    BAD_LAND_IDS = {0x0001}
+    if land_id in BAD_LAND_IDS:
+        return False
+    return True
 
 
 def generate_circle_points(center_x, center_y, radius, points, rotation=0):
@@ -147,58 +209,107 @@ def find_item_with_retry(item_id, max_retries=3, retry_delay=500):
     return None
 
 def place_item(x, y, item_id, z=None):
-    """Place a single item with verification"""
-    if not is_valid_position(x, y, z):
+    """Place a single item with enhanced safety and verification"""
+    if item_id is None:
         return False
-        
-    # Find a new item each time
-    item = Items.FindByID(item_id, -1, Player.Backpack.Serial)
-    if not item:
-        debug_message(f"Could not find item 0x{item_id:X}", 33)
-        return False
-    
-    # Get initial count
-    initial_count = Items.BackpackCount(item_id, -1)
-    if initial_count <= 0:
-        return False
-        
-    # Try to place item
-    Items.MoveOnGround(item, 1, x, y, z if z is not None else Player.Position.Z)
-    Misc.Pause(PAUSE_DURATION_PLACE)
-    
-    # Verify placement with multiple checks
-    for _ in range(2):
-        new_count = Items.BackpackCount(item_id, -1)
-        if new_count < initial_count:
-            return True
-        Misc.Pause(PAUSE_DURATION)
-    
+    offsets = [(0, 0)] if SAFE_MODE else [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)]
+    if z is None:
+        z = Player.Position.Z
+
+    for dx_off, dy_off in offsets:
+        tx = x + dx_off
+        ty = y + dy_off
+        if not is_valid_position(tx, ty, z):
+            continue
+        if not is_safe_ground(tx, ty):
+            BAD_COORDS.add((tx, ty))
+            continue
+        for attempt in range(1, PLACE_MAX_RETRIES + 1):
+            item = Items.FindByID(item_id, -1, Player.Backpack.Serial)
+            if not item:
+                debug_message(f"Could not find item 0x{item_id:X}", 33)
+                return False
+
+            try:
+                initial_count = Items.BackpackCount(item_id, -1)
+            except Exception as e:
+                debug_message(f"BackpackCount error for 0x{item_id:X}: {e}", 33)
+                return False
+            if initial_count <= 0:
+                return False
+
+            try:
+                Items.MoveOnGround(item, 1, tx, ty, z)
+            except Exception as e:
+                debug_message(f"MoveOnGround failed at ({tx},{ty}): {e}", 33)
+                BAD_COORDS.add((x, y))
+                pause_ms(PAUSE_DURATION + 150)
+                return False
+            else:
+                throttle()
+                pause_ms(PAUSE_DURATION_PLACE)
+
+            for _ in range(2):
+                try:
+                    new_count = Items.BackpackCount(item_id, -1)
+                except Exception as e:
+                    debug_message(f"BackpackCount verify error: {e}", 33)
+                    break
+                if new_count < initial_count:
+                    return True
+                pause_ms(PAUSE_DURATION)
+
+            pause_ms(PLACE_BACKOFF_BASE * attempt)
+
     return False
 
-def place_items_at_points(points, item_id, z=None, progress_msg="Placing items"):
-    """Place items at points with progress tracking"""
-    if not points:
+def place_items_at_points(points, item_id, z=None, progress_msg="Placing items", center=None):
+    """Place items at points with enhanced safety and progress tracking"""
+    if not points or item_id is None:
         return set()
-        
+
     total = len(points)
     placed = set()
-    
+    failures = 0
+    if item_id not in PLACED_COORDS_BY_ITEM:
+        PLACED_COORDS_BY_ITEM[item_id] = set()
+
     for i, (x, y) in enumerate(points, 1):
         debug_message(f"{progress_msg}: {i} out of {total}", 67)
-        
-        # Try to get in range - convert coordinates to string for goto_location
-        if not goto_location_with_wiggle(str(x), str(y)):
-            debug_message(f"Could not reach position ({x}, {y})", 33)
+
+        start_ms = int(time.time() * 1000)
+
+        if (x, y) in BAD_COORDS:
+            debug_message(f"Skipping known-bad coord ({x},{y})", 33)
             continue
-        
-        # Try placement up to 2 times
-        for attempt in range(2):
+
+        if (x, y) in PLACED_COORDS_BY_ITEM[item_id]:
+            debug_message(f"Duplicate coords for {get_item_name(item_id)} at ({x},{y}), skipping.", 68)
+            continue
+
+        if not goto_location_with_wiggle(x, y, center=center):
+            debug_message(f"Could not reach position ({x}, {y})", 33)
+            failures += 1
+            if failures >= MAX_PHASE_FAILURES:
+                debug_message("Too many failures in this phase; aborting phase early.", 33)
+                break
+            continue
+
+        for attempt in range(1):
             if place_item(x, y, item_id, z):
                 placed.add((x, y))
+                PLACED_COORDS_BY_ITEM[item_id].add((x, y))
                 break
-            if attempt < 1:  # Only pause between attempts, not after last attempt
-                Misc.Pause(PAUSE_DURATION)
-                
+            pause_ms(PAUSE_DURATION)
+
+            if int(time.time() * 1000) - start_ms > POINT_TIMEOUT_MS:
+                debug_message(f"Timeout at point ({x},{y}), skipping.", 33)
+                BAD_COORDS.add((x, y))
+                failures += 1
+                break
+
+        pause_ms(POINT_BREATHER_MS)
+
     return placed
 
 def get_direction(from_x, from_y, to_x, to_y):
@@ -221,29 +332,79 @@ def get_direction(from_x, from_y, to_x, to_y):
         if dy < 0: return 7  # Northwest
         return 5  # Southwest
 
-def goto_location_with_wiggle(x, y, max_retries=3):
-    """Move to within placement range"""
-    # Convert to float for calculations
-    target_x = float(x)
-    target_y = float(y)
-    
-    for _ in range(max_retries):
-        if (abs(Player.Position.X - target_x) <= MAX_DISTANCE and 
-            abs(Player.Position.Y - target_y) <= MAX_DISTANCE):
+def dir_to_str(d):
+    """Convert direction number to string"""
+    mapping = {
+        0: "North",
+        1: "Northeast", 
+        2: "East",
+        3: "Southeast",
+        4: "South",
+        5: "Southwest",
+        6: "West",
+        7: "Northwest",
+    }
+    return mapping.get(int(d) % 8, "North")
+
+def attempt_walk_toward(tx, ty, max_steps=6):
+    """Enhanced walking with better pathfinding and error handling"""
+    last_pos = (Player.Position.X, Player.Position.Y)
+    step_delay = GOTO_BASE_DELAY
+    for step in range(max_steps):
+        if (abs(Player.Position.X - tx) <= MAX_DISTANCE and
+            abs(Player.Position.Y - ty) <= MAX_DISTANCE):
             return True
-            
-        # Try to move closer - convert to int for PathFindTo
-        Player.PathFindTo(int(target_x), int(target_y), Player.Position.Z)
-        Misc.Pause(500)
-        
-        # If still not in range, try to walk directly
-        if not (abs(Player.Position.X - target_x) <= MAX_DISTANCE and 
-                abs(Player.Position.Y - target_y) <= MAX_DISTANCE):
-            direction = get_direction(Player.Position.X, Player.Position.Y, target_x, target_y)
-            Player.Walk(direction)
-            Misc.Pause(200)
-    
-    return False
+        try:
+            base_dir = get_direction(Player.Position.X, Player.Position.Y, tx, ty)
+        except Exception:
+            base_dir = 0
+
+        dirs = [base_dir, (base_dir+1)%8, (base_dir+7)%8]
+        moved = False
+        for d in dirs:
+            for rep in range(WALK_REPEATS_PER_DIR):
+                try:
+                    throttle()
+                    Player.Walk(dir_to_str(d))
+                except Exception as e:
+                    debug_message(f"Walk error dir {d}: {e}", 33)
+                    break
+                pause_ms(step_delay)
+                cur_pos = (Player.Position.X, Player.Position.Y)
+                if cur_pos != last_pos:
+                    moved = True
+                    last_pos = cur_pos
+                    break
+            if moved:
+                break
+        if not moved:
+            step_delay = int(step_delay * 1.3) + 50
+            pause_ms(step_delay)
+    return (abs(Player.Position.X - tx) <= MAX_DISTANCE and
+            abs(Player.Position.Y - ty) <= MAX_DISTANCE)
+
+def goto_location_with_wiggle(x, y, max_retries=GOTO_MAX_RETRIES, center=None):
+    """Enhanced movement with center bias and better error handling"""
+    target_x = int(float(x))
+    target_y = int(float(y))
+
+    if not is_safe_ground(target_x, target_y):
+        return False
+
+    if attempt_walk_toward(target_x, target_y, max_steps=8):
+        return True
+
+    if CENTER_BIAS_ENABLED and center is not None:
+        cx, cy = int(center[0]), int(center[1])
+        dxc = abs(Player.Position.X - cx)
+        dyc = abs(Player.Position.Y - cy)
+        if dxc > CENTER_NUDGE_DISTANCE or dyc > CENTER_NUDGE_DISTANCE:
+            attempt_walk_toward(cx, cy, max_steps=CENTER_NUDGE_STEPS)
+            if attempt_walk_toward(target_x, target_y, max_steps=6):
+                return True
+
+    return (abs(Player.Position.X - target_x) <= MAX_DISTANCE and
+            abs(Player.Position.Y - target_y) <= MAX_DISTANCE)
 
 def get_first_available_item_id(item_ids, required_count):
     """Return the first item_id with at least required_count in backpack."""
@@ -275,7 +436,8 @@ def place_pattern_component(center_x, center_y, config, z=None):
         points, 
         item_id, 
         z,
-        f"Placing {get_item_name(item_id)}"
+        f"Placing {get_item_name(item_id)}",
+        center=(center_x, center_y)
     )
 
 def get_item_name(item_id):
@@ -332,7 +494,7 @@ def create_feast(center_x, center_y):
     center_z = Player.Position.Z
     
     # First try to reach the center
-    if not goto_location_with_wiggle(center_x, center_y):
+    if not goto_location_with_wiggle(center_x, center_y, center=(center_x, center_y)):
         debug_message("Could not reach center position!", 33)
         return
     

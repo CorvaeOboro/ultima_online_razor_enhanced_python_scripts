@@ -9,6 +9,10 @@ Pattern focuses on interleaved rings and symmetry, staying within item limits:
 - Apples: < 40 (uses 36)
 - Nightshade: < 70 (uses 64)
 
+TODO:
+elixir of rebirth in the center 0x4516
+black pearl in the open grid cells of the circle , filling in the gaps of all layers combined
+
 VERSION = 20250818
 """
 import math
@@ -88,32 +92,32 @@ FEAST_CONFIG = {
 }
 
 # Constants
-PAUSE_DURATION = 500        # General pause between actions (ms)
-PAUSE_DURATION_PLACE = 800  # Pause after placing item (ms)
+PAUSE_DURATION = 350        # General pause between actions (ms)
+PAUSE_DURATION_PLACE = 550  # Pause after placing item (ms)
 MAX_DISTANCE = 2
 
 # Movement tuning (graceful handling)
-GOTO_BASE_DELAY = 350       # base delay between movement attempts (ms)
+GOTO_BASE_DELAY = 250       # base delay between movement attempts (ms)
 GOTO_MAX_RETRIES = 1        # minimal retries
 WIGGLE_RADII = [0]          # in SAFE_MODE we only try exact tile
 WIGGLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
-WALK_REPEATS_PER_DIR = 3    # how many times to attempt walking in one direction before switching
+WALK_REPEATS_PER_DIR = 2    # how many times to attempt walking in one direction before switching
 
 # Center bias tuning (keep minimal to avoid backtracking)
 CENTER_BIAS_ENABLED = True
-CENTER_NUDGE_DISTANCE = 4   # only nudge toward center if farther than this many tiles from center
+CENTER_NUDGE_DISTANCE = 3   # only nudge toward center if farther than this many tiles from center
 CENTER_NUDGE_STEPS = 2      # max steps to take toward center when nudging
 
 # Placement tuning
 PLACE_MAX_RETRIES = 1        # minimal placement attempts
-PLACE_BACKOFF_BASE = 350     # ms
-POINT_TIMEOUT_MS = 2000      # per-point cap
-POINT_BREATHER_MS = 400      # larger breather between points
+PLACE_BACKOFF_BASE = 250     # ms
+POINT_TIMEOUT_MS = 1500      # per-point cap
+POINT_BREATHER_MS = 250      # larger breather between points
 
 # Global throttling / jitter to protect client and server
-RATE_MIN_GAP_MS = 500        # ensure at least this much time between heavy actions
-LOOP_YIELD_MS = 60           # small yield inside loops
-JITTER_MS = 80               # random jitter applied to pauses
+RATE_MIN_GAP_MS = 350        # ensure at least this much time between heavy actions
+LOOP_YIELD_MS = 40           # small yield inside loops
+JITTER_MS = 50               # random jitter applied to pauses
 LAST_ACTION_MS = 0
 
 # Phase fail-safe

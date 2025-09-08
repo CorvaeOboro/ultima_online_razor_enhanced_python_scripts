@@ -2,14 +2,19 @@
 BANK Auto Deposit and Restock -  A Razor Enhanced Python script for Ultima Online
 
 move specific items from backpack to bank ( gems , supplies , special items )
-restock reagents placing excessive and maintaing a "loadout" 
+restock reagents maintaining a "loadout" 
 "resources" for crafting or imbueing are placed in a specific sub container inside the bank  
 
-this script is similar to using an "Organizer" Agent in Razor , this script is slower but has more control 
+this script is similar to using an "Organizer" Agent in Razor ,
+this script is a little slower but has more control and updates and distributes easier then organizer presets
 current item dictionaries are based on UO Unchained , modify as needed
 
+TODO:
+restock reagents either needs profile character name matching or could be based on mana , 
+hybrid mage characters dont need as many regs 
+
 HOTKEY:: N
-VERSION::20250808
+VERSION::20250907
 """
 BANK_PHRASE = "bank"
 DEBUG_MODE = False # Set to True to enable debug/info messages
@@ -17,17 +22,32 @@ MOVE_GEMS = True # Set to True to enable moving gems to bank
 MOVE_SUPPLIES = True # Set to True to enable moving supplies to bank
 # Reagent RESTOCK 
 REAGENT_RESTOCK = True # Set to True to enable reagent restocking
-REAGENT_MIN = 100  # Minimum amount to keep in backpack
-REAGENT_MAX = 200  # Amount above which to move to bank
+# Reagent configuration - format: reagent_name: {'id': ItemID, 'min': min_amount, 'max': max_amount}
+REAGENTS_CONFIG = {
+    'Black Pearl': {'id': 0x0F7A, 'min': 200, 'max': 300},     # Higher min/max due to frequent use
+    'Nightshade': {'id': 0x0F88, 'min': 200, 'max': 300},      # Higher min/max due to frequent use
+    'Blood Moss': {'id': 0x0F7B, 'min': 100, 'max': 200},      # Standard amounts
+    'Garlic': {'id': 0x0F84, 'min': 100, 'max': 200},          # Standard amounts
+    'Ginseng': {'id': 0x0F85, 'min': 100, 'max': 200},         # Standard amounts
+    'Mandrake Root': {'id': 0x0F86, 'min': 100, 'max': 200},   # Standard amounts
+    'Spider Silk': {'id': 0x0F8D, 'min': 100, 'max': 200},     # Standard amounts
+    'Sulfurous Ash': {'id': 0x0F8C, 'min': 100, 'max': 200},   # Standard amounts
+}
 # RESOURCES - crafting or imbue materials 
 MOVE_RESOURCES = True  # Set to True to enable moving resources to sub-container
 RESOURCE_CONTAINER_SERIALS = [0x40050F9D, 0x40047C80]  # List of possible resource container serials (inside the bank box, by priority)
 RESOURCE_CONTAINER_PRIORITY = 0  # Index of the preferred container in the list
 # POTION RESTOCK
 POTION_RESTOCK = True  # Set to True to enable potion restocking
-POTION_TARGET = 10  # Target amount of potions to maintain in backpack
-# When True, if missing potions can't be pulled from bank, attempt to fill from kegs using empty bottles
-POTION_USE_KEGS = False  # Global toggle to allow/disallow keg usage during restock
+# Potion configuration - format: potion_name: {'id': ItemID, 'target': target_amount}
+POTIONS_CONFIG = {
+    'Greater Heal Potion': {'id': 0x0F0C, 'target': 5},
+    'Greater Cure Potion': {'id': 0x0F07, 'target': 5},
+    'Greater Strength Potion': {'id': 0x0F09, 'target': 1},
+    'Greater Agility Potion': {'id': 0x0F08, 'target': 0},
+    'Total Refresh Potion': {'id': 0x0F0B, 'target': 5},
+    'Greater Magic Resist Potion': {'id': 0x0F06, 'target': 0},
+}
 
 # Dictionary of items to deposit: Name -> ItemID
 ITEMS_TO_DEPOSIT = {
@@ -55,27 +75,7 @@ SUPPLIES_TO_DEPOSIT = {
     'gold': 0x0EED,
 }
 
-# Dictionary of reagents to manage: Name -> ItemID
-REAGENTS_TO_MANAGE = {
-    'Black Pearl':     0x0F7A,
-    'Blood Moss':      0x0F7B,
-    'Garlic':         0x0F84,
-    'Ginseng':        0x0F85,
-    'Mandrake Root':   0x0F86,
-    'Nightshade':      0x0F88,
-    'Spider Silk':     0x0F8D,
-    'Sulfurous Ash':   0x0F8C,
-}
 
-# Dictionary of potions to manage: Name -> ItemID
-POTIONS_TO_MANAGE = {
-    'Greater Heal Potion':    0x0F0C,
-    'Greater Cure Potion':    0x0F07,
-    'Greater Strength Potion': 0x0F09,
-    'Greater Agility Potion': 0x0F08,
-    'Total Refresh Potion':   0x0F0B,
-    'Greater Magic Resist Potion': 0x0F06,
-}
 
 # Dictionary of resources to deposit: Name -> ItemID
 # These are imbueing materials , we are placing them in a sub-container inside the bank box
@@ -172,8 +172,8 @@ special_items_dict = {
 # dictionaries to map ItemID to Name for easy lookup
 ITEMIDS_TO_NAME = {v: k for k, v in ITEMS_TO_DEPOSIT.items()}
 SUPPLYIDS_TO_NAME = {v: k for k, v in SUPPLIES_TO_DEPOSIT.items()}
-REAGENTIDS_TO_NAME = {v: k for k, v in REAGENTS_TO_MANAGE.items()}
-POTIONIDS_TO_NAME = {v: k for k, v in POTIONS_TO_MANAGE.items()}
+REAGENTIDS_TO_NAME = {v['id']: k for k, v in REAGENTS_CONFIG.items()}
+POTIONIDS_TO_NAME = {v['id']: k for k, v in POTIONS_CONFIG.items()}
 
 def debug_message(msg, color=67):
     """Send a debug/status message if SHOW_DEBUG is enabled."""
@@ -181,29 +181,32 @@ def debug_message(msg, color=67):
         Misc.SendMessage(msg, color)
 
 def manage_reagents(bankBox):
-    """Manage reagents based on min/max thresholds"""
+    """Manage reagents based on individual min/max thresholds"""
     if not REAGENT_RESTOCK:
         return
         
     debug_message("Managing reagents...", 65)
     
-    for reagent_id in REAGENTS_TO_MANAGE.values():
+    for reagent_name, reagent_config in REAGENTS_CONFIG.items():
+        reagent_id = reagent_config['id']
+        reagent_min = reagent_config['min']
+        reagent_max = reagent_config['max']
+        
         # Count reagents in backpack
         backpack_count = Items.ContainerCount(Player.Backpack.Serial, reagent_id, -1)
-        reagent_name = REAGENTIDS_TO_NAME[reagent_id]
         
-        if backpack_count > REAGENT_MAX:
+        if backpack_count > reagent_max:
             # Move excess to bank
-            amount_to_move = backpack_count - REAGENT_MAX
-            debug_message(f"Moving {amount_to_move} {reagent_name} to bank", 65)
+            amount_to_move = backpack_count - reagent_max
+            debug_message(f"Moving {amount_to_move} {reagent_name} to bank (current: {backpack_count}, max: {reagent_max})", 65)
             Items.Move(Items.FindByID(reagent_id, -1, Player.Backpack.Serial, -1), bankBox, amount_to_move)
             Misc.Pause(600)
-        elif backpack_count < REAGENT_MIN:
+        elif backpack_count < reagent_min:
             # Get reagents from bank
-            amount_needed = REAGENT_MIN - backpack_count
+            amount_needed = reagent_min - backpack_count
             bank_reagent = Items.FindByID(reagent_id, -1, bankBox.Serial, -1)
             if bank_reagent:
-                debug_message(f"Getting {amount_needed} {reagent_name} from bank", 65)
+                debug_message(f"Getting {amount_needed} {reagent_name} from bank (current: {backpack_count}, min: {reagent_min})", 65)
                 Items.Move(bank_reagent, Player.Backpack, amount_needed)
                 Misc.Pause(600)
             else:
@@ -213,22 +216,22 @@ def manage_potions(bankBox):
     """Manage potions based on target amount.
     Behavior:
     - Pull potions from bank when available.
-    - If still short and POTION_USE_KEGS is True, attempt to fill from kegs using empty bottles.
     """
     if not POTION_RESTOCK:
         return
         
     debug_message("Managing potions...", 65)
     
-    for potion_id in POTIONS_TO_MANAGE.values():
-        potion_name = POTIONIDS_TO_NAME[potion_id]
+    for potion_name, potion_config in POTIONS_CONFIG.items():
+        potion_id = potion_config['id']
+        potion_target = potion_config['target']
         
         # Count potions in backpack
         backpack_count = Items.ContainerCount(Player.Backpack.Serial, potion_id, -1)
         
-        if backpack_count < POTION_TARGET:
-            potions_needed = POTION_TARGET - backpack_count
-            debug_message(f"Need {potions_needed} more {potion_name}. Current: {backpack_count}", 65)
+        if backpack_count < potion_target:
+            potions_needed = potion_target - backpack_count
+            debug_message(f"Need {potions_needed} more {potion_name}. Current: {backpack_count}, Target: {potion_target}", 65)
             
             # First, try to get potions directly from bank
             bank_potion = Items.FindByID(potion_id, -1, bankBox.Serial, -1)
@@ -245,73 +248,10 @@ def manage_potions(bankBox):
                 Misc.Pause(600)
                 potions_needed -= available
             
-            # If we still need potions, optionally try to make them from kegs and empty bottles
+            # If we still need potions after checking bank, log the shortage
             if potions_needed > 0:
-                if POTION_USE_KEGS:
-                    debug_message(f"Still need {potions_needed} {potion_name}. Attempting to create from keg...", 65)
-                    create_potions_from_keg(bankBox, potion_id, potion_name, potions_needed)
-                else:
-                    debug_message(f"Still need {potions_needed} {potion_name}, but POTION_USE_KEGS is disabled; skipping keg fill.", 53)
+                debug_message(f"Warning: Still need {potions_needed} {potion_name} but none available in bank", 33)
 
-def create_potions_from_keg(bankBox, potion_id, potion_name, amount_needed):
-    """Create potions by using a keg and empty bottles from the bank."""
-    # THIS IS WORK IN PROGRESS , currently not working
-    
-    # Find empty bottles in bank (ItemID 0x0F0E)
-    empty_bottle_id = 0x0F0E
-    bank_bottles = Items.FindByID(empty_bottle_id, -1, bankBox.Serial, -1)
-    
-    if not bank_bottles or bank_bottles.Amount < amount_needed:
-        debug_message(f"Warning: Not enough empty bottles in bank for {potion_name}. Need {amount_needed}, found {bank_bottles.Amount if bank_bottles else 0}", 33)
-        return
-    
-    # Get empty bottles from bank to backpack
-    debug_message(f"Getting {amount_needed} empty bottles from bank", 65)
-    Items.Move(bank_bottles, Player.Backpack, amount_needed)
-    Misc.Pause(600)
-    
-    # Find appropriate keg in bank
-    # Kegs typically have different ItemIDs based on potion type
-    # For this implementation, we'll search for kegs by looking for items that might be kegs
-    # This is a simplified approach - you may need to adjust keg ItemIDs based on your server
-    keg_ids = [0x1940, 0x1941, 0x1942, 0x1943, 0x1944, 0x1945]  # Common keg ItemIDs
-    
-    keg_found = None
-    for keg_id in keg_ids:
-        potential_keg = Items.FindByID(keg_id, -1, bankBox.Serial, -1)
-        if potential_keg:
-            # Additional check could be done here to verify it's the right type of keg
-            # For now, we'll use the first keg found
-            keg_found = potential_keg
-            break
-    
-    if not keg_found:
-        debug_message(f"Warning: No suitable keg found in bank for {potion_name}", 33)
-        # Return bottles to bank
-        backpack_bottles = Items.FindByID(empty_bottle_id, -1, Player.Backpack.Serial, -1)
-        if backpack_bottles:
-            Items.Move(backpack_bottles, bankBox, amount_needed)
-            Misc.Pause(600)
-        return
-    
-    debug_message(f"Found keg (ID: 0x{keg_found.ItemID:04X}) for {potion_name}", 65)
-    
-    # Use keg to fill bottles
-    for i in range(amount_needed):
-        # Find an empty bottle in backpack
-        empty_bottle = Items.FindByID(empty_bottle_id, -1, Player.Backpack.Serial, -1)
-        if empty_bottle:
-            debug_message(f"Using keg to fill bottle {i+1}/{amount_needed}", 65)
-            # Use the empty bottle on the keg
-            Items.UseItem(empty_bottle)
-            Misc.Pause(200)
-            Target.TargetExecute(keg_found)
-            Misc.Pause(800)  # Wait for the potion to be created
-        else:
-            debug_message(f"Warning: No empty bottle found in backpack for filling {i+1}", 33)
-            break
-    
-    debug_message(f"Completed potion creation attempt for {potion_name}", 65)
 
 def move_resources_to_subcontainer(bankBox, resourceContainer):
     """
