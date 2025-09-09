@@ -1,5 +1,5 @@
 """
-UI WALIA Item Inspection - a Razor Enhanced Python Script for Ultima Online
+UI WALIA Item Inspect - a Razor Enhanced Python Script for Ultima Online
 
 WALIA ( What Am I Looking At ) , display item information , formatted with extra details
 a custom gump running in background as a button ( book shelf )
@@ -13,11 +13,12 @@ TODO:
 - add materials handling
 - remove the crafting json logic ( we are adding data directly to the script currently )
 - focus on core items with mechanics ( recall rune ) and weapons and armor
+add the artifact weapons
 
 ** issues = item properties through api limited to 4 ? therefore the display is not displaying the full properties **
 
 HOTKEY:: AutoStart on Login
-VERSION:: 20250902
+VERSION:: 20250908
 """
 import re # regex parsing the text
 import os # reading the crafting json , could remove if hardcoded data
@@ -97,199 +98,249 @@ PROPERTY_REMAP = {
     'mastercrafted': '<basefont color=#3FA9FF>Mastercrafted</basefont>',
 }
 
-# Known items with custom descriptions and colored text
+# Accuracy modifier keys to support weapon-type specific skill mapping (bows use Archery instead of Tactics)
+ACCURACY_KEYS = {
+    'accurate',
+    'surpassingly accurate',
+    'eminently accurate',
+    'eminently accurately',  # common typo variant
+    'exceedingly accurate',
+    'supremely accurate',
+}
+
+# Known items with custom descriptions and colored text (hue-aware via tuple keys)
+# Key: (ItemID, Hue or None) -> list[str]
+# Use Hue=None to apply to all hues. Add specific entries like (0x0996, 0x005F) to override for that hue only.
 KNOWN_ITEMS = {
-    # Key: ItemID (hex or int), Value: list of description lines with HTML color formatting
-    0x1F14: [  # Recall Rune
+    (0x1F14, None): [  # Recall Rune (all hues)
         "this rune stone may store a location",
         "using <basefont color=#3FA9FF>Recall</basefont> or <basefont color=#3FA9FF>GateTravel</basefont> will transport the caster to the location stored in the target rune stone",
         "using <basefont color=#FF6B6B>Mark</basefont> sets the caster's location into the target rune stone",
         "rename the rune stone by double clicking it",
         "a <basefont color=#8B4513>RuneBook</basefont> may store multiple rune stones , by dropping them onto the book"
     ],
-    0x0996: [  # Mento Seasoning , color =0x005f
+    (0x0996, None): [  # Mento Seasoning (all hues) , special hue sometimes 0x005F
         "a <basefont color=#228B22>Cooking</basefont> ingredient",
         "used in <basefont color=#32CD32>Bowl of Marinated Rocks</basefont> (Grants 10% physical resistance for 10 min) ",   
         "used in <basefont color=#228B22>Colorful Salad</basefont>, <basefont color=#228B22>Pork Meal</basefont>",   
         "collected from <basefont color=#3FA9FF>Humanoid</basefont> enemies",
     ],
-    0x099F: [  # Samuel Secret Sauce
+    (0x099F, None): [  # Samuel Secret Sauce (all hues)
         "a <basefont color=#228B22>Cooking</basefont> ingredient",
         "used in <basefont color=#32CD32>Pixie Leg Feast</basefont> (Grants increased spell surging chance for 15 min) ",   
         "used in <basefont color=#32CD32>Charcuterie Board</basefont> (Grants 10% magical resistance for 10 min) ",   
         "used in <basefont color=#228B22>Salmon Meal</basefont>, <basefont color=#228B22>Spicy Fish Bowl</basefont> ",   
         "collected from <basefont color=#3FA9FF>Humanoid</basefont> enemies",
     ],
-    0x3199: [  # Brilliant Amber
+    (0x3199, None): [  # Brilliant Amber (all hues)
         "a rare gem",
         "collected from <basefont color=#8B4513>Lumberjacking</basefont>",  
     ],
-    0x4FB6: [  # N token for raffle
+    (0x4FB6, None): [  # N token for raffle (all hues)
         "a token for raffle",
         "turn in at the <basefont color=#3FA9FF>Britain</basefont> bank top right corner",  
     ],
 }
 
-# Enchanting materials with their specific enhancement properties
+# Enchanting materials with their specific enhancement properties (hue-aware via tuple keys)
 KNOWN_ENCHANTING_ITEMS = {
-    0x3197: [  # Fire Ruby
+    (0x3197, None): [  # Fire Ruby (all hues)
         "a gem for enchanting",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for  <basefont color=#FF6B6B>Weapon Damage</basefont> , and Spellbook <basefont color=#FF6B6B>Fireball</basefont>, and Armor <basefont color=#FF6B6B>Fire Elemental</basefont>",
         "collected from mining and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
         #imbuing "used for imbuing <basefont color=#5CB85C>Strength</basefont> properties onto armor , and <basefont color=#FFB84D>Hit Fireball</basefont> onto weapon ",
         #crafting "used for crafting the <basefont color=#FF6B6B>Fiery Spellblade</basefont>",
     ],
-    0x573C: [  # Arcanic Rune Stone
+    (0x573C, None): [  # Arcanic Rune Stone
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#FF6B6B>Mastery Damage</basefont> (spellbook)",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5748: [  # Bottle Ichor
+    (0x5748, None): [  # Bottle Ichor
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#5CB85C>Weapon Life Leech</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x3198: [  # Blue Diamond
+    (0x3198, None): [  # Blue Diamond
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#FFB84D>Boss Damage</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5742: [  # Boura Pelt
+    (0x5742, None): [  # Boura Pelt
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Giant defense</basefont>, and Spellbook <basefont color=#B084FF>Earth Elemental</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x573B: [  # Crushed Glass
+    (0x573B, None): [  # Crushed Glass
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#3FA9FF>Blade Spirits</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",    
     ],
-    0x5732: [  # Crystalline (BlackrockCrystaline)
+    (0x5732, None): [  # Crystalline (BlackrockCrystaline)
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#FFB84D>Surging</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5721: [  # Daemon Claw
+    (0x5721, None): [  # Daemon Claw
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#FF6B6B>Savagery</basefont>, and Armor <basefont color=#8B4513>Daemonic defense</basefont>, and Spellbook <basefont color=#B084FF>Summon Daemon</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x26B4: [  # Delicate Scales
+    (0x26B4, None): [  # Delicate Scales
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#5CB85C>Hunter's Luck</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5737: [  # Elven Fletching
+    (0x5737, None): [  # Elven Fletching
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#3FA9FF>Weapon Accuracy</basefont>, and Spellbook <basefont color=#B084FF>Magic Arrow</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x2DB2: [  # Enchanted Essence
+    (0x2DB2, None): [  # Enchanted Essence
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Lower Mana Cost</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5745: [  # Faery Dust
+    (0x5745, None): [  # Faery Dust
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Curse Resistance</basefont>, and Spellbook <basefont color=#B084FF>Mind Blast</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5726: [  # Fey Wings
+    (0x5726, None): [  # Fey Wings
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#5CB85C>Evasion</basefont>, and Spellbook <basefont color=#B084FF>Air Elemental</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x572C: [  # Goblin Blood
+    (0x572C, None): [  # Goblin Blood
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Vermin defense</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x572D: [  # Lava Serpent Crust
+    (0x572D, None): [  # Lava Serpent Crust
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Draconic defense</basefont>, and Spellbook <basefont color=#B084FF>Flamestrike</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x0F87: [  # Lucky Coin
+    (0x0F87, None): [  # Lucky Coin
         "a metal coin of luck used for enchanting",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#5CB85C>Crafting Luck</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x3191: [  # Luminescent (FungusLuminescent)
+    (0x3191, None): [  # Luminescent (FungusLuminescent)
         "a glowing mushroom of luminescent fungi",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Spell Leech</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
         #imbuing "an Imbuing ingredients to imbue the Hit Point Increase, Mana Increase and Stamina Increase property onto items.",
         #crafting "used for crafting the <basefont color=#FF6B6B>Darkglow Potion</basefont>",
     ],
-    0x2DB1: [  # Magical Residue
+    (0x2DB1, None): [  # Magical Residue
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Lower Reagent Cost</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x3190: [  # Parasitic Plant
+    (0x3190, None): [  # Parasitic Plant
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#B084FF>Summon Surge</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x573D: [  # Powdered Iron
+    (0x573D, None): [  # Powdered Iron
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#FF6B6B>Attack Speed</basefont>, and Spellbook <basefont color=#B084FF>Explosion</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5747: [  # Raptor Teeth
+    (0x5747, None): [  # Raptor Teeth
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#FF6B6B>Critical Damage</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x2DB3: [  # Relic Fragment
+    (0x2DB3, None): [  # Relic Fragment
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#5CB85C>Archeologist</basefont>, and Spellbook <basefont color=#B084FF>Summon Creature</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5736: [  # Seed of Renewel
+    (0x5736, None): [  # Seed of Renewel
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#5CB85C>Harvesting Luck</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5744: [  # Silver Snake
+    (0x5744, None): [  # Silver Snake
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Water Elemental</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5746: [  # Slith Tongue
+    (0x5746, None): [  # Slith Tongue
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Poison Resistance</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5720: [  # Spider Carapace
+    (0x5720, None): [  # Spider Carapace
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Arachnid defense</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5731: [  # Undying Flesh
-        "an enchanting material",
+    (0x5731, None): [  # Undying Flesh
+        "a crafting and enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#8B4513>Undead defense</basefont>",
+        "used in <basefont color=#FFB84D>Tinkering</basefont> to craft the <basefont color=#CF9FFF>Dark Passage Lantern</basefont> , an important Summoner item",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5722: [  # Vial of Vitriol
+    (0x5722, None): [  # Vial of Vitriol
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#FF6B6B>Mage Killer</basefont>, and Spellbook <basefont color=#B084FF>Harm</basefont>, and Armor <basefont color=#8B4513>Infidel Defense</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x573E: [  # Void Orb
+    (0x573E, None): [  # Void Orb
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Weapon <basefont color=#B084FF>Paragon Conversion</basefont>, and Spellbook <basefont color=#B084FF>Energy Vortex</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
-    0x5749: [  # Reflective wolf eye
+    (0x5749, None): [  # Reflective wolf eye
         "an enchanting material",
         "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Armor <basefont color=#B084FF>Reflective</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
 }
 
+# Known items used in quest with custom descriptions and colored text and reward item id
+# quest description notes = trying to be minimal here , just enough to tell where to go ( quest giver ) and why ( rewards ) without overload about specifics
+# notably choosing not to include the amount needed for turn in ( could be misunderstood that you need all 15 at once )
+KNOWN_QUEST_ITEMS = {
+    # Key: (ItemID, Hue or None) -> list[str]
+    (0x5737, 0x0b42): [  # Robust Harpy Feather
+        "a quest item",
+        #"a quest item for <basefont color=#3FA9FF>Sky is the Limit</basefont>",
+        "<basefont color=#3FA9FF>Canute</basefont> in Britain is offering the reward of <basefont color=#8B4513>Random Runic Component</basefont> or <basefont color=#FFB84D>Treasure Map</basefont> or <basefont color=#32CD32>Food Supply Crate</basefont>",
+        #"<basefont color=#3FA9FF>Sky is the Limit</basefont>",
+    ],
+    (0x241E, None): [  # Elfic Artifact
+        "a quest item",
+        #"a quest item for <basefont color=#3FA9FF>Stolen Artifacts</basefont>",
+        "<basefont color=#3FA9FF>Canute</basefont> in Britain is offering the reward of <basefont color=#8B4513>Random Bulk Resource</basefont> or <basefont color=#FFB84D>3,000 Gold</basefont> or <basefont color=#CF9FFF>Random Mastery Orb</basefont>",
+        #"<basefont color=#3FA9FF>Stolen Artifacts</basefont>",
+    ],
+    (0x1F19, 0x0829): [  # Wrong Champion Crystal
+        "a crystal to <basefont color=#FF6B6B>Awaken Champions</basefont>",
+        "place at the Altar of <basefont color=#FF6B6B>Wrong</basefont>",
+    ],
+}
+
+KNOWN_SCROLL_ITEMS = {
+    # Key: (ItemID, Hue or None) -> list[str]
+    (0x0E34, 0x0808): [  # Spellbook Enhancement Scroll
+        "apply to a <basefont color=#FF6B6B>Spellbook</basefont>",
+    ],
+    (0x0E34, 0x0808): [  # Weapon Enhancement Scroll
+        "apply to a <basefont color=#FF6B6B>Weapon</basefont>",
+    ],
+    (0x0E34, 0x0808): [  # Armor Enhancement Scroll
+        "apply to a <basefont color=#FF6B6B>Armor</basefont>",
+    ],
+}
+
 # Append enchanting items to the main known items dictionary
 KNOWN_ITEMS.update(KNOWN_ENCHANTING_ITEMS)
+KNOWN_ITEMS.update(KNOWN_QUEST_ITEMS)
+KNOWN_ITEMS.update(KNOWN_SCROLL_ITEMS)
 
 # Colors (Razor Enhanced gump label hues)
 COLORS = {
@@ -367,13 +418,6 @@ _LAST_TARGET_SERIAL = None
 _LAST_TARGET_ITEMID = None
 _LAST_TARGET_NAME = None
 _LAST_USAGES = None
-
-def get_next_results_gump_id():
-    """Get the next cycling RESULTS_GUMP_ID and increment the counter."""
-    global _CURRENT_GUMP_OFFSET
-    current_id = RESULTS_GUMP_ID_BASE + _CURRENT_GUMP_OFFSET
-    _CURRENT_GUMP_OFFSET = (_CURRENT_GUMP_OFFSET + 1) % RESULTS_GUMP_ID_MAX_OFFSET
-    return current_id
 
 #//=============================================================================
 # Equipment data mapping (by ItemID)
@@ -713,6 +757,66 @@ def get_item_properties(item_serial, delay=500):
         debug_msg(f"Error getting properties for serial {item_serial}: {e}", COLORS['warn'])
     return []
 
+def _resolve_known_item_lines(item_id: int, item_hue: int, treat_hue_as_agnostic: bool = False) -> list:
+    """Resolve known item description lines using the new tuple-key system only.
+
+    Priority:
+      1) If treat_hue_as_agnostic: (item_id, None)
+      2) Else: if hue in (0, None) -> (item_id, None)
+      3) Else: (item_id, hue) -> (item_id, None)
+      4) Scan fallback over tuple keys for this item_id
+    """
+    # 1/2. Tuple-key lookups
+    try:
+        iid = int(item_id)
+    except Exception:
+        iid = item_id
+    # Use flexible int/hex conversion for hue
+    hue = _to_int_id(item_hue)
+    if hue is None:
+        try:
+            hue = int(item_hue)
+        except Exception:
+            hue = 0
+
+    # When hue is agnostic (weapons/armor), skip hue-specific
+    if treat_hue_as_agnostic:
+        if (iid, None) in KNOWN_ITEMS and isinstance(KNOWN_ITEMS[(iid, None)], list):
+            return KNOWN_ITEMS[(iid, None)]
+    else:
+        # If hue is effectively "no hue" (0/None), prefer the generic (iid, None)
+        if hue in (0, None):
+            if (iid, None) in KNOWN_ITEMS and isinstance(KNOWN_ITEMS[(iid, None)], list):
+                return KNOWN_ITEMS[(iid, None)]
+        # Otherwise attempt exact hue match first, then generic
+        if (iid, hue) in KNOWN_ITEMS and isinstance(KNOWN_ITEMS[(iid, hue)], list):
+            return KNOWN_ITEMS[(iid, hue)]
+        if (iid, None) in KNOWN_ITEMS and isinstance(KNOWN_ITEMS[(iid, None)], list):
+            return KNOWN_ITEMS[(iid, None)]
+
+    # Scan fallback: find any tuple key matching iid, prefer None hue
+    try:
+        for k, v in KNOWN_ITEMS.items():
+            if isinstance(k, tuple) and len(k) == 2 and k[0] == iid and isinstance(v, list):
+                # Prefer None hue explicitly
+                if k[1] is None:
+                    return v
+        # If none had None hue, return the first matching iid tuple
+        for k, v in KNOWN_ITEMS.items():
+            if isinstance(k, tuple) and len(k) == 2 and k[0] == iid and isinstance(v, list):
+                return v
+    except Exception:
+        pass
+
+    # Nothing found
+    return []
+
+def get_next_results_gump_id():
+    """Get the next cycling RESULTS_GUMP_ID and increment the counter."""
+    global _CURRENT_GUMP_OFFSET
+    current_id = RESULTS_GUMP_ID_BASE + _CURRENT_GUMP_OFFSET
+    _CURRENT_GUMP_OFFSET = (_CURRENT_GUMP_OFFSET + 1) % RESULTS_GUMP_ID_MAX_OFFSET
+    return current_id
 
 def _singularize(word: str) -> str:
     if len(word) > 3 and word.endswith('s'):
@@ -1500,6 +1604,16 @@ def build_text_sections(target_item, usages: list) -> list:
                             else:
                                 # For armor, exceptional gives durability bonus
                                 final_text = '<basefont color=#888888>+ 20% Durability</basefont> <basefont color=#AAAAAA>( Exceptional )</basefont>'
+                        # Accuracy set: use Archery for bows/crossbows instead of Tactics
+                        elif low in ACCURACY_KEYS:
+                            weapon_info = WEAPON_DATA_BY_ITEMID.get(item_id, {})
+                            weapon_type = weapon_info.get('type', '') if weapon_info else ''
+                            base_text = PROPERTY_REMAP[low]
+                            if weapon_type in ('Bow', 'Crossbow'):
+                                # Replace 'Tactics' with 'Archery' in the remapped string
+                                final_text = base_text.replace('Tactics', 'Archery')
+                            else:
+                                final_text = base_text
                         else:
                             final_text = PROPERTY_REMAP[low]
                         # Don't escape HTML for remapped properties since they have color formatting
@@ -1594,30 +1708,58 @@ def build_text_sections(target_item, usages: list) -> list:
         sections.append(TextSection(durability_lines, 'durability', 25, separator_before=separator_needed))
         debug_msg(f"ADDED SECTION: durability (priority 25, {len(durability_lines)} lines, separator: {separator_needed})", COLORS['info'])
     
-    # 2. Known item descriptions section (high priority) - EACH LINE AS SEPARATE SECTION WITH PROPER COLOR WRAPPING
+    # 2. Known item descriptions section (high priority) - hue-aware
     try:
-        if item_id in KNOWN_ITEMS:
-            debug_msg(f"Adding {len(KNOWN_ITEMS[item_id])} known item descriptions as separate sections", COLORS['cat'])
-            for i, desc_line in enumerate(KNOWN_ITEMS[item_id]):
-                debug_msg(f"  Known desc [{i}]: {repr(desc_line)}", COLORS['cat'])
+        # Determine if hue should be ignored (weapons/armor can be any hue)
+        # Avoid calling is_weapon() here since a local variable named `is_weapon` may exist in this scope
+        treat_hue_as_agnostic = (get_weapon_data(item_id) is not None) or (get_armor_data(item_id) is not None)
+        try:
+            item_hue = int(getattr(target_item, 'Hue', 0) or 0)
+        except Exception:
+            item_hue = 0
+
+        known_lines = _resolve_known_item_lines(item_id, item_hue, treat_hue_as_agnostic=treat_hue_as_agnostic)
+        if known_lines:
+            debug_msg(
+                f"Adding {len(known_lines)} known item descriptions (hue-aware: {'yes' if not treat_hue_as_agnostic else 'no'})",
+                COLORS['cat']
+            )
+            # Show a separator before every known-item line except the first
+            have_rendered_any_known = False
+            need_separator_before_next = False
+
+            for i, desc_line in enumerate(known_lines):
+                # Allow inline separator control via markers in description list
+                raw = (desc_line or '').strip().lower()
+                if raw in ('---', '[sep]', '[separator]'):
+                    debug_msg(f"  Known desc [{i}] requested separator", COLORS['cat'])
+                    need_separator_before_next = True
+                    continue  # Do not render a line for the marker itself
+
+                debug_msg(f"  Known desc [{i}] (hue={item_hue}): {repr(desc_line)}", COLORS['cat'])
                 # Wrap line with default color, preserving existing basefont tags
                 formatted_line = _wrap_line_with_default_color(desc_line, '#BBBBBB')
                 debug_msg(f"    Formatted: {repr(formatted_line)}", COLORS['cat'])
-                
+
                 # Split long lines for word wrapping at 30 characters
-                wrapped_lines = _split_line_for_wrapping(formatted_line, max_chars=35)
-                debug_msg(f"    Wrapped into {len(wrapped_lines)} lines", COLORS['cat'])
-                
-                # Create sections for each wrapped line
-                for j, wrapped_line in enumerate(wrapped_lines):
-                    priority = 20 + i + (j * 0.1)  # Maintain order with sub-priorities for wrapped lines
-                    # Add separator before each new description entry (not just the first one)
-                    separator_needed = (j == 0 and (i == 0 and bool(modifier_lines or regular_lines) or i > 0))
-                    section_id = f'known_desc_{i}_{j}' if len(wrapped_lines) > 1 else f'known_desc_{i}'
-                    sections.append(TextSection([wrapped_line], section_id, priority, separator_before=separator_needed))
-                    debug_msg(f"    ADDED SECTION: {section_id} (priority {priority}, separator: {separator_needed})", COLORS['cat'])
+                wrapped_lines = _split_line_for_wrapping(formatted_line, 30)
+
+                # Add each line as its own section for better layout control
+                for j, wl in enumerate(wrapped_lines):
+                    # Apply separator on the first wrapped visual line when:
+                    #  - We've already rendered at least one known line (separator between lines), or
+                    #  - A marker explicitly requested a separator
+                    sep_flag = (j == 0) and ((have_rendered_any_known) or (need_separator_before_next))
+                    sections.append(TextSection([wl], 'known', 8, separator_before=sep_flag))
+                    if j == 0:
+                        # After the first visual line of this description, we have rendered content
+                        have_rendered_any_known = True
+                        need_separator_before_next = False
+            # Ensure there is a separator before the next (non-known) section in the results
+            sections.append(TextSection([], 'known_end_separator', 9, separator_before=True))
+            debug_msg("ADDED known item lines as individual sections (priority 8) with dynamic separators and trailing separator", COLORS['info'])
     except Exception as e:
-        debug_msg(f"Error adding known descriptions: {e}", COLORS['warn'])
+        debug_msg(f"Error adding known item descriptions: {e}", COLORS['warn'])
     
     # 3. Equipment type section (medium priority)
     equipment_lines = []
@@ -1798,7 +1940,7 @@ def show_walia_gump(target_item, usages: list, gump_id=None):
         debug_msg("\n  Section [{}]: {} (priority {})".format(section_idx, section.category, section.priority), COLORS['cat'])
         debug_msg(f"    Lines: {len(section.lines)}, Separator: {section.separator_before}, Y: {current_y}", COLORS['cat'])
         
-        if section.separator_before and current_y > text_y + 2:
+        if section.separator_before:
             # Add separator line
             separator_html = "<basefont color=#444444>─────────</basefont>"
             debug_msg(f"    Adding separator at Y={current_y}: {repr(separator_html)}", COLORS['cat'])
