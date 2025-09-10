@@ -8,20 +8,29 @@ using multiple filters to reduce to player and npc spoken words without "command
 names are colorized consistently by deterministic seed to visually separate
 only "Quest" and "Event" related system messages are whitelisted 
 
-filters=
+global chat may be displayed as well , tho is turned off by default
+many settings are toggleable for preference 
+
+filters =
 common command words "bank" , "All guard me" , housing
 repeating messages
 known npcs are filtered out
 
+events =
+events are colorized and condensed into a single line 
+harvest and kill global quests , virtue shrine corruption , danger zone rotation  
+
 STATUS:: working
-VERSION::20250908
+VERSION::20250909
 """
 
-import time # timestamps , and for timing the mouse lock for moving gump ( considering removing )
-import random # optional jitter for update pacing
+import time # timestamps and delays 
+import random # jitter for desynchronize updates
 import re # regex parsing the text
 
 DEBUG_MODE = False
+
+CHAT_ORDER_TOP_NEW = True  # True = newest at top; or  False = oldest at top 
 
 SHOW_SYSTEM = True
 SHOW_REGULAR = True
@@ -35,43 +44,50 @@ SHOW_FOCUS = False
 SHOW_SPELL = False
 
 SHOW_PLAYER_SELF_MESSAGES = True  # show or hide messages spoken by the local player
-SHOW_ROW_DUPLICATES = False       # show or hide duplicate rows; False keeps spam suppressed (previously HIDE_ROW_DUPLICATES=True)
-SHOW_STATUS_EFFECT_LINES = False  # show or hide asterisk-wrapped status/emote-like lines
-SHOW_BONDED_PET_LINES = False     # show or hide lines from bonded pets or lines that are only a bonded tag
-
-# System message visibility controls
-SHOW_SYSTEM_GLOBAL_MESSAGES = True  # show or hide global chat routed through System: "System <General> Player : msg"
-SHOW_SYSTEM_QUEST_MESSAGES = True   # show or hide quest-related non-global System notifications
-SHOW_SYSTEM_OTHER_MESSAGES = False  # show or hide other non-global System lines
 SHOW_OPTIONAL_NPC_ENABLED = False   # show or hide messages from optional NPC list (False = hide, replacing previous FILTER_OPTIONAL_NPC_ENABLED=True)
-SHOW_SYSTEM_QUEST_PROGRESS = True   # show or hide quest progress lines like "Quest Progress - City Cleanup: 11/20"
+SHOW_MONSTER_NPC_ENABLED = False    # show or hide messages from monster NPC list (False = hide)
 
-# Anti-spam content controls
-SHOW_NUMERIC_ONLY_MESSAGES = False   # show or hide messages that are only digits (e.g., accidental number spam)
-SHOW_LONG_ALNUM_TOKENS = False       # show or hide messages that contain very long alphanumeric tokens (likely hotkey mash)
+# System message  
+SHOW_SYSTEM_QUEST_MESSAGES = True   # quest-related non-global chat System notifications
+SHOW_SYSTEM_QUEST_PROGRESS = False   # quest progress lines like "Quest Progress - City Cleanup: 11/20"
+SHOW_SYSTEM_WEEKLY_QUEST_MESSAGES = False  # Weekly Quest announcements (lines containing 'Weekly Quest:')
+SHOW_SYSTEM_OTHER_MESSAGES = False  # other non-global System lines
+
+# Global chat channels 
+SHOW_SYSTEM_GLOBAL_MESSAGES = True  # global chat routed through System: "System <General> Player : msg"
+SHOW_GLOBAL_CHAT_GENERAL = False  # System: <General> Speaker : message
+SHOW_GLOBAL_CHAT_PVP = False      # System: <PVP> Speaker : message
+SHOW_GLOBAL_CHAT_TRADE = False    # System: <Trade> Speaker : message
+
+# Anti-spam  , filters hotkey spam , numeric only messages 
+SHOW_NUMERIC_ONLY_MESSAGES = False   # messages that are only digits (e.g., accidental number spam)
+SHOW_LONG_ALNUM_TOKENS = False       # messages that contain very long alphanumeric tokens (likely hotkey mash)
 LONG_ALNUM_TOKEN_THRESHOLD = 20      # tokens longer than this (A-Za-z0-9 only, no spaces) are considered spam when SHOW_LONG_ALNUM_TOKENS is False
-SHOW_PUNCT_NUM_ONLY_MESSAGES = False # show or hide messages that contain only punctuation/special characters and numbers (no letters)
-
-"""
-Offline simulation settings: when enabled, reads a plain text journal file and produces an HTML preview
-that simulates how this gump would render in-game after filtering. This does not require the game to be running.
-"""
-OFFLINE_JOURNAL_SIMULATE = False
-OFFLINE_JOURNAL_INPUT_PATH = r"D:\ULTIMA\UO_Unchained\Data\Client\JournalLogs\2025_09_08_20_39_33_journal.txt"
-OFFLINE_JOURNAL_OUTPUT_PATH = r"d:\ULTIMA\SCRIPTS\RazorEnhanced_Python\data\journal_preview.html"
+SHOW_PUNCT_NUM_ONLY_MESSAGES = False # messages that contain only punctuation/special characters and numbers (no letters)
 
 SHOW_TIMESTAMP = False  # Show [HH:MM:SS] prefix; default off 
 DEDUPLICATE_BY_TEXT = True # De-duplicate for simple anti spam
-CHAT_ORDER_TOP_NEW = True  # True=newest at top; or  False=oldest at top , new entries appear at bottom
+SHOW_ROW_DUPLICATES = False       # duplicate rows; False keeps spam suppressed 
+SHOW_STATUS_EFFECT_LINES = False  # asterisk-wrapped status/emote-like lines
+SHOW_BONDED_PET_LINES = False     # lines from bonded pets or lines that are only a bonded tag
 
-#//==== GUMP ===================
+"""
+Offline preview settings: when enabled, reads a plain text journal file and produces an HTML preview
+that simulates how this gump would render in-game after filtering.  this is for testing the colors and formatting
+it is not representative of the actual gump because of the in game "channel" filtering , but lets us review how specific instances will be formatted 
+"""
+OFFLINE_JOURNAL_SIMULATE = False # setting this to true will read external journal log then exit for testing purposes .
+OFFLINE_JOURNAL_INPUT_PATH = r"D:\ULTIMA\example\Data\Client\JournalLogs\2025_09_09_20_37_33_journal.txt"
+OFFLINE_JOURNAL_OUTPUT_PATH = r"d:\ULTIMA\SCRIPTS\RazorEnhanced_Python\data\journal_preview.html"
+
+#//==== GUMP ==================================================================
 # example=4294967295 #  a high pseudo-random gump id to avoid other existing gump ids
 GUMP_ID = 3135545776
 
 # Default gump position and sizing
-DEFAULT_GUMP_X = 100
+DEFAULT_GUMP_X = 200
 DEFAULT_GUMP_Y = 0
-DEFAULT_GUMP_WIDTH = 420
+DEFAULT_GUMP_WIDTH = 400
 DEFAULT_GUMP_HEIGHT = 500
 
 # TIMING
@@ -79,10 +95,8 @@ UPDATE_INTERVAL_MS = 750
 
 # SAFETY LIMITS
 MAX_HISTORY = 50           # Keep only the last N messages in memory and on-screen
-MIN_RESEND_MS = 750        # Do not re-send gump faster than this, even if content changed
-
-# Optional jitter to desynchronize with other scripts
-ENABLE_JITTER = True
+MIN_RESEND_MS = 750        # throttling
+ENABLE_JITTER = True # Optional jitter to desynchronize with other scripts
 JITTER_MS_MAX = 100
 
 # UI SHAPE
@@ -92,15 +106,19 @@ JOURNAL_START_Y = 25
 FILTER_SPACING_Y = 30
 JOURNAL_ENTRY_HEIGHT = 20
 
-# Chat COLORS
+# Chat COLORS =================================================================
 CHAT_BG_DARK = True
 CHAT_TEXT_COLOR = "#C0C0C0"  # light grey
 QUEST_TEXT_COLOR = "#1E90FF" # Muted gold for quest lines ( other options gold = #C2A14A , teal = #76D7C4 , blue = #3FA9FF)
-CHAT_BG_IMAGE_ID = None  # e.g., 2624 if you have a known black tile; None = no image # Leave as None to avoid any image (fully transparent via alpha region only).
+CHAT_BG_IMAGE_ID = None  # maybe could use 2624; # None = no image (fully transparent via alpha region only).
 
 # Special event colors
-VIRTUE_ALERT_COLOR = "#F8C471"  # orange for shrine corruption/virtue attacks
+VIRTUE_ALERT_COLOR = "#E84827"  # orange for shrine corruption/virtue attacks
 DANGER_ZONE_LABEL_COLOR = "#FF3333"  # red for danger zone label
+
+# Alert highlighting
+ALERT_ATTACK_SUBSTRING = " is attacking you"
+ALERT_ATTACK_COLOR = "#FF3333"
 
 # Speaker colorization palette (bright, muted colors for readability)
 PALETTE_SPEAKER_COLORS = [
@@ -121,19 +139,17 @@ PALETTE_SPEAKER_COLORS = [
     "#C39BD3",  # violet
 ]
 
- 
-
 # Optional global seed offset to bias speaker color selection (user-tunable)
 COLOR_SEED_OFFSET = 0 # speaker name color is a deterministic seed based on name , use this offset if you want different colors
 
-# VIRTUES are referenced by in world shrines where events may occur 
-# virtues + chaos
+# VIRTUES are referenced by in world shrines where events may occur  , virtues + chaos
 VIRTUES = {
     "honesty", "compassion", "valor", "justice",
     "sacrifice", "honor", "spirituality", "humility", "chaos"
 }
 
 # MASTERY_NAMES are referenced by golems in game , we use this to filter out their title messages 
+# currently disabled ( not-filtered ) , as a player may actually just say the mastery name as a response 
 MASTERY_NAMES = {
     "aero", "fira", "earth", "shadow", "blood", "doom", "fortune", "artisan", "bulwark", "poison", "lyric", "death", "druidic", "holy"
 }
@@ -143,12 +159,12 @@ FILTER_SYSTEM_SUBSTRINGS = [
     "[safe looting] you refuse to loot this corpse",
     "careful! you",  # e.g., "System : Careful! You ..."
     "enhanced summons",  # e.g., "System : [Enhanced Summons] ..."
-    "enhanced sumons",  # common misspelling variant
+    "enhanced sumons",  #  misspelling 
     "a pixie is guarding you",
 ]
 
 FILTER_SYSTEM_PATTERNS = [
-    # Add regex patterns here if needed
+    # universal regex patterns here , for now we are doing specific regex patterns after routing , like for global quests
 ]
 
 # Generic text filters (apply to any speaker/type) , 
@@ -156,7 +172,7 @@ FILTER_SYSTEM_PATTERNS = [
 FILTER_GENERIC_SUBSTRINGS = [
     "you see nothing useful to carve from the corpse",
     "(summoned)",
-    "the spell fizzles.",
+    "the spell fizzles.","you cannot heal that.",
     "You have accepted quest:","You have accepted the quest:",
     "bank container has ",
     "Take a look at my goods",
@@ -165,9 +181,9 @@ FILTER_GENERIC_SUBSTRINGS = [
     "There's not enough room in your bankbox",
     "the purchased items were placed in you bank box.",
     "The total of thy purchase is",
-    "i am dead and cannot do that.",
+    "i am dead and cannot do that.","I can't reach that.",
     "emptying the trashcan!",
-    "It appears to be locked.",
+    "It appears to be locked.","The lock quickly yields to your skill.",
     "The trash is full!",
 ]
 
@@ -193,9 +209,9 @@ FILTER_GENERIC_EXACTS = [
     "bnak","bak","ban"
     "that is secure.","Locked down!","I can't reach that.",
     "vendor buy me a bank",
-    "bank guards i ban thee",
+    "bank guards i ban thee","vendor buy bank i ban thee",
     "bank guard room claim list i ban thee",
-    "You cannot heal yourself in your current state.",
+    "You cannot heal yourself in your current state.","you cannot heal that target in their current state.",
     "(tame)","(bonded)",
     "i wish to lock this down","i wish to release this","i wish to secure this","(no longer locked down)",
 ]
@@ -212,11 +228,12 @@ CHECK_ONLY_PATTERN   = re.compile(r"^\s*check\s+[\d,]+\s*$", re.IGNORECASE)
 BALANCE_ONLY_PATTERN = re.compile(r"^\s*balance\s*$", re.IGNORECASE)
 STATEMENT_ONLY_PATTERN = re.compile(r"^\s*statement\s*$", re.IGNORECASE)
 
-# Speaker-based filters
+# Speaker-based filters , adjust per shard
 FILTER_SPEAKER_EXACTS = [
     "canute", # quest giver , we are letting other quest givers through but the daily quest giver "Canute" spams unique messages for each quest some one takes
 ]
 
+# Town NPCs , adjust per shard
 FILTER_SPEAKER_OPTIONAL_NPC = [
     "ogden", # quest givers in brit bank
     "luffy", # quest givers in brit bank
@@ -225,9 +242,14 @@ FILTER_SPEAKER_OPTIONAL_NPC = [
     "forsythe", #banker
 ]
 
-# Alert highlighting
-ALERT_ATTACK_SUBSTRING = " is attacking you"
-ALERT_ATTACK_COLOR = "#FF3333"
+# talkative monsters like lizardmen are filtered from local chat by default
+FILTER_SPEAKER_MONSTER_NPC = [
+    "a lizardman berserker", # 
+    "a mephite lizardman", # 
+    "a lizardman warlock", # 
+    "a molten lizardman", # 
+    "a lizardman berserker", 
+]
 
 #//==================================================================================
 
@@ -264,7 +286,7 @@ class JournalFilterUI:
         # REGEX pattern with named groups and explicit channel detection.
         # Handles spacing around colons, optional channel tags, and both "System" and "Systems".
         # Examples of raw journal lines (all should match):
-        #   "System: <General> Tom Shade : hello world"
+        #   "System: <General> PlayerName : hello world"
         #   "System <Trade> Alice: selling regs"
         #   "Systems: <Help> Bob : need a rez"
         #   "System: PlayerName : local system line"
@@ -305,6 +327,12 @@ class JournalFilterUI:
         # Pending state for Danger Zones activation -> regions list combo
         self._danger_zones_pending_until_ms = 0
 
+        # Pending state for Global Quest name/objective combiner
+        self._globalquest_name = ''
+        self._globalquest_pending_until_ms = 0
+        self._globalquest_last_objective = ''
+        self._globalquest_last_objective_until_ms = 0
+
     # Basic clamp helpers to keep gump textures sane
     def _clamp_int(self, val, lo, hi, fallback):
         try:
@@ -331,6 +359,7 @@ class JournalFilterUI:
         return SHOW_REGULAR
 
     def _allow_guild(self, entry):
+        # maybe colorize guild chat words
         return SHOW_GUILD
 
     def _allow_alliance(self, entry):
@@ -349,7 +378,7 @@ class JournalFilterUI:
         return SHOW_SPELL
 
     def _allow_party(self, entry):
-        # Example spot to apply a color tint or other remap in the future
+        # maybe colorize party chat words
         return SHOW_PARTY
 
     #//======= Data processing =====================
@@ -364,7 +393,8 @@ class JournalFilterUI:
             # Process only new entries by timestamp when possible
             try:
                 if hasattr(entry, 'Timestamp') and entry.Timestamp is not None:
-                    if float(entry.Timestamp) <= float(self._last_processed_ts):
+                    # Allow processing when timestamp == last boundary to avoid missing multi-line events (e.g., Quest begin + objective)
+                    if float(entry.Timestamp) < float(self._last_processed_ts):
                         continue
             except Exception:
                 pass
@@ -475,6 +505,8 @@ class JournalFilterUI:
                     hide_entry = True
                 elif (not SHOW_OPTIONAL_NPC_ENABLED) and (entry.Name.strip().lower() in FILTER_SPEAKER_OPTIONAL_NPC):
                     hide_entry = True
+                elif (not SHOW_MONSTER_NPC_ENABLED) and (entry.Name.strip().lower() in FILTER_SPEAKER_MONSTER_NPC):
+                    hide_entry = True
         except Exception:
             pass
 
@@ -578,17 +610,24 @@ class JournalFilterUI:
             except Exception:
                 text_norm = None
             # Effective text-dedupe: disabled in offline simulation to keep full history in preview
+            # and ALWAYS bypassed for Quest entries so repeated Quest lines are not suppressed.
             dedupe_by_text = DEDUPLICATE_BY_TEXT if not OFFLINE_JOURNAL_SIMULATE else False
-            if dedupe_by_text and text_norm:
-                if text_norm not in self._seen_text_norm:
-                    self._seen_text_norm.add(text_norm)
-                    self.filtered_entries.append(row)
-                    self.filtered_entries_with_time.append(row_with_time)
-                    did_append = True
-            else:
+            if (row_type == 'Quest'):
+                # Always append Quest entries (no text-based dedupe suppression)
                 self.filtered_entries.append(row)
                 self.filtered_entries_with_time.append(row_with_time)
                 did_append = True
+            else:
+                if dedupe_by_text and text_norm:
+                    if text_norm not in self._seen_text_norm:
+                        self._seen_text_norm.add(text_norm)
+                        self.filtered_entries.append(row)
+                        self.filtered_entries_with_time.append(row_with_time)
+                        did_append = True
+                else:
+                    self.filtered_entries.append(row)
+                    self.filtered_entries_with_time.append(row_with_time)
+                    did_append = True
 
         # mark as seen regardless so we don't reprocess on the next tick
         try:
@@ -629,6 +668,22 @@ class JournalFilterUI:
         except Exception:
             return html_text
 
+    # Remove simple HTML color tags from a string to produce a plain-text version for span calculation
+    def _strip_html_tags(self, text):
+        try:
+            s = str(text)
+            # Remove BASEFONT tags
+            s = re.sub(r"<\s*BASEFONT\s+COLOR=\"[^\"]+\"\s*>", "", s, flags=re.IGNORECASE)
+            s = re.sub(r"<\s*/\s*BASEFONT\s*>", "", s, flags=re.IGNORECASE)
+            # Remove span color tags
+            s = re.sub(r"<\s*span\s+style=\"color:\s*[^\"]+\"\s*>", "", s, flags=re.IGNORECASE)
+            s = re.sub(r"<\s*/\s*span\s*>", "", s, flags=re.IGNORECASE)
+            # Collapse excess whitespace
+            s = re.sub(r"\s+", " ", s).strip()
+            return s
+        except Exception:
+            return text
+
     # Remove leading timestamp like "[09/08/2025 22 : 09:18]" (with optional spaces and NBSP) from a raw log line
     def _strip_leading_timestamp(self, line):
         try:
@@ -643,7 +698,7 @@ class JournalFilterUI:
 
     # Offline: simulate rendering from a text log file and write an HTML preview
     # Expected input lines examples:
-    #   System: <Trade> Bou Lags : Book of Lost Knowledge
+    #   System: <Trade> Bokagsea : Book of Lost Knowledge
     #   System: The following regions are now DANGER ZONES: Stygian Keep, Minoc
     #   Alice : hello there
     #   Bob: missing space but still handled
@@ -769,6 +824,33 @@ class JournalFilterUI:
         except Exception:
             return False
 
+    # Normalize Global Quest objective text by removing trailing qualifiers like 'worldwide'/'globally'
+    # and collapsing redundant whitespace/punctuation. Examples:
+    #  - "Kill 350 Dragons worldwide" -> "Kill 350 Dragons"
+    #  - "Harvest 5000 Logs" -> unchanged
+    def _normalize_globalquest_objective(self, obj_text):
+        try:
+            s = str(obj_text).strip()
+            # Remove trailing qualifiers commonly seen in objectives
+            s = re.sub(r"\s*(?:world\s*wide|worldwide|globally|across\s+the\s+realm|across\s+britannia)\s*$",
+                       "", s, flags=re.IGNORECASE)
+            # Compact internal whitespace
+            s = re.sub(r"\s+", " ", s).strip()
+            # If pattern is Kill/Harvest N Thing(s), keep it as-is after trimming
+            m_kill = re.match(r"^Kill\s+(\d+)\s+(.+)$", s, re.IGNORECASE)
+            if m_kill:
+                n = m_kill.group(1)
+                thing = m_kill.group(2).strip()
+                return f"Kill {n} {thing}"
+            m_harv = re.match(r"^Harvest\s+(\d+)\s+(.+)$", s, re.IGNORECASE)
+            if m_harv:
+                n = m_harv.group(1)
+                thing = m_harv.group(2).strip()
+                return f"Harvest {n} {thing}"
+            return s
+        except Exception:
+            return obj_text
+
     # Decide if a non-global System line should be considered a quest notification
     def _is_quest_system_text(self, s_lower):
         try:
@@ -792,7 +874,7 @@ class JournalFilterUI:
     #
     # Examples from raw log and expected classification:
     # - "System: <General> Playername : speaking in general chat"
-    #     => Global (channel present), show if SHOW_SYSTEM_GLOBAL_MESSAGES is True; do NOT treat as Quest (contains 'question').
+    #     => Global (channel present), show if SHOW_SYSTEM_GLOBAL_MESSAGES is True; 
     # - "System: <Trade> Alice : WTS Valorite Ingots"
     #     => Global, show/hide per SHOW_SYSTEM_GLOBAL_MESSAGES.
     # - "System: Spirituality is currently under attack!"
@@ -809,23 +891,37 @@ class JournalFilterUI:
             # Check for Global format first
             m = self.system_global_capturing_pattern.match(s)
             if m:
-                # Channel present means definite Global; if no channel but a player name pattern, still treat as Global.
-                if not SHOW_SYSTEM_GLOBAL_MESSAGES:
+                # Only treat as Global if a channel like <General>/<Trade>/<PVP> is present
+                try:
+                    channel = (m.group('channel') or '').strip()
+                except Exception:
+                    channel = ''
+                if channel:
+                    if not SHOW_SYSTEM_GLOBAL_MESSAGES:
+                        if DEBUG_MODE:
+                            debug_message(f"Global suppressed by toggle: channel={channel}, speaker={m.group('speaker')}, msg={m.group('message')[:60] if m.group('message') else ''}")
+                        return True, None
+                    speaker = (m.group('speaker') or '').strip()
+                    # Enforce per-channel visibility
+                    ch_low = channel.lower()
+                    if ch_low == 'general' and not SHOW_GLOBAL_CHAT_GENERAL:
+                        return True, None
+                    if ch_low == 'pvp' and not SHOW_GLOBAL_CHAT_PVP:
+                        return True, None
+                    if ch_low == 'trade' and not SHOW_GLOBAL_CHAT_TRADE:
+                        return True, None
+                    message = (m.group('message') or '').strip()
+                    fixed_type = 'Global'
+                    new_entry = type('E', (), dict(Type=fixed_type,
+                                                   Color=entry.Color,
+                                                   Name=speaker or entry.Name,
+                                                   Serial=entry.Serial,
+                                                   Text=message,
+                                                   Timestamp=entry.Timestamp))
                     if DEBUG_MODE:
-                        debug_message(f"Global suppressed by toggle: speaker={m.group('speaker')}, msg={m.group('message')[:60] if m.group('message') else ''}")
-                    return True, None
-                speaker = (m.group('speaker') or '').strip()
-                message = (m.group('message') or '').strip()
-                fixed_type = 'Global'
-                new_entry = type('E', (), dict(Type=fixed_type,
-                                               Color=entry.Color,
-                                               Name=speaker or entry.Name,
-                                               Serial=entry.Serial,
-                                               Text=message,
-                                               Timestamp=entry.Timestamp))
-                if DEBUG_MODE:
-                    debug_message(f"Classified Global: speaker={speaker}, msg={message[:80]}")
-                return False, new_entry
+                        debug_message(f"Classified Global: channel={channel}, speaker={speaker}, msg={message[:80]}")
+                    return False, new_entry
+                # If no channel, fall through to non-global handling (Quest/Danger/etc.)
             # Non-global: specialized handling first (DANGER ZONES, Virtue Shrine events), then generic quest/other
             now_ms = int(time.time() * 1000)
             # Detect and hold the shrine corruption marker
@@ -834,25 +930,150 @@ class JournalFilterUI:
             except Exception:
                 cleaned_marker = s.strip()
 
+            # Weekly Quest announcements filter (non-global System lines that contain "Weekly Quest:")
+            try:
+                if (not SHOW_SYSTEM_WEEKLY_QUEST_MESSAGES) and re.search(r"\bweekly\s+quest\s*:\s*", cleaned_marker, re.IGNORECASE):
+                    return True, None
+            except Exception:
+                pass
+
+            # Fallback Global routing: if the cleaned text still looks like '<Channel> Speaker : Message', treat as Global
+            try:
+                ch_m = re.match(r"^\s*<\s*(?P<channel>[^>]+)\s*>\s*(?P<speaker>[^:<>]+?)\s*:\s*(?P<message>.+)$", cleaned_marker)
+                if ch_m:
+                    if not SHOW_SYSTEM_GLOBAL_MESSAGES:
+                        return True, None
+                    speaker = (ch_m.group('speaker') or '').strip()
+                    channel = (ch_m.group('channel') or '').strip()
+                    ch_low = channel.lower()
+                    if ch_low == 'general' and not SHOW_GLOBAL_CHAT_GENERAL:
+                        return True, None
+                    if ch_low == 'pvp' and not SHOW_GLOBAL_CHAT_PVP:
+                        return True, None
+                    if ch_low == 'trade' and not SHOW_GLOBAL_CHAT_TRADE:
+                        return True, None
+                    message = (ch_m.group('message') or '').strip()
+                    fixed_type = 'Global'
+                    new_entry = type('E', (), dict(Type=fixed_type,
+                                                   Color=entry.Color,
+                                                   Name=speaker or entry.Name,
+                                                   Serial=entry.Serial,
+                                                   Text=message,
+                                                   Timestamp=entry.Timestamp))
+                    if DEBUG_MODE:
+                        debug_message(f"Fallback Classified Global: channel={channel}, speaker={speaker}, msg={message[:80]}")
+                    return False, new_entry
+            except Exception:
+                pass
+
+            # Global Quest combiner: begin line + objective line to a single Quest message
+            #
+            # Expected inputs (non-channel System lines):
+            #   System: A new global quest has begun: Lumber Crisis!
+            #   System: Objective: Harvest 5000 Logs (Target: 5000)
+            #   System: Say [globalquest to view details!
+            # -> Output: [QUEST] Lumber Crisis! Harvest 5000 Logs
+            #
+            #   System: A new global quest has begun: Dragon Threat!
+            #   System: Objective: Kill 350 Dragons worldwide (Target: 350)
+            #   System: Say [globalquest to view details!
+            # -> Output: [QUEST] Dragon Threat! Kill 350 Dragons
+            #
+            #   System: A new global quest has begun: Shame Purification!
+            #   System: Objective: Kill 300 monsters in Shame (Target: 300)
+            #   System: Say [globalquest to view details!
+            # -> Output: [QUEST] Shame Purification! Kill 300 monsters in Shame
+            #
+            # Notes:
+            # - We intentionally ignore the "Say [globalquest ..." helper line.
+            # - Objective parser ignores the "(Target: NNN)" suffix and trims qualifiers like "worldwide/globally".
+            # - Pending window must span both lines; prefer >= 6000 ms if timestamps may differ.
+            try:
+                # Examples: "A new global quest has begun: Lumber Crisis!"
+                # Allow optional trailing punctuation variations and spacing
+                begin_m = re.match(r"^\s*A\s+new\s+global\s+quest\s+has\s+begun\s*:\s*(?P<name>.+?)\s*[!\.]?\s*$", cleaned_marker, re.IGNORECASE)
+                if begin_m:
+                    # Hold quest name for a short time to await objective line
+                    self._globalquest_name = (begin_m.group('name') or '').strip()
+                    self._globalquest_pending_until_ms = now_ms + 3000
+                    if DEBUG_MODE:
+                        debug_message(f"Quest begin: name='{self._globalquest_name}' pending 3s")
+                    # If we previously saw an objective first and it's still fresh, combine immediately
+                    try:
+                        if getattr(self, '_globalquest_last_objective_until_ms', 0) > now_ms and getattr(self, '_globalquest_last_objective', '').strip():
+                            objective = self._normalize_globalquest_objective(self._globalquest_last_objective)
+                            # Clear stored objective state and pending window
+                            self._globalquest_last_objective = ''
+                            self._globalquest_last_objective_until_ms = 0
+                            self._globalquest_pending_until_ms = 0
+                            quest_name = self._globalquest_name
+                            self._globalquest_name = ''
+                            if not SHOW_SYSTEM_QUEST_MESSAGES:
+                                return True, None
+                            combined_name = quest_name if quest_name.endswith('!') else f"{quest_name}!"
+                            combined = f"{combined_name} {objective}"
+                            fixed_type = 'Quest'
+                            new_entry = type('E', (), dict(Type=fixed_type,
+                                                           Color=entry.Color,
+                                                           Name='[QUEST]',
+                                                           Serial=entry.Serial,
+                                                           Text=combined,
+                                                           Timestamp=entry.Timestamp))
+                            return False, new_entry
+                    except Exception:
+                        pass
+                    return True, None  # hide the begin line itself
+                # Examples: "Objective: Harvest 5000 Logs (Target: 5000)"
+                obj_m = re.match(r"^\s*Objective\s*:\s*(?P<obj>.+?)(?:\s*\(\s*Target\s*:\s*[^\)]*\))?\s*$", cleaned_marker, re.IGNORECASE)
+                if obj_m and getattr(self, '_globalquest_pending_until_ms', 0) > now_ms:
+                    quest_name = getattr(self, '_globalquest_name', '').strip()
+                    # Clear pending state
+                    self._globalquest_pending_until_ms = 0
+                    self._globalquest_name = ''
+                    if quest_name:
+                        if not SHOW_SYSTEM_QUEST_MESSAGES:
+                            return True, None
+                        objective = (obj_m.group('obj') or '').strip()
+                        objective = self._normalize_globalquest_objective(objective)
+                        # Ensure single trailing '!' after name and a single space before objective
+                        combined_name = quest_name if quest_name.endswith('!') else f"{quest_name}!"
+                        combined = f"{combined_name} {objective}"
+                        fixed_type = 'Quest'
+                        new_entry = type('E', (), dict(Type=fixed_type,
+                                                       Color=entry.Color,
+                                                       Name='[QUEST]',
+                                                       Serial=entry.Serial,
+                                                       Text=combined,
+                                                       Timestamp=entry.Timestamp))
+                        return False, new_entry
+                # Defensive: if Objective appears before Begin (rare), hold it briefly and try to pair
+                if obj_m and getattr(self, '_globalquest_pending_until_ms', 0) <= now_ms:
+                    self._globalquest_last_objective = (obj_m.group('obj') or '').strip()
+                    self._globalquest_last_objective_until_ms = now_ms + 3000
+                    if DEBUG_MODE:
+                        debug_message("Quest objective seen before begin; holding for 3s")
+                    return True, None
+            except Exception:
+                pass
+
             # DANGER ZONES handling
             # Accept variations like: [DANGER ZONES ACTIVATED], [Danger Zones Active], etc.
             if re.match(r"^\s*\[\s*danger\s+zone[s]?\s+activ\w*\s*\]\s*$", cleaned_marker, re.IGNORECASE):
                 # arm a short pending window to catch the next regions list line
-                self._danger_zones_pending_until_ms = now_ms + 5000
+                self._danger_zones_pending_until_ms = now_ms + 2000
                 return True, None  # hide the marker itself
-            dz_match = re.match(r"^\s*the\s+following\s+regions\s+are\s+now\s+danger\s+zone[s]?\s*:\s*(?P<list>.+)\s*$", cleaned_marker, re.IGNORECASE)
-            if dz_match and now_ms < self._danger_zones_pending_until_ms:
-                self._danger_zones_pending_until_ms = 0
-                regions_raw = dz_match.group('list') or ''
+            # Unconditional combined list handling: convert directly to Danger entry regardless of pending state
+            dz_list_match = re.match(r"^\s*the\s+following\s+regions\s+are\s+now\s+danger\s+zone[s]?\s*:\s*(?P<list>.+)\s*$", cleaned_marker, re.IGNORECASE)
+            if dz_list_match:
+                regions_raw = dz_list_match.group('list') or ''
                 regions = [r.strip() for r in regions_raw.split(',') if r.strip()]
                 colored = self._colorize_regions(regions)
-                # Build a unified Danger entry; content includes per-region color tags
                 fixed_type = 'Danger'
                 new_entry = type('E', (), dict(Type=fixed_type,
                                                Color=entry.Color,
                                                Name='[DANGER ZONE]',
                                                Serial=entry.Serial,
-                                               Text=colored,  # already HTML colored
+                                               Text=colored,
                                                Timestamp=entry.Timestamp))
                 return False, new_entry
             # Fallback: if the line contains 'danger zone' and a colon-separated list, classify as Danger even without prior marker
@@ -875,13 +1096,18 @@ class JournalFilterUI:
                     return False, new_entry
             if re.match(r"^\s*\[\s*shrine\s+corruption\s*\]\s*$", cleaned_marker, re.IGNORECASE):
                 # Hold for a short window so we can coalesce the next virtue attack line
-                self._shrine_corruption_pending_until_ms = now_ms + 5000
+                self._shrine_corruption_pending_until_ms = now_ms + 2000
                 return True, None  # hide the marker itself
 
             # Hide Quest Progress lines if disabled
             try:
-                if (not SHOW_SYSTEM_QUEST_PROGRESS) and re.match(r"^\s*quest\s+progress\b", cleaned_marker, re.IGNORECASE):
-                    return True, None
+                if not SHOW_SYSTEM_QUEST_PROGRESS:
+                    # Hide any variant that includes 'Quest Progress:' (e.g., 'Global Quest Progress: ...')
+                    if re.search(r"\bquest\s+progress\s*:\s*", cleaned_marker, re.IGNORECASE):
+                        return True, None
+                    # Backward compatibility: also hide lines that start with 'Quest Progress' even without a colon
+                    if re.match(r"^\s*quest\s+progress\b", cleaned_marker, re.IGNORECASE):
+                        return True, None
             except Exception:
                 pass
 
@@ -1180,6 +1406,11 @@ class JournalFilterUI:
             try:
                 if ALERT_ATTACK_SUBSTRING.lower() in plain_text.lower():
                     html_text = f"<BASEFONT COLOR=\"{ALERT_ATTACK_COLOR}\">{plain_text}</BASEFONT>"
+            except Exception:
+                pass
+            # Ensure plain_text contains no HTML tags so span calculation is based on visible characters
+            try:
+                plain_text = self._strip_html_tags(plain_text)
             except Exception:
                 pass
             return html_text, plain_text

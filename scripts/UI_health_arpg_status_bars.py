@@ -13,11 +13,11 @@ bandage duration
 add color dict for changing color scheme ( Blue to Orange gradient )
 update to use optional setting.json , this way we can still default the gump locations to be visible on small resolution (laptop) , then have specific favored placement set . maybe this could be visible in first time usage , like a LOCK , that once clicked it hides the editablity and now loads into the placement of gump for your monitor 
 add global toggle for emoting , and features
-
+add in check if logged in , currently this shows on the login screen after logging out
 add bandage duration and poison tick timing so we can better visualize 
 
 HOTKEY:: AutoStart on Login
-VERSION :: 20250831
+VERSION :: 20250908
 """
 
 import time
@@ -174,6 +174,25 @@ class ARPGStatusBars:
             "low": 0.4,       # 40% health
             "medium": 0.7     # 70% health
         }
+
+    # ---- Safe rect helpers to prevent invalid texture sizes ----
+    def _clamp_int(self, v, lo, hi, fallback):
+        try:
+            iv = int(v)
+            if iv < lo:
+                return lo
+            if iv > hi:
+                return hi
+            return iv
+        except Exception:
+            return int(fallback)
+
+    def _safe_rect(self, x, y, w, h, max_w=1200, max_h=1200):
+        sx = self._clamp_int(x, 0, 4096, 0)
+        sy = self._clamp_int(y, 0, 4096, 0)
+        sw = self._clamp_int(w, 1, int(max_w), 1)
+        sh = self._clamp_int(h, 1, int(max_h), 1)
+        return sx, sy, sw, sh
         
     def debug_message(self, message, color=68):
         """Send debug message if DEBUG_MODE is enabled"""
@@ -273,9 +292,18 @@ class ARPGStatusBars:
         art = self.art["bar"]["small"] if is_small else self.art["bar"]["large"]
         dims = SEGMENT_DIMENSIONS["SMALL"] if is_small else SEGMENT_DIMENSIONS["LARGE"]
         
-        # Calculate segments
+        # Calculate segments (clamped for safety)
         num_segments = width // dims["WIDTH"]
+        # Prevent pathological values
+        if num_segments < 1:
+            num_segments = 1
+        elif num_segments > 256:
+            num_segments = 256
         filled_segments = int((current / maximum) * num_segments) if maximum > 0 else 0
+        if filled_segments < 0:
+            filled_segments = 0
+        elif filled_segments > num_segments:
+            filled_segments = num_segments
         
         # Get current time for change animation (only for health and mana)
         current_time = time.time() * 1000
@@ -286,7 +314,7 @@ class ARPGStatusBars:
             if current != previous:
                 if current < previous:  # Resource decreased
                     start_seg = filled_segments
-                    end_seg = int((previous / maximum) * num_segments)
+                    end_seg = int((previous / maximum) * num_segments) if maximum > 0 else 0
                     self.changed_segments[bar_type].extend([
                         {"segment": i, "time": current_time}
                         for i in range(start_seg, end_seg)
@@ -328,8 +356,9 @@ class ARPGStatusBars:
                 else:
                     color = self.segment_colors["depleted"]
             
-            # Draw segment
-            Gumps.AddImage(gump, int(segment_x), int(y), art, color)
+            # Draw segment (clamp X/Y)
+            seg_x, seg_y, _, _ = self._safe_rect(segment_x, y, 1, 1)
+            Gumps.AddImage(gump, int(seg_x), int(seg_y), art, color)
             
     def check_journal(self):
         """Check journal for status effect messages"""
@@ -378,13 +407,15 @@ class ARPGStatusBars:
                 color = config["flash_color"]
         
         # Draw background (darker version of effect color)
-        Gumps.AddImageTiled(gump, x, y, width, height,
-                           self.art["bar"]["small"])
+        rx, ry, rw, rh = self._safe_rect(x, y, width, height)
+        if rw > 0 and rh > 0:
+            Gumps.AddImageTiled(gump, rx, ry, rw, rh, self.art["bar"]["small"])
         
         # Draw filled portion
         if filled_width > 0:
-            Gumps.AddImageTiled(gump, x, y, filled_width, height,
-                               self.art["bar"]["small"])
+            fx, fy, fw, fh = self._safe_rect(x, y, filled_width, height)
+            if fw > 0 and fh > 0:
+                Gumps.AddImageTiled(gump, fx, fy, fw, fh, self.art["bar"]["small"])
             
     def create_gump(self):
         """Create the status bars gump"""
@@ -403,11 +434,14 @@ class ARPGStatusBars:
                           self.stamina_height +
                           status_section_height +
                           self.spacing * 4 + 4))  # Minimal padding, scaled down
+            # Clamp overall background size
+            bg_x, bg_y, bg_w, bg_h = self._safe_rect(0, 0, total_width, total_height)
             
-            # Add background with pure black tint
-            Gumps.AddBackground(gump, 0, 0, total_width, total_height, self.art["background"])
-            Gumps.AddImage(gump, 0, 0, self.art["background"], 0)  # Pure black tint
-            Gumps.AddAlphaRegion(gump, 0, 0, total_width, total_height)
+            # Add background with pure black tint (guard against degenerate sizes)
+            if bg_w > 0 and bg_h > 0:
+                Gumps.AddBackground(gump, bg_x, bg_y, bg_w, bg_h, self.art["background"])
+                Gumps.AddImage(gump, bg_x, bg_y, self.art["background"], 0)  # Pure black tint
+                Gumps.AddAlphaRegion(gump, bg_x, bg_y, bg_w, bg_h)
             
             # Health bar
             y_pos = 5
@@ -416,9 +450,11 @@ class ARPGStatusBars:
             # Health value with color based on percentage
             health_text = str(Player.Hits)
             text_x = (self.bar_width // 2) - (len(health_text) * 4)
-            Gumps.AddLabel(gump, text_x + 1, y_pos + 2, 
+            lx1, ly1, _, _ = self._safe_rect(text_x + 1, y_pos + 2, 1, 1)
+            Gumps.AddLabel(gump, lx1, ly1, 
                           self.colors["text_border"], health_text)
-            Gumps.AddLabel(gump, text_x, y_pos + 1, 
+            lx2, ly2, _, _ = self._safe_rect(text_x, y_pos + 1, 1, 1)
+            Gumps.AddLabel(gump, lx2, ly2, 
                           self.get_bar_color(Player.Hits, Player.HitsMax, "health"), health_text)
             
             # Mana bar
@@ -428,9 +464,11 @@ class ARPGStatusBars:
             # Mana value in blue
             mana_text = str(Player.Mana)
             text_x = (self.bar_width // 2) - (len(mana_text) * 4)
-            Gumps.AddLabel(gump, text_x + 1, y_pos + 2, 
+            mx1, my1, _, _ = self._safe_rect(text_x + 1, y_pos + 2, 1, 1)
+            Gumps.AddLabel(gump, mx1, my1, 
                           self.colors["text_border"], mana_text)
-            Gumps.AddLabel(gump, text_x, y_pos + 1, 
+            mx2, my2, _, _ = self._safe_rect(text_x, y_pos + 1, 1, 1)
+            Gumps.AddLabel(gump, mx2, my2, 
                           self.colors["mana"]["text"], mana_text)
             
             # Stamina bar (no text)
@@ -446,10 +484,14 @@ class ARPGStatusBars:
                 bandage_y = y_pos + self.stamina_height + self.spacing
                 color = self.colors["health"]["high"]  # Bright green, like stamina
                 # Draw background bar (dark)
-                Gumps.AddImageTiled(gump, 5, bandage_y, self.bar_width, self.stamina_height, self.art["bar"]["small"])
+                bx, by, bw, bh = self._safe_rect(5, bandage_y, self.bar_width, self.stamina_height)
+                if bw > 0 and bh > 0:
+                    Gumps.AddImageTiled(gump, bx, by, bw, bh, self.art["bar"]["small"])
                 # Draw filled portion (fills as time passes)
                 if bandage_width > 0:
-                    Gumps.AddImageTiled(gump, 5, bandage_y, bandage_width, self.stamina_height, self.art["bar"]["small"])
+                    bfx, bfy, bfw, bfh = self._safe_rect(5, bandage_y, bandage_width, self.stamina_height)
+                    if bfw > 0 and bfh > 0:
+                        Gumps.AddImageTiled(gump, bfx, bfy, bfw, bfh, self.art["bar"]["small"])
                 y_pos = bandage_y
 
             # Status effect bars
