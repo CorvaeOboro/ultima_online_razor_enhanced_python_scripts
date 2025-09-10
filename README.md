@@ -24,13 +24,18 @@ user interface custom gumps
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_health_bar_long.gif?raw=true"/>
 - [UI_summon_health_monitor.py](scripts/UI_summon_health_monitor.py) – display the health of summoned creatures at a consistent position
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_summons_health.png?raw=true"/>
-- [UI_spell_hotbar_hotkeys.py](scripts/UI_spell_hotbar_hotkeys.py) – the example Spell hotbar with added hotkey display
 - [UI_experience_progress_tracker.py](scripts/UI_experience_progress_tracker.py) – visualize progression system as progress bar , parsed from journal
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/UI_experience_progress_tracker.png?raw=true"/>
 - [UI_boss_healthbar.py](scripts/UI_boss_healthbar.py) – large boss health bar appears at top of screen when nearby known bosses
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_boss_health_bar.png?raw=true"/>
 - [UI_walia_item_inspect.py](scripts/UI_walia_item_inspect.py) – WALIA (What Am I Looking At) in-game item inspection to display detailed properties, crafting info, and custom descriptions
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info.png?raw=true"/>
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info_20250903.png?raw=true"/>
+- [UI_journal_filtered.py](scripts/UI_journal_filtered.py) – minimal journal filtered and focused on local chat and events
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_journal_filtered.png?raw=true"/>
+- [UI_layout_preset.py](scripts/UI_layout_preset.py) – move gumps to specified positions
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_layout_preset.png?raw=true"/>
+
 
 ## RITUAL
 ritual magic 
