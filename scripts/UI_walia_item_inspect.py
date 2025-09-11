@@ -18,8 +18,9 @@ add the artifact weapons
 ** issues = item properties through api limited to 4 ? therefore the display is not displaying the full properties **
 
 HOTKEY:: AutoStart on Login
-VERSION:: 20250908
+VERSION:: 20250909
 """
+
 import re # regex parsing the text
 import os # reading the crafting json , could remove if hardcoded data
 import json # maybe we conditionally load this if a crafting_recipe.json is found? that way no dependency for general use
@@ -342,6 +343,89 @@ KNOWN_ITEMS.update(KNOWN_ENCHANTING_ITEMS)
 KNOWN_ITEMS.update(KNOWN_QUEST_ITEMS)
 KNOWN_ITEMS.update(KNOWN_SCROLL_ITEMS)
 
+# Known artifact weapons with special descriptions (match by ItemID and exact Name)
+# Format: {'item_id': int, 'name': str, 'description': str}
+# Example: "Aegis Breaker" shares the same ItemID as a normal mace (0x0F5C) but includes an extra description.
+KNOWN_ARTIFACT_WEAPON_ITEMS = [
+    # SWORDS
+    { 'item_id': 0x0F5E, 'name': "Pridestalker's Blade", 'description': '<basefont color=#FFB84D>Stacking Attack Speed (3)</basefont>' },  # broadsword
+    { 'item_id': 0x1441, 'name': 'Plague', 'description': '<basefont color=#5CB85C>Disease enemy</basefont>' },                  # cutlass
+    { 'item_id': 0x13FF, 'name': "Death's Dance", 'description': '<basefont color=#FF6B6B>Extra damage if enemy injured</basefont>' },          # katana
+    { 'item_id': 0x0F61, 'name': 'Zeal', 'description': '<basefont color=#FFB84D>Stacking Attack Speed (3)</basefont>' },                    # longsword
+    { 'item_id': 0x13B6, 'name': 'Spectral Scimitar', 'description': '<basefont color=#FF6B6B>Ignore Armor</basefont>' },       # scimitar
+    { 'item_id': 0x13B9, 'name': "Blackthorn's Blade", 'description': '<basefont color=#FF6B6B>Stacking Damage (3)</basefont>' },     # viking sword
+    { 'item_id': 0x26BB, 'name': 'Breath of the Dead', 'description': '<basefont color=#FF6B6B>Damage at the cost of your own hit points</basefont>' },      # bone harvester
+    { 'item_id': 0x0EC3, 'name': 'Decapitator', 'description': '<basefont color=#FF6B6B>Bleeding damage</basefont>' },             # cleaver
+    { 'item_id': 0x13F6, 'name': "Butcher's Carver", 'description': '<basefont color=#FF6B6B>Leech hit points</basefont>' },       # butcher knife
+    { 'item_id': 0x0EC4, 'name': 'Deviousness', 'description': '<basefont color=#FF6B6B>Leech hit points</basefont>' },             # skinning knife
+    # AXE TYPES
+    { 'item_id': 0x0F4D, 'name': 'Demonic Embrace', 'description': '<basefont color=#FF6B6B>Burning damage</basefont>, <basefont color=#FF6B6B>extra vs burning</basefont>' },         # bardiche
+    { 'item_id': 0x26BA, 'name': 'Galeforce', 'description': '<basefont color=#FF6B6B>Creates fire field under enemy</basefont>' },               # scythe
+    { 'item_id': 0x0F4B, 'name': "The Twins' Rage", 'description': '<basefont color=#FFB84D>Double Attack</basefont>' },        # double axe
+    { 'item_id': 0x13B0, 'name': 'Siege Breaker', 'description': '<basefont color=#FF6B6B>Shatters Armor</basefont>' },           # war axe
+    { 'item_id': 0x1443, 'name': "Titan's Fall", 'description': '<basefont color=#FFB84D>Stacking Accuracy (3)</basefont>' },           # two handed axe
+    { 'item_id': 0x13FB, 'name': "Giant's Will", 'description': '<basefont color=#FF6B6B>Double damage</basefont>' },           # large battle axe
+    { 'item_id': 0x0F43, 'name': 'Windseeker', 'description': '<basefont color=#FFB84D>Stacking Attack Speed (3)</basefont>' },              # hatchet
+    { 'item_id': 0x143E, 'name': 'Infernal Maw', 'description': '<basefont color=#FF6B6B>Creates fire field under enemy</basefont>' },            # halberd
+    { 'item_id': 0x0F45, 'name': "Executioner's Calling", 'description': '<basefont color=#FF6B6B>Extra damage if enemy injured</basefont>' },  # executioner's axe
+    { 'item_id': 0x0F47, 'name': 'World Splitter', 'description': '<basefont color=#FF6B6B>Stacking Damage (3)</basefont>' },          # battle axe
+    { 'item_id': 0x0F49, 'name': 'Frostbite', 'description': '<basefont color=#FF6B6B>Stacking Damage (3)</basefont>' },               # axe
+    { 'item_id': 0x26BD, 'name': 'Lethality', 'description': '<basefont color=#5CB85C>Lethal poison</basefont>' },               # bladed staff
+    { 'item_id': 0x2D28, 'name': 'The Condemner', 'description': '<basefont color=#FF6B6B>Stacking Damage (3)</basefont>' },           # ornate axe
+    # FENCING
+    { 'item_id': 0x1400, 'name': 'Silver Fang', 'description': '<basefont color=#5CB85C>Infect damage</basefont>' },             # kryss
+    { 'item_id': 0x0F52, 'name': "Serpent's Fang", 'description': '<basefont color=#FF6B6B>Extra damage vs poisoned</basefont>' },         # dagger
+    { 'item_id': 0x1405, 'name': 'Bloodthirster', 'description': '<basefont color=#FF6B6B>Leech hit points</basefont>' },           # war fork
+    { 'item_id': 0x0E87, 'name': 'No Current Artifact for Pitchfork', 'description': 'PENDING' }, # pitchfork
+    { 'item_id': 0x0F62, 'name': 'Mortal Reminder', 'description': '<basefont color=#3FA9FF>Stun enemy</basefont>' },         # spear
+    { 'item_id': 0x26BF, 'name': 'Deathfire Grasp', 'description': '<basefont color=#FF6B6B>Summons a meteor over enemy</basefont>' },         # double bladed staff
+    { 'item_id': 0x26BE, 'name': 'The Taskmaster', 'description': '<basefont color=#5CB85C>Poison surrounding enemies</basefont>' },          # pike
+    { 'item_id': 0x1403, 'name': 'Corrupted Pike', 'description': '<basefont color=#B084FF>Curses enemy</basefont>' },          # short spear
+    # MACE & STAVES
+    { 'item_id': 0x13B4, 'name': 'Umbral Shard', 'description': '<basefont color=#FF6B6B>Bleeding damage</basefont>' },            # club
+    { 'item_id': 0x0F5C, 'name': 'Aegis Breaker', 'description': '<basefont color=#FF6B6B>Shatters Armor</basefont>' },# Aegis Breaker already present for mace (0x0F5C)
+    { 'item_id': 0x143B, 'name': 'Harbringer', 'description': '<basefont color=#FF6B6B>Burning damage</basefont>, <basefont color=#FF6B6B>extra vs burning</basefont>' },              # maul
+    { 'item_id': 0x0E86, 'name': 'No Current PickAxe Artifact', 'description': 'PENDING' },# pickaxe
+    { 'item_id': 0x143D, 'name': 'The Impaler', 'description': '<basefont color=#FF6B6B>Leech hit points</basefont>' },             # hammer pick
+    { 'item_id': 0x1439, 'name': 'Hellclap', 'description': '<basefont color=#FF6B6B>Burning damage</basefont>, <basefont color=#FF6B6B>extra vs burning</basefont>' },                # war hammer
+    { 'item_id': 0x1407, 'name': 'Tantrum', 'description': '<basefont color=#3FA9FF>Stun enemy</basefont>' },                 # war mace
+    { 'item_id': 0x0E89, 'name': 'Mindcry', 'description': '<basefont color=#FFB84D>Stacking Accuracy (3)</basefont>' },                 # quarter staff
+    { 'item_id': 0x13F8, 'name': 'The Peacekeeper', 'description': '<basefont color=#3FA9FF>Calms surrounding creatures</basefont>' },         # gnarled staff
+    { 'item_id': 0x0DF0, 'name': 'The Absorber', 'description': '<basefont color=#B084FF>Gain spell reflection</basefont>' },            # black staff
+    { 'item_id': 0x0E81, 'name': 'The Shepherd', 'description': 'PENDING' },            # shepherd's crook
+    # ARCHERY
+    { 'item_id': 0x13B2, 'name': 'Elven Bow', 'description': '<basefont color=#5CB85C>Heals friendly creatures</basefont>' },               # bow
+    { 'item_id': 0x13FD, 'name': 'Widow Maker', 'description': '<basefont color=#B084FF>Shadow step</basefont>' },             # heavy crossbow
+    { 'item_id': 0x0F50, 'name': 'Repugnance', 'description': '<basefont color=#FFB84D>Knockback</basefont>, <basefont color=#FF6B6B>more damage if pinned</basefont>' },              # crossbow
+    { 'item_id': 0x26C2, 'name': 'The Dryad Bow', 'description': '<basefont color=#FFB84D>Distance based damage</basefont>' },           # composite bow
+    { 'item_id': 0x26C3, 'name': 'Wraith Whisperer', 'description': '<basefont color=#FF6B6B>Ignore armor</basefont>' },        # repeating crossbow
+    { 'item_id': 0x27A5, 'name': 'Bow of Infinite Swarms', 'description': '<basefont color=#FFB84D>Stacking Attack speed (3)</basefont>' },  # yumi
+]
+
+def resolve_artifact_weapon_description(item_id: int, item_name: str):
+    """Return artifact description if this item matches a known artifact weapon by id and name.
+
+    Matching is case-insensitive on name and exact on item_id.
+    """
+    try:
+        iid = int(item_id)
+    except Exception:
+        iid = item_id
+    nm = (item_name or '').strip()
+    if not nm or iid is None:
+        return None
+    low = nm.lower()
+    try:
+        for entry in (KNOWN_ARTIFACT_WEAPON_ITEMS or []):
+            try:
+                if int(entry.get('item_id')) == iid and str(entry.get('name', '')).strip().lower() == low:
+                    return entry.get('description')
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None
+
 # Colors (Razor Enhanced gump label hues)
 COLORS = {
     'title': 68,       # blue
@@ -530,9 +614,9 @@ WEAPON_DATA_BY_ITEMID = {
     0x0E89: {'type': 'Staff', 'hands': '2h', 'name': 'quarter staff', 'skill': 'Mace Fighting'},
 
     # --- Fencing ---
-    0x0EC3: {'type': 'Fencing', 'hands': '1h', 'name': 'cleaver', 'skill': 'Fencing'},
-    0x0EC4: {'type': 'Fencing', 'hands': '1h', 'name': 'skinning knife', 'skill': 'Fencing'},
-    0x13F6: {'type': 'Fencing', 'hands': '1h', 'name': 'butcher knife', 'skill': 'Fencing'},
+    0x0EC3: {'type': 'Sword', 'hands': '1h', 'name': 'cleaver', 'skill': 'Sword'}, # originally fencing moved to swords
+    0x0EC4: {'type': 'Sword', 'hands': '1h', 'name': 'skinning knife', 'skill': 'Sword'}, # originally fencing moved to swords
+    0x13F6: {'type': 'Sword', 'hands': '1h', 'name': 'butcher knife', 'skill': 'Sword'}, # originally fencing moved to swords
     0x0F52: {'type': 'Fencing', 'hands': '1h', 'name': 'dagger', 'skill': 'Fencing'},
     0x0F62: {'type': 'Fencing', 'hands': '2h', 'name': 'spear', 'skill': 'Fencing'},
     0x1403: {'type': 'Fencing', 'hands': '2h', 'name': 'short spear', 'skill': 'Fencing'},
@@ -1667,6 +1751,16 @@ def build_text_sections(target_item, usages: list) -> list:
             sections.append(TextSection(modifier_lines, 'modifiers', 10))
             debug_msg(f"ADDED SECTION: modifiers (priority 10, {len(modifier_lines)} lines)", COLORS['warn'])
         
+        # Add artifact weapon description right below modifiers (priority 12)
+        try:
+            artifact_desc = resolve_artifact_weapon_description(item_id, item_display_name)
+        except Exception:
+            artifact_desc = None
+        if artifact_desc:
+            sep_needed_art = bool(modifier_lines)
+            sections.append(TextSection([f"<basefont color=#FF550F>Artifact: {artifact_desc}</basefont>"], 'artifact', 12, separator_before=sep_needed_art))
+            debug_msg(f"ADDED SECTION: artifact (priority 12, 1 line, separator: {sep_needed_art})", COLORS['info'])
+
         # Add regular properties after modifiers (priority 15) with separator if modifiers exist
         if regular_lines:
             separator_needed = bool(modifier_lines) or bool(is_weapon and (weapon_damage_text or weapon_speed_text))
@@ -1779,9 +1873,10 @@ def build_text_sections(target_item, usages: list) -> list:
             primary_ability, secondary_ability = get_weapon_abilities(item_id)
             debug_msg(f"Raw API result: primary='{primary_ability}', secondary='{secondary_ability}'", COLORS['cat'])
             if primary_ability:
-                equipment_lines.append(f"<basefont color=#FFD700>Primary: {primary_ability}</basefont>")
+                equipment_lines.append(f"<basefont color=#333333>Primary: {primary_ability}</basefont>")  # previous color: #FFD700 (yellow)
             if secondary_ability:
-                equipment_lines.append(f"<basefont color=#87CEEB>Secondary: {secondary_ability}</basefont>")
+                equipment_lines.append(f"<basefont color=#333333>Secondary: {secondary_ability}</basefont>")  # previous color: #87CEEB (light blue)
+
         else:
             debug_msg(f"Item is not in weapon data dictionary", COLORS['cat'])
     
