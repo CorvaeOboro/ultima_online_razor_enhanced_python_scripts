@@ -1,7 +1,7 @@
 """
-UI WALIA Item Inspect - a Razor Enhanced Python Script for Ultima Online
+UI WAILA Item Inspect - a Razor Enhanced Python Script for Ultima Online
 
-WALIA ( What Am I Looking At ) , display item information , formatted with extra details
+WAILA ( What Am I Looking At ) , display item information , formatted with extra details
 a custom gump running in background as a button ( book shelf )
 clicking the info bookshelf button triggers the item inspection targeter then select an item 
 a custom gump displays the item info and the items that can be crafted with it 
@@ -12,10 +12,12 @@ TODO:
 - armor values update ( currently only 30% of modifier combinations known)
 - add materials handling
 - remove the crafting json logic ( we are adding data directly to the script currently )
-- focus on core items with mechanics ( recall rune ) and weapons and armor
-add the artifact weapons
+- weapon exceptional = +20 dmg
 
 ** issues = item properties through api limited to 4 ? therefore the display is not displaying the full properties **
+
+TROUBLESHOOTING:
+- if "import" errors , download iron python 3.4.2 and copy the files in its "Lib" folder into your RazorEnhanced "Lib" folder 
 
 HOTKEY:: AutoStart on Login
 VERSION:: 20250909
@@ -76,7 +78,7 @@ PROPERTY_REMAP = {
     'force': '<basefont color=#FF6B6B>+ 5 Damage</basefont> <basefont color=#FFB84D>( Force )</basefont>',
     'power': '<basefont color=#FF6B6B>+ 7 Damage</basefont> <basefont color=#FFB84D>( Power )</basefont>',
     'vanquishing': '<basefont color=#FF6B6B>+ 9 Damage</basefont> <basefont color=#FFB84D>( Vanquishing )</basefont>',
-    'exceptional': '<basefont color=#FF6B6B>+ 4 Damage</basefont> <basefont color=#FFB84D>( Exceptional )</basefont>',
+    'exceptional': '<basefont color=#FF6B6B>+ 20 Damage</basefont> <basefont color=#FFB84D>( Exceptional )</basefont>', # default was +4 damage , unchained = +20
     # Slayer tiers — numeric-first , orange
     'lesser slaying': '<basefont color=#B084FF>+ 15%</basefont> vs type <basefont color=#FFB84D>( Lesser Slayer )</basefont>',
     'slaying': '<basefont color=#B084FF>+ 20%</basefont> vs type <basefont color=#FFB84D>( Slayer )</basefont>',
@@ -159,7 +161,7 @@ KNOWN_ENCHANTING_ITEMS = {
     ],
     (0x5748, None): [  # Bottle Ichor
         "an enchanting material",
-        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#5CB85C>Weapon Life Leech</basefont>",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for <basefont color=#5CB85C>Weapon Lifesteal</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
     ],
     (0x3198, None): [  # Blue Diamond
@@ -229,7 +231,7 @@ KNOWN_ENCHANTING_ITEMS = {
     ],
     (0x3191, None): [  # Luminescent (FungusLuminescent)
         "a glowing mushroom of luminescent fungi",
-        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Spell Leech</basefont>",
+        "used at an <basefont color=#FFB84D>Enchantment Table</basefont> for Spellbook <basefont color=#3FA9FF>Spell Lifesteal</basefont>",
         "collected from <basefont color=#8B4513>Scavenging</basefont> and salvaging <basefont color=#3FA9FF>Magical</basefont> items ",
         #imbuing "an Imbuing ingredients to imbue the Hit Point Increase, Mana Increase and Stamina Increase property onto items.",
         #crafting "used for crafting the <basefont color=#FF6B6B>Darkglow Potion</basefont>",
@@ -354,10 +356,10 @@ KNOWN_ARTIFACT_WEAPON_ITEMS = [
     { 'item_id': 0x0F61, 'name': 'Zeal', 'description': '<basefont color=#FFB84D>Stacking Attack Speed (3)</basefont>' },                    # longsword
     { 'item_id': 0x13B6, 'name': 'Spectral Scimitar', 'description': '<basefont color=#FF6B6B>Ignore Armor</basefont>' },       # scimitar
     { 'item_id': 0x13B9, 'name': "Blackthorn's Blade", 'description': '<basefont color=#FF6B6B>Stacking Damage (3)</basefont>' },     # viking sword
-    { 'item_id': 0x26BB, 'name': 'Breath of the Dead', 'description': '<basefont color=#FF6B6B>Damage at the cost of your own hit points</basefont>' },      # bone harvester
+    { 'item_id': 0x26BB, 'name': 'Breath of the Dead', 'description': '<basefont color=#FF6B6B>Damage at the cost of your own life</basefont>' },      # bone harvester
     { 'item_id': 0x0EC3, 'name': 'Decapitator', 'description': '<basefont color=#FF6B6B>Bleeding damage</basefont>' },             # cleaver
-    { 'item_id': 0x13F6, 'name': "Butcher's Carver", 'description': '<basefont color=#FF6B6B>Leech hit points</basefont>' },       # butcher knife
-    { 'item_id': 0x0EC4, 'name': 'Deviousness', 'description': '<basefont color=#FF6B6B>Leech hit points</basefont>' },             # skinning knife
+    { 'item_id': 0x13F6, 'name': "Butcher's Carver", 'description': '<basefont color=#FF6B6B>Lifesteal</basefont>' },       # butcher knife
+    { 'item_id': 0x0EC4, 'name': 'Deviousness', 'description': '<basefont color=#FF6B6B>Lifesteal</basefont>' },             # skinning knife
     # AXE TYPES
     { 'item_id': 0x0F4D, 'name': 'Demonic Embrace', 'description': '<basefont color=#FF6B6B>Burning damage</basefont>, <basefont color=#FF6B6B>extra vs burning</basefont>' },         # bardiche
     { 'item_id': 0x26BA, 'name': 'Galeforce', 'description': '<basefont color=#FF6B6B>Creates fire field under enemy</basefont>' },               # scythe
@@ -375,7 +377,7 @@ KNOWN_ARTIFACT_WEAPON_ITEMS = [
     # FENCING
     { 'item_id': 0x1400, 'name': 'Silver Fang', 'description': '<basefont color=#5CB85C>Infect damage</basefont>' },             # kryss
     { 'item_id': 0x0F52, 'name': "Serpent's Fang", 'description': '<basefont color=#FF6B6B>Extra damage vs poisoned</basefont>' },         # dagger
-    { 'item_id': 0x1405, 'name': 'Bloodthirster', 'description': '<basefont color=#FF6B6B>Leech hit points</basefont>' },           # war fork
+    { 'item_id': 0x1405, 'name': 'Bloodthirster', 'description': '<basefont color=#FF6B6B>Lifesteal</basefont>' },           # war fork
     { 'item_id': 0x0E87, 'name': 'No Current Artifact for Pitchfork', 'description': 'PENDING' }, # pitchfork
     { 'item_id': 0x0F62, 'name': 'Mortal Reminder', 'description': '<basefont color=#3FA9FF>Stun enemy</basefont>' },         # spear
     { 'item_id': 0x26BF, 'name': 'Deathfire Grasp', 'description': '<basefont color=#FF6B6B>Summons a meteor over enemy</basefont>' },         # double bladed staff
@@ -386,7 +388,7 @@ KNOWN_ARTIFACT_WEAPON_ITEMS = [
     { 'item_id': 0x0F5C, 'name': 'Aegis Breaker', 'description': '<basefont color=#FF6B6B>Shatters Armor</basefont>' },# Aegis Breaker already present for mace (0x0F5C)
     { 'item_id': 0x143B, 'name': 'Harbringer', 'description': '<basefont color=#FF6B6B>Burning damage</basefont>, <basefont color=#FF6B6B>extra vs burning</basefont>' },              # maul
     { 'item_id': 0x0E86, 'name': 'No Current PickAxe Artifact', 'description': 'PENDING' },# pickaxe
-    { 'item_id': 0x143D, 'name': 'The Impaler', 'description': '<basefont color=#FF6B6B>Leech hit points</basefont>' },             # hammer pick
+    { 'item_id': 0x143D, 'name': 'The Impaler', 'description': '<basefont color=#FF6B6B>Lifesteal</basefont>' },             # hammer pick
     { 'item_id': 0x1439, 'name': 'Hellclap', 'description': '<basefont color=#FF6B6B>Burning damage</basefont>, <basefont color=#FF6B6B>extra vs burning</basefont>' },                # war hammer
     { 'item_id': 0x1407, 'name': 'Tantrum', 'description': '<basefont color=#3FA9FF>Stun enemy</basefont>' },                 # war mace
     { 'item_id': 0x0E89, 'name': 'Mindcry', 'description': '<basefont color=#FFB84D>Stacking Accuracy (3)</basefont>' },                 # quarter staff
@@ -402,30 +404,6 @@ KNOWN_ARTIFACT_WEAPON_ITEMS = [
     { 'item_id': 0x27A5, 'name': 'Bow of Infinite Swarms', 'description': '<basefont color=#FFB84D>Stacking Attack speed (3)</basefont>' },  # yumi
 ]
 
-def resolve_artifact_weapon_description(item_id: int, item_name: str):
-    """Return artifact description if this item matches a known artifact weapon by id and name.
-
-    Matching is case-insensitive on name and exact on item_id.
-    """
-    try:
-        iid = int(item_id)
-    except Exception:
-        iid = item_id
-    nm = (item_name or '').strip()
-    if not nm or iid is None:
-        return None
-    low = nm.lower()
-    try:
-        for entry in (KNOWN_ARTIFACT_WEAPON_ITEMS or []):
-            try:
-                if int(entry.get('item_id')) == iid and str(entry.get('name', '')).strip().lower() == low:
-                    return entry.get('description')
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return None
-
 # Colors (Razor Enhanced gump label hues)
 COLORS = {
     'title': 68,       # blue
@@ -437,7 +415,6 @@ COLORS = {
     'info': 1153,      # light gray for info messages
     'success': 63,     # green for success messages
 }
-
 
 # Define which properties are considered "modifiers" that should be displayed first
 MODIFIER_PROPERTIES = {
@@ -731,12 +708,35 @@ def debug_msg(message, color=90):
     if not DEBUG_MODE:
         return
     try:
-        Misc.SendMessage(f"[WALIA] {message}", color)
+        Misc.SendMessage(f"[WAILA] {message}", color)
     except Exception:
         try:
-            print(f"[WALIA] {message}")
+            print(f"[WAILA] {message}")
         except Exception:
             pass
+
+def resolve_artifact_weapon_description(item_id: int, item_name: str):
+    """Return artifact description if this item matches a known artifact weapon by id and name.
+    Matching is case-insensitive on name and exact on item_id.
+    """
+    try:
+        iid = int(item_id)
+    except Exception:
+        iid = item_id
+    nm = (item_name or '').strip()
+    if not nm or iid is None:
+        return None
+    low = nm.lower()
+    try:
+        for entry in (KNOWN_ARTIFACT_WEAPON_ITEMS or []):
+            try:
+                if int(entry.get('item_id')) == iid and str(entry.get('name', '')).strip().lower() == low:
+                    return entry.get('description')
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None
 
 def get_modifier_color_category(property_text):
     """Determine the color category for a modifier based on its content."""
@@ -761,9 +761,6 @@ def format_modifier_text(property_text):
     """Format modifier text with appropriate colors and extract numeric values."""
     color_category = get_modifier_color_category(property_text)
     color = MODIFIER_COLORS[color_category]
-    
-    # Extract numeric values and format them prominently
-    import re
     
     # Look for patterns like "+5", "+ 10", "20", etc.
     number_match = re.search(r'[+\-]?\s*(\d+)', property_text)
@@ -1005,32 +1002,30 @@ def build_material_index(items: list) -> dict:
     - by_name: {normalized_name -> [recipe dicts]}
     - by_fuzzy: {fuzzy_key -> [recipe dicts]}
     """
-    idx = {
+    material_index = {
         'by_id': {},
         'by_name': {},
         'by_fuzzy': {},
     }
-    for rec in (items or []):
-        mats = rec.get('materials') or []
-        for m in mats:
-            # id-based
-            mid = _to_int_id(m.get('id') if m.get('id') is not None else m.get('id_hex'))
-            if isinstance(mid, int):
-                idx['by_id'].setdefault(int(mid), []).append(rec)
-            # name-based
-            nm = _normalize_material_name(m.get('name'))
-            if nm:
-                idx['by_name'].setdefault(nm, []).append(rec)
-                fk = name_to_fuzzy_key(nm)
-                if fk:
-                    idx['by_fuzzy'].setdefault(fk, []).append(rec)
-    return idx
+    for recipe_entry in (items or []):
+        material_entries = recipe_entry.get('materials') or []
+        for material_entry in material_entries:
+            # Index by material id (supports both decimal and hex id fields)
+            material_id_value = _to_int_id(
+                material_entry.get('id') if material_entry.get('id') is not None else material_entry.get('id_hex')
+            )
+            if isinstance(material_id_value, int):
+                material_index['by_id'].setdefault(int(material_id_value), []).append(recipe_entry)
+            # Index by normalized material name (and fuzzy key variant)
+            normalized_material_name = _normalize_material_name(material_entry.get('name'))
+            if normalized_material_name:
+                material_index['by_name'].setdefault(normalized_material_name, []).append(recipe_entry)
+                fuzzy_material_key = name_to_fuzzy_key(normalized_material_name)
+                if fuzzy_material_key:
+                    material_index['by_fuzzy'].setdefault(fuzzy_material_key, []).append(recipe_entry)
+    return material_index
 
 # Razor Enhanced helpers -----------------------------
-
-def _pause(ms):
-    Misc.Pause(int(ms))
-
 
 def _clean_leading_amount(name: str, amount: int) -> str:
     try:
@@ -1049,33 +1044,33 @@ def _clean_leading_amount(name: str, amount: int) -> str:
 
 def get_item_name(item, amount_hint=None):
     try:
-        nm = item.Name
-        if nm:
-            nm = str(nm)
-            amt = amount_hint if amount_hint is not None else item.Amount
-            return _clean_leading_amount(nm, amt)
+        item_name_text = item.Name
+        if item_name_text:
+            item_name_text = str(item_name_text)
+            amount_to_strip = amount_hint if amount_hint is not None else item.Amount
+            return _clean_leading_amount(item_name_text, amount_to_strip)
     except Exception:
         pass
     try:
         Items.WaitForProps(item.Serial, 400)
-        props = Items.GetPropStringList(item.Serial)
-        if props:
-            nm = str(props[0])
-            amt = amount_hint if amount_hint is not None else item.Amount
-            return _clean_leading_amount(nm, amt)
+        property_strings = Items.GetPropStringList(item.Serial)
+        if property_strings:
+            item_name_text = str(property_strings[0])
+            amount_to_strip = amount_hint if amount_hint is not None else item.Amount
+            return _clean_leading_amount(item_name_text, amount_to_strip)
         Items.SingleClick(item.Serial)
-        _pause(150)
+        Misc.Pause(150)
         Items.WaitForProps(item.Serial, 600)
-        props = Items.GetPropStringList(item.Serial)
-        if props:
-            nm = str(props[0])
-            amt = amount_hint if amount_hint is not None else item.Amount
-            return _clean_leading_amount(nm, amt)
+        property_strings = Items.GetPropStringList(item.Serial)
+        if property_strings:
+            item_name_text = str(property_strings[0])
+            amount_to_strip = amount_hint if amount_hint is not None else item.Amount
+            return _clean_leading_amount(item_name_text, amount_to_strip)
     except Exception:
         pass
     return 'Unknown'
 
-def _fmt_hex4(v: int) -> str:
+def _format_hex4(v: int) -> str:
     try:
         return f"0x{int(v)&0xFFFF:04X}"
     except Exception:
@@ -1100,49 +1095,38 @@ def find_usages_for_item(item, index: dict) -> list:
     """Return list of recipes that use the targeted item as a material.
     Matches by itemID, normalized name, or fuzzy name.
     """
-    matches = []
+    matching_recipe_entries = []
     try:
-        gid = int(item.ItemID)
+        target_item_id = int(item.ItemID)
     except Exception:
-        gid = None
-    name = get_item_name(item, amount_hint=getattr(item, 'Amount', 1))
-    n_norm = _normalize_material_name(name)
-    fkey = name_to_fuzzy_key(n_norm)
+        target_item_id = None
+    target_item_display_name = get_item_name(item, amount_hint=getattr(item, 'Amount', 1))
+    normalized_target_item_name = _normalize_material_name(target_item_display_name)
+    fuzzy_target_item_key = name_to_fuzzy_key(normalized_target_item_name)
 
-    seen = set()
-    # by id
-    if isinstance(gid, int) and gid in index.get('by_id', {}):
-        for r in index['by_id'][gid]:
-            k = (r.get('category'), r.get('name'))
-            if k not in seen:
-                matches.append(r)
-                seen.add(k)
-    # by normalized name
-    if n_norm and n_norm in index.get('by_name', {}):
-        for r in index['by_name'][n_norm]:
-            k = (r.get('category'), r.get('name'))
-            if k not in seen:
-                matches.append(r)
-                seen.add(k)
-    # by fuzzy
-    if fkey and fkey in index.get('by_fuzzy', {}):
-        for r in index['by_fuzzy'][fkey]:
-            k = (r.get('category'), r.get('name'))
-            if k not in seen:
-                matches.append(r)
-                seen.add(k)
-    return matches
-
-def _build_item_description(name: str, usages: list) -> str:
-    try:
-        total = len(usages or [])
-        if total <= 0:
-            return "No known crafting usages found."
-        cats = sorted({(u.get('category') or 'Unknown') for u in usages})
-        cats_txt = ', '.join(cats[:6]) + ("…" if len(cats) > 6 else "")
-        return f"Used in {total} recipes across: {cats_txt}"
-    except Exception:
-        return ""
+    seen_recipe_keys = set()
+    # Match by exact item id
+    if isinstance(target_item_id, int) and target_item_id in index.get('by_id', {}):
+        for recipe_entry in index['by_id'][target_item_id]:
+            recipe_key = (recipe_entry.get('category'), recipe_entry.get('name'))
+            if recipe_key not in seen_recipe_keys:
+                matching_recipe_entries.append(recipe_entry)
+                seen_recipe_keys.add(recipe_key)
+    # Match by normalized item name
+    if normalized_target_item_name and normalized_target_item_name in index.get('by_name', {}):
+        for recipe_entry in index['by_name'][normalized_target_item_name]:
+            recipe_key = (recipe_entry.get('category'), recipe_entry.get('name'))
+            if recipe_key not in seen_recipe_keys:
+                matching_recipe_entries.append(recipe_entry)
+                seen_recipe_keys.add(recipe_key)
+    # Match by fuzzy key variant
+    if fuzzy_target_item_key and fuzzy_target_item_key in index.get('by_fuzzy', {}):
+        for recipe_entry in index['by_fuzzy'][fuzzy_target_item_key]:
+            recipe_key = (recipe_entry.get('category'), recipe_entry.get('name'))
+            if recipe_key not in seen_recipe_keys:
+                matching_recipe_entries.append(recipe_entry)
+                seen_recipe_keys.add(recipe_key)
+    return matching_recipe_entries
 
 def _stylize_unicode(text: str, style: str = 'fullwidth') -> str:
     """Return a unicode-styled variant of ASCII text.
@@ -1175,10 +1159,9 @@ def _derive_name_color(prop_list: list) -> str:
     try:
         if not prop_list:
             return '#FFFFFF'
-        import re as _re
         for ln in prop_list:
             s = str(ln).strip()
-            m = _re.search(r"magical\s+intensity\s*\d+\s*\(([^)]+)\)", s, flags=_re.IGNORECASE)
+            m = re.search(r"magical\s+intensity\s*\d+\s*\(([^)]+)\)", s, flags=re.IGNORECASE)
             if m:
                 tier = m.group(1).strip().lower()
                 # Normalize common tier names
@@ -1247,9 +1230,6 @@ def _wrap_line_with_default_color(line: str, default_color: str = '#BBBBBB') -> 
     if '<basefont' not in line:
         return f"<basefont color={default_color}>{line}</basefont>"
     
-    # Split on basefont tags to inject default color around them
-    import re
-    
     # Find all basefont color tags and their positions
     basefont_pattern = r'<basefont\s+color=[^>]*>'
     end_pattern = r'</basefont>'
@@ -1289,16 +1269,8 @@ def _wrap_line_with_default_color(line: str, default_color: str = '#BBBBBB') -> 
     result += "</basefont>"
     return result
 
-def _estimate_text_width(text: str, char_width: int = 7) -> int:
-    """Estimate text width in pixels, ignoring HTML tags."""
-    import re
-    # Remove HTML tags for width calculation
-    clean_text = re.sub(r'<[^>]+>', '', text)
-    return len(clean_text) * char_width
-
 def _split_line_for_wrapping(line: str, max_chars: int = 30) -> list:
     """Split a long line into multiple lines based on character count and word boundaries."""
-    import re
     
     # Remove HTML tags to get clean text for length calculation
     clean_text = re.sub(r'<[^>]+>', '', line)
@@ -1336,7 +1308,6 @@ def _split_line_for_wrapping(line: str, max_chars: int = 30) -> list:
 
 def _split_html_line(line: str, max_chars: int = 30) -> list:
     """Split HTML-formatted line while preserving color formatting."""
-    import re
     
     # Extract text segments and their formatting
     segments = []
@@ -1417,37 +1388,45 @@ def _rebuild_html_line(segments: list) -> str:
     result += "</basefont>"
     return result
 
-def _compute_ar_bonus_text(equip_slot: str, raw_lower: str) -> str or None:
-    """Given an equip slot and a property line (lowercased), return a slot-specific AR bonus text.
-    Returns None when not an AR tier line.
+def _compute_ar_bonus_text(equipment_slot: str, property_text_lowercase: str) -> str or None:
+    """Return a slot-specific Armor Rating (AR) bonus label for an AR tier line.
+    Parameters:
+      - equipment_slot: logical slot name (e.g., 'head', 'body', 'shield')
+      - property_text_lowercase: item property line already lowercased
+    Returns:
+      - A formatted text string like "+ 1.4 AR ( Fortification )" or None if not applicable.
     """
-    # Slot-aware AR bonus computation for armor rating tiers
-    if not equip_slot or not raw_lower:
+    # Validate input
+    if not equipment_slot or not property_text_lowercase:
         return None
-    # Identify AR tier keyword
-    found = None
-    for key in AR_BONUS_TIERS.keys():
-        if key in raw_lower:
-            found = key
+    
+    # Identify which AR tier keyword is present in the property text
+    matched_tier_key = None
+    for tier_key in AR_BONUS_TIERS.keys():
+        if tier_key in property_text_lowercase:
+            matched_tier_key = tier_key
             break
-    if not found:
+    if not matched_tier_key:
         return None
-    t = AR_BONUS_TIERS[found]
-    # Map slot to appropriate bucket
-    slot = (equip_slot or '').lower()
-    if slot in ('neck', 'hand'):
-        delta = t['neck_hands']
-    elif slot in ('arms', 'head', 'legs'):
-        delta = t['arms_head_legs']
-    elif slot == 'body':
-        delta = t['body']
-    elif slot == 'shield':
-        delta = t['shield']
+    
+    tier_values = AR_BONUS_TIERS[matched_tier_key]
+    
+    # Map the equipment slot to the appropriate numeric bucket
+    normalized_slot = (equipment_slot or '').lower()
+    if normalized_slot in ('neck', 'hand'):
+        armor_rating_bonus_delta = tier_values['neck_hands']
+    elif normalized_slot in ('arms', 'head', 'legs'):
+        armor_rating_bonus_delta = tier_values['arms_head_legs']
+    elif normalized_slot == 'body':
+        armor_rating_bonus_delta = tier_values['body']
+    elif normalized_slot == 'shield':
+        armor_rating_bonus_delta = tier_values['shield']
     else:
-        # Non-armor/shield slots: do not display AR percent; suppress line
+        # Non-armor/shield slots: do not display AR bonus; suppress line
         return None
+    
     # Numeric-first formatting
-    return f"+ {delta:g} AR ( {found.capitalize()} )"
+    return f"+ {armor_rating_bonus_delta:g} AR ( {matched_tier_key.capitalize()} )"
 
 def _is_weapon_slot(equip_slot: str) -> bool:
     slot = (equip_slot or '').lower()
@@ -1570,7 +1549,6 @@ def build_text_sections(target_item, usages: list) -> list:
                 debug_msg("\n--- PROPERTY {}: {} ---".format(prop_idx+1, repr(raw_line)), COLORS['cat'])
                 
                 # Check if this is a durability status line (e.g., "durability 46 / 51")
-                import re
                 is_durability_status = re.match(r'durability\s+\d+\s*/\s*\d+', low)
                 
                 # Check for hue property (e.g., "Metallic (#2311)" or "Inferno (#2136)")
@@ -1684,7 +1662,7 @@ def build_text_sections(target_item, usages: list) -> list:
                         # Special handling for "exceptional" - different for weapons vs armor
                         elif low == 'exceptional':
                             if is_weapon:
-                                final_text = '<basefont color=#FF6B6B>+ 4 Damage</basefont> <basefont color=#FFB84D>( Exceptional )</basefont>'
+                                final_text = '<basefont color=#FF6B6B>+ 20 Damage</basefont> <basefont color=#FFB84D>( Exceptional )</basefont>'
                             else:
                                 # For armor, exceptional gives durability bonus
                                 final_text = '<basefont color=#888888>+ 20% Durability</basefont> <basefont color=#AAAAAA>( Exceptional )</basefont>'
@@ -1902,7 +1880,7 @@ def build_text_sections(target_item, usages: list) -> list:
     # 7. Technical/dev info section (lowest priority) - shown when SHOW_TECHNICAL_INFO is True
     if SHOW_TECHNICAL_INFO:
         dev_lines = []
-        dev_lines.append(f"<basefont color=#999999>ItemID: {_fmt_hex4(item_id)}</basefont>")
+        dev_lines.append(f"<basefont color=#999999>ItemID: {_format_hex4(item_id)}</basefont>")
         if item_hue > 0:
             dev_lines.append(f"<basefont color=#999999>Hue: {item_hue}</basefont>")
         dev_lines.append(f"<basefont color=#999999>Serial: {item_serial}</basefont>")
@@ -2179,7 +2157,7 @@ def process_launcher_input(index: dict) -> bool:
             _IS_TARGETING = True
             try:
                 # Debounce to prevent the button click from leaking into the world click buffer
-                _pause(180)
+                Misc.Pause(180)
                 walia_run_once(index)
             finally:
                 _IS_TARGETING = False
@@ -2220,7 +2198,7 @@ def walia_run_once(index: dict):
     debug_msg("Prompting for target")
     try:
         Target.Cancel()
-        _pause(100)
+        Misc.Pause(100)
         sel = Target.PromptTarget("Select an item to inspect")
     except Exception:
         sel = -1
@@ -2242,7 +2220,7 @@ def walia_run_once(index: dict):
         except Exception:
             print("Could not find targeted item.")
         return
-    debug_msg(f"Target acquired: serial={hex(sel)} id={_fmt_hex4(getattr(it,'ItemID',0))}")
+    debug_msg(f"Target acquired: serial={hex(sel)} id={_format_hex4(getattr(it,'ItemID',0))}")
     usages = find_usages_for_item(it, index)
     debug_msg(f"Usages found: {len(usages)}")
     # cache last results for UI toggles
@@ -2285,7 +2263,7 @@ def main():
         send_launcher_gump()
         debug_msg("Entering UI loop")
         while True:
-            _pause(50)
+            Misc.Pause(50)
             keep_running = process_launcher_input(index)
             process_results_input()
             if not keep_running:

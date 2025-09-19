@@ -1,26 +1,24 @@
 """
-Food Eater Script - a Razor Enhanced Python Script for Ultima Online
+ITEM Food Eater - a Razor Enhanced Python Script for Ultima Online
 
-Automatically finds and eats food items from the backpack.
-- Hunger monitoring via journal
-- Continuous prioritized eating until satisfied
+eat food items until full
 
 HOTKEY:: Y
-VERSION::20250714
+VERSION::20250918
 """
 
-DEBUG_MODE = False  # Set to False to suppress debug output
-PRIORITIZE_LEAST_AMOUNT_FIRST = True  # Toggle: eat food with least amount first
-
-def debug_message(msg, color=67):
-    if DEBUG_MODE:
-        Misc.SendMessage(f"[FoodEater] {msg}", color)
-
 import time
-from System.Collections.Generic import List
-from System import Int32
 
-# Food Categories with their properties
+DEBUG_MODE = False  # Set to False to suppress debug output
+PRIORITIZE_LEAST_AMOUNT_FIRST = True  #  eat food with least amount first
+
+# Exempt specific hued items from being eaten
+# Format: {(ItemID, Hue)} where both are integers
+EXCLUDED_HUED_ITEMS = {
+    (0x097B, 0x0825),  # Blue mana fish steak is a mana restorative
+}
+
+# Food Categories with ID
 FOOD_ITEMS = {
     "FRUITS": {
         "items": [
@@ -57,6 +55,12 @@ FOOD_ITEMS = {
     }
 }
 
+
+
+def debug_message(msg, color=67):
+    if DEBUG_MODE:
+        Misc.SendMessage(f"[FoodEater] {msg}", color)
+        
 class FoodEater:
     def __init__(self):
         self.debug_color = 67  # Light blue for messages
@@ -104,6 +108,17 @@ class FoodEater:
                     if not isinstance(items, list):
                         items = [items]
                     for food in items:
+                        # Skip exempted hued items
+                        try:
+                            item_id = int(food.ItemID)
+                            hue_val = int(food.Hue)
+                        except Exception:
+                            # Fallback in case of unexpected types
+                            item_id = food.ItemID
+                            hue_val = food.Hue
+                        if (item_id, hue_val) in EXCLUDED_HUED_ITEMS:
+                            self.debug_message(f"  Skipping exempt item {item['name']} (ID {hex(item_id)}, Hue {hex(hue_val)})")
+                            continue
                         found_items.append({
                             "item": food,
                             "name": item["name"],
@@ -161,7 +176,7 @@ class FoodEater:
             for msg in hunger_messages:
                 if Journal.Search(msg):
                     self.is_hungry = True
-                    self.debug(f"Status: {msg}", self.debug_color)
+                    self.debug_message(f"Status: {msg}", self.debug_color)
                     Journal.Clear()  # Clear to prevent re-reading same message
                     return True
                     
@@ -232,7 +247,19 @@ class FoodEater:
                     if items_of_type:
                         if not isinstance(items_of_type, list):
                             items_of_type = [items_of_type]
-                        food["quantity"] = len(items_of_type)
+                        # Count only non-exempt variants
+                        qty = 0
+                        for it in items_of_type:
+                            try:
+                                item_id = int(it.ItemID)
+                                hue_val = int(it.Hue)
+                            except Exception:
+                                item_id = it.ItemID
+                                hue_val = it.Hue
+                            if (item_id, hue_val) in EXCLUDED_HUED_ITEMS:
+                                continue
+                            qty += 1
+                        food["quantity"] = qty
                     else:
                         food["quantity"] = 0
                 food_items.sort(key=lambda x: x.get("quantity", 0))

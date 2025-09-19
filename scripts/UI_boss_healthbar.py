@@ -1,22 +1,21 @@
 """
 UI Boss Health Bar - a Razor Enhanced Python Script for Ultima Online
 
-an auto displaying health bar for known bosses , a custom gump top center that is otherwise hidden
+display the health bar for known bosses when nearby , a custom gump top center that is otherwise hidden
 an arpg style big red boss enemy health bar , phase markers , side image embellishments 
-features to open classic uo healthbar and attack boss onsight option
-image elements can be toggled in settings
-
+optionally opens classic uo healthbar and attack boss onsight 
                 ___.o.____
   ..o\<{|[   |  Boss Name   |   ]|}>\o..  
 
 TODO:
-- each boss different color tint presets ( red default , darkness purple , poison green , grey )
+- boss specific color tint presets ( red default , darkness purple , poison green , grey )
 
 HOTKEY:: AutoStart on Login
-VERSION:: 20250829
+VERSION:: 20250918
 """
 
 import time
+import random
 
 DEBUG_MODE = False # Debug toggle , sends messages
 # SETTINGS 
@@ -29,85 +28,125 @@ SIDE_IMAGES_ENABLED = True
 FLOURISH_ARROWS_ENABLED = True
 TOP_CENTER_IMAGE_ENABLED = True
 
-# + KNOWN_BOSSES_UO: base UO boss names (base -> display)
-# + KNOWN_BOSSES_CUSTOM: custom shard boss names
-# >>> KNOWN_BOSSES: merged 
+# TESTING MODE: apply a random boss title to normal creatures for visualization testing
+TESTING_FAKE_BOSS_MODE = False
+TESTING_TARGET_NAMES = {"a harpy", "a giant rat"}
+USE_SIMPLE_TITLES = False  # When True, prefer display_simple over decorated display
+TESTING_FAKE_BOSS_RENAME_MS = 8000 # In testing mode, how often to rotate the randomized title for a target (milliseconds)
+
+# Name rendering
+# Use classic label-based rendering with black outline for readability
+
+def simplify_title(title: str) -> str:
+    """Return a simplified display title by stripping decorative ASCII, keeping letters, digits, spaces and common punctuation."""
+    try:
+        # Keep alphanumerics, space, apostrophe, hyphen, comma, period
+        return ''.join(ch for ch in title if ch.isalnum() or ch in " '-.,").strip()
+    except Exception:
+        return title
+
+# Cleaner input dictionaries (base -> display). Keep inline comments next to entries.
+KNOWN_BOSSES_UO_TITLES = {
+    "abyssal infernal": "¸¸·¯·¸¸·¯· Abyssal Infernal ·¯·¸¸·¯·¸¸",  # fiery abyss,  flourish of chaos
+    "abyssmal horror": "◈═╡ Abyssmal Horror ╞═◈",  # jagged abyssal 
+    "anon": "¤º°`°º¤ Anon ¤º°`°º¤",  # mysterious,  
+    "barracoon the piper": "¸¸♬·¯·♪ Barracoon the Piper ♪·¯·♬¸¸",  # bardic musical energy
+    "barracoon": "¸„.-•~¹°”ˆ Barracoon ˜”°¹~•-.„.",  # already styled, bard ratman, music
+    "bone daemon": "☠══✦ Bone Daemon ✦══☠",  # skeletal, infernal
+    "charybdis": "~~¤( Charybdis )¤~~",  # oceanic whirlpool # good
+    "chief paroxysmus": "۞¤ø„¸ Chief Paroxysmus ¸„ø¤۞",  # grotesque swelling plague 
+    "cora the sorceress": "✧*:･ﾟ✧ Cora the Sorceress ✧･ﾟ:*✧",  # mystical arcane 
+    "corgul the soulbinder": "☯═══ Corgul the Soulbinder ═══☯",  # binding duality 
+    "dark father": "††† Dark Father †††",  # gothic,  crosses
+    "darknight creeper": "⋆✢ Darknight Creeper ✢⋆",  # shadowed spark  
+    "dragon turtle": "≋≋≋ Dragon Turtle ≋≋≋",  # waves, sea beast 
+    "dread horn": "↯↯ Dread Horn ↯↯",  # thunderous primal force
+    "drelgor the impaler": "══╬ Drelgor the Impaler ╬══",  # brutal, spear
+    "exodus": "✦°°✦ Exodus ✦°°✦",  # divine radiance
+    #"fleshrenderer": "Fleshrenderer", # removed as this is sometimes a standard creature on custom shard
+    "ilhenir the stained": ".-^-.-^-.- Ilhenir the Stained -.-^-.-^-.-.",  # corrupted, 
+    "impaler": "══╬ Impaler ╬══",  # spear
+    "juo'nar": "-=†=- Juo'nar -=†=-",  # dark knight, necrotic cross
+    "khal ankur": "~=~ Khal Ankur ~=~",  # desertmystic sands
+    "lady melisande": "°º¤ø¤º°` Lady Melisande ´°º¤ø¤º°",  # ornate  
+    "lord oaks": "~~~ Lord Oaks ~~~",  # angel, natural, forest druid 
+    "medusa": "<<< Medusa >>>",  # piercing gaze
+    "mephitis": "-·=» Mephitis «=·-",  # venomous sting
+    "meraktus the tormented": "==[ Meraktus the Tormented ]==",  # chained   
+    "moltrog the void seer": "~*~ Moltrog the Void Seer ~*~",  #  void shimmer
+    "monstrous interred grizzle": "-=¤=- Monstrous Interred Grizzle -=¤=-",  # tomb and burial 
+    "navrey night-eyes": "°-( Navrey Night-Eyes )-°",  # spiderweb trap, enclosing
+    "neira the necromancer": "+†+ Neira the Necromancer +†+",  # gothic necromancy
+    "osiredon the scalis enforcer": "-<><>- Osiredon the Scalis Enforcer -<><>-",  # ocean  and 
+    "ozymandias": "—=≡ Ozymandias ≡=—",  # ancient monolith,  
+    #"primeval lich": "Primeval Lich", # removed as this is sometimes a standard creature on custom shard
+    "rikktor": "==={ Rikktor }===",  # earthshaking  
+    "semidar": "─ +† Semidar †+ ─",  # succubus
+    #"shadow knight": "Shadow Knight", # removed as this is sometimes a standard creature on custom shard
+    "shadowlords": "--= Shadowlords =--",  #  darkness
+    "shanty the pirate": "~-=-~ Shanty the Pirate ~-=-~",  # waves 
+    "shimmering effusion": "*~*~ Shimmering Effusion ~*~*",  # radiant magical shimmer
+    "silvani": "~*~ Silvani ~*~",  #  forest nature fae # good
+    "slasher of veils": "-=\\ Slasher of Veils /=-",  #  jagged cuts
+    "stygian dragon": "<<< Stygian Dragon >>>",  # abyssal wings
+    "the harrower": "+-- The Harrower --+",  #  ominous ritual
+    "travesty": "=-[ Travesty ]- =",  # fae
+    "twaulo of the glade": "~~~ Twaulo of the Glade ~~~",  # forest
+    "virtuebane": "++= Virtuebane =++",  # blasphem
+    "vorothal the mindflayer": "-{ Vorothal the Mindflayer }-",  # psychic grasp
+    "zipactriotl": "==< Zipactriotl >==",  # ancient 
+}
+
+KNOWN_BOSSES_CUSTOM_TITLES = {
+    "ixir": "-= Ixir =-",
+    "goliath": "===[ Goliath ]===",
+    "yog-sothoth": "-< YOG-SOTHOTH >-",
+    "skeleton king": "+++ Skeleton King +++",
+    "bog king": "~~~ Bog King ~~~",
+    "celestus": "*=* Celestus *=*", #good
+    "gargantua": "-= Gargantua =-",
+    "gorgon": ">>> Gorgon <<<", # demon
+    "norg": "== Norg ==", # giant
+    "malcanthet": "-+- Malcanthet -+-", 
+    "surgat": "=== Surgat ===", 
+    "eligor": "-=| Eligor |=-", # wizard 
+    "the undying": "+-- The Undying --+", 
+    "lord of darkness": "=== Lord of Darkness ===", 
+    "sandstorm templar": "-= Sandstorm Templar =-", 
+    "a dread horn": "-> A Dread Horn <-", # miniboss in sandstorm
+    "an abomination": "==[ An Abomination ]==", # miniboss in sandstorm
+    "a flesh devourer": "-= IT THAT DEVOURS =-", # miniboss in wrong
+    "paradigm": "-<>- Paradigm -<>-", # dragon electric 
+    "a frozen ancestor": "*~ A Frozen Ancestor ~*", #boss
+    "sergutthy": "-= Sergutthy =-", # mini boss
+    "a stygian drakeling": "-< A Stygian Drakeling >-", # mini boss
+    "molten wyvern": ">> Molten Wyvern <<", #boss
+    "tharnok": "== Tharnok ==", #boss
+    "a swamp abomination": "~~ A Swamp Abomination ~~", #boss
+    "abysmal balron": "-= Abysmal Balron =-", #boss
+    "glassyalabolas": "-*- Glassyalabolas -*-", # mini boss
+}
+
+# Now generate structured dictionaries from the clean input, adding display_simple automatically
 KNOWN_BOSSES_UO = {
-    "abyssal infernal": "Abyssal Infernal",
-    "abyssmal horror": "Abyssmal Horror",
-    "anon": "Anon",
-    "barracoon the piper": "Barracoon the Piper",
-    "barracoon": "¸„.-•~¹°”ˆ Barracoon ˜”°¹~•-.„.",
-    "bone daemon": "Bone Daemon",
-    "charybdis": "Charybdis",
-    "chief paroxysmus": "Chief Paroxysmus",
-    "cora the sorceress": "Cora the Sorceress",
-    "corgul the soulbinder": "Corgul the Soulbinder",
-    "dark father": "Dark Father",
-    "darknight creeper": "Darknight Creeper",
-    "dragon turtle": "Dragon Turtle",
-    "dread horn": "Dread Horn",
-    "drelgor the impaler": "Drelgor the Impaler",
-    "exodus": "Exodus",
-    #"fleshrenderer": "Fleshrenderer",
-    "ilhenir the stained": "Ilhenir the Stained",
-    "impaler": "Impaler",
-    "juo'nar": "Juo'nar",
-    "khal ankur": "Khal Ankur",
-    "lady melisande": "Lady Melisande",
-    "lord oaks": "Lord Oaks",
-    "medusa": "Medusa",
-    "mephitis": "Mephitis",
-    "meraktus the tormented": "Meraktus the Tormented",
-    "moltrog the void seer": "Moltrog The Void Seer",
-    "monstrous interred grizzle": "Monstrous Interred Grizzle",
-    "navrey night-eyes": "Navrey Night-Eyes",
-    "neira the necromancer": "Neira the Necromancer",
-    "osiredon the scalis enforcer": "Osiredon the Scalis Enforcer",
-    "ozymandias": "Ozymandias",
-    #"primeval lich": "Primeval Lich",
-    "rikktor": "Rikktor",
-    "semidar": "─ +† Semidar †+ ─",
-    #"shadow knight": "Shadow Knight",
-    "shadowlords": "Shadowlords",
-    "shanty the pirate": "Shanty the Pirate",
-    "shimmering effusion": "Shimmering Effusion",
-    "silvani": "Silvani",
-    "slasher of veils": "Slasher of Veils",
-    "stygian dragon": "Stygian Dragon",
-    "the harrower": "The Harrower",
-    "travesty": "Travesty",
-    "twaulo of the glade": "Twaulo of the Glade",
-    "virtuebane": "Virtuebane",
-    "vorothal the mindflayer": "Vorothal the Mindflayer",
-    "zipactriotl": "Zipactriotl",
+    base: {
+        'display': display,
+        'display_simple': simplify_title(display),
+        'comment': ''
+    }
+    for base, display in KNOWN_BOSSES_UO_TITLES.items()
 }
 
-# unchained
 KNOWN_BOSSES_CUSTOM = {
-    "ixir": "Ixir",
-    "goliath": "Goliath",
-    "yog-sothoth": "YOG-SOTHOTH",
-    "skeleton king": "Skeleton King",
-    "bog king": "Bog King",
-    "celestus": "Celestus",
-    "gargantua": "Gargantua",
-    "gorgon": "Gorgon", # demon
-    "norg": "Norg", # giant
-    "malcanthet": "Malcanthet", 
-    "surgat": "Surgat", 
-    "eligor": "Eligor", # wizard 
-    "the undying": "The Undying", 
-    "lord of darkness": "Lord of Darkness", 
-    "sandstorm templar": "Sandstorm Templar", 
-    "a dread horn": "A Dread Horn", # miniboss in sandstorm
-    "an abomination": "An Abomination", # miniboss in sandstorm
-    "a flesh devourer": "-=  I T    T H A T    D E V O U R S  =-", # miniboss in wrong
-    "test a harpy": "─ +† Semidar †+ ─", 
-    "test a giant rat": "Celestus",
+    base: {
+        'display': display,
+        'display_simple': simplify_title(display),
+        'comment': ''
+    }
+    for base, display in KNOWN_BOSSES_CUSTOM_TITLES.items()
 }
 
-# Merge with custom overriding defaults where keys overlap
+# Merge with custom overriding defaults where keys overlap (custom wins)
 KNOWN_BOSSES = {**KNOWN_BOSSES_UO, **KNOWN_BOSSES_CUSTOM}
 
 #//==========================================================================
@@ -115,7 +154,7 @@ KNOWN_BOSSES = {**KNOWN_BOSSES_UO, **KNOWN_BOSSES_CUSTOM}
 UPDATE_RATE = 1000 #ms  # idle/default update rate
 FAST_UPDATE_RATE = 300  # ms # When a boss has been seen recently, use a faster update
 RECENT_BOSS_SEEN_MS = 5000 # Consider a boss "recently seen" if spotted within this window
-SCAN_RANGE_MAX = 30  # tiles to scan for boss candidates
+SEARCH_RANGE_MAX = 30  # tiles to search for boss candidates
 STALE_MS = 15000     # prune unseen candidates after 15s
 
 # Unique gump ID (large, unlikely to collide)
@@ -155,6 +194,7 @@ NAME_OFFSET_Y = 17          # vertical offset from top padding (move down by inc
 NAME_DUPLICATE_COUNT = 2   # how many times to draw the main red label for boldness
 
 # Text width tuning for centering ( this is not good , not working well )
+# trying to center the text based on the length but we need to account for irregular ascii characters
 NAME_CHAR_W_LOWER = 5
 NAME_CHAR_W_UPPER = 5
 NAME_CHAR_W_DIGIT = 5
@@ -240,6 +280,9 @@ class BossHealthBar:
         #   'x': int, 'y': int, 'map': int
         # }
         self.boss_info = {}
+        # Test-mode cache of randomized display per target serial
+        # serial -> {'display': str, 'last_change_ms': int}
+        self._test_fake_title_state = {}
 
     def debug_message(self, msg, color=68):
         if DEBUG_MODE:
@@ -294,14 +337,15 @@ class BossHealthBar:
             return ""
 
     def match_known_boss(self, name):
-        """Return (base_key, display) if name contains a known base boss name, else (None, None)."""
+        """Return (base_key, display_str) if name contains a known base boss name, else (None, None)."""
         n = self.normalize(name)
         if not n:
             return None, None
-        for base, display in KNOWN_BOSSES.items():
+        for base, meta in KNOWN_BOSSES.items():
             b = self.normalize(base)
             if b and b in n:
-                return base, display
+                display_str = meta.get('display_simple') if USE_SIMPLE_TITLES else meta.get('display')
+                return base, (display_str or base)
         return None, None
 
     def distance_to_player(self, mob):
@@ -312,12 +356,12 @@ class BossHealthBar:
         except Exception:
             return 9999
 
-    def scan_for_boss_candidates(self):
-        """Scan nearby mobiles and update boss_info for those matching KNOWN_BOSSES."""
+    def search_for_boss_candidates(self):
+        """search nearby mobiles and update boss_info for those matching KNOWN_BOSSES."""
         try:
             f = Mobiles.Filter()
             f.Enabled = True
-            f.RangeMax = SCAN_RANGE_MAX
+            f.RangeMax = SEARCH_RANGE_MAX
             # Prefer hostiles; if unavailable, leave empty to include all
             # consider Lord Oaks or potential Blue bosses
             try:
@@ -332,18 +376,44 @@ class BossHealthBar:
             now = int(time.time() * 1000)
 
             if mobs:
-                self.debug_message(f"Scanning {len(mobs)} mobiles within {SCAN_RANGE_MAX} tiles...")
+                self.debug_message(f"searchning {len(mobs)} mobiles within {SEARCH_RANGE_MAX} tiles...")
                 for mob in mobs:
                     try:
                         if not mob or not mob.Name:
                             continue
-                        key, display = self.match_known_boss(mob.Name)
+                        # Optional testing: force random boss titles on specific simple mobs
+                        nlow = self.normalize(mob.Name)
+                        if TESTING_FAKE_BOSS_MODE and nlow in TESTING_TARGET_NAMES:
+                            try:
+                                # Build a list of display strings according to USE_SIMPLE_TITLES
+                                all_titles = [
+                                    (meta.get('display_simple') if USE_SIMPLE_TITLES else meta.get('display')) or base
+                                    for base, meta in KNOWN_BOSSES.items()
+                                ]
+                                if all_titles:
+                                    key = "test_random"
+                                    # Throttle randomization per target serial
+                                    st = self._test_fake_title_state.get(mob.Serial)
+                                    if st and (now - st.get('last_change_ms', 0)) < TESTING_FAKE_BOSS_RENAME_MS:
+                                        display = st.get('display')
+                                    else:
+                                        display = random.choice(all_titles)
+                                        self._test_fake_title_state[mob.Serial] = {
+                                            'display': display,
+                                            'last_change_ms': now,
+                                        }
+                                else:
+                                    key, display = self.match_known_boss(mob.Name)
+                            except Exception:
+                                key, display = self.match_known_boss(mob.Name)
+                        else:
+                            key, display = self.match_known_boss(mob.Name)
                         if not key:
                             self.debug_message(f"Seen mobile (no match): {mob.Name} @ {mob.Position.X},{mob.Position.Y} (serial {mob.Serial})")
                             continue
                         dist = self.distance_to_player(mob)
                         # only keep reasonably close
-                        if dist > SCAN_RANGE_MAX:
+                        if dist > SEARCH_RANGE_MAX:
                             self.debug_message(f"Match but out of range: {mob.Name} dist {dist}")
                             continue
 
@@ -378,10 +448,15 @@ class BossHealthBar:
                     to_del.append(serial)
             for serial in to_del:
                 self.boss_info.pop(serial, None)
+                # also clear test-mode state for this serial
+                try:
+                    self._test_fake_title_state.pop(serial, None)
+                except Exception:
+                    pass
             if to_del:
                 self.debug_message(f"Pruned {len(to_del)} stale candidates")
         except Exception as e:
-            self.debug_message(f"scan_for_boss_candidates error: {e}")
+            self.debug_message(f"search_for_boss_candidates error: {e}")
 
     def auto_select_best_boss(self):
         """If no manual selection, choose the closest boss candidate."""
@@ -500,6 +575,8 @@ class BossHealthBar:
         except Exception as e:
             self.debug_message(f"add_name_label error: {e}")
 
+    
+
     def draw_phase_markers(self, gump, x, y, width, height):
         if not SHOW_PHASE_MARKERS or width < 6:
             return
@@ -535,7 +612,7 @@ class BossHealthBar:
 
             # Ensure we have a candidate if none selected
             if not self.boss_serial:
-                self.scan_for_boss_candidates()
+                self.search_for_boss_candidates()
                 self.auto_select_best_boss()
 
             mob = self.get_boss_mobile()
@@ -634,10 +711,10 @@ class BossHealthBar:
             # Draw phase dividers on top of images and bar
             self.draw_phase_markers(gump, bar_x, bar_y, BAR_WIDTH, BAR_HEIGHT)
 
-            # Centered name label with improved width estimation and global offsets
+            # Centered name label using classic outline method
+            text_y = PADDING + NAME_OFFSET_Y
             est_w = self.estimate_label_width(name)
             text_x = (self.total_width - est_w) // 2 + NAME_OFFSET_X
-            text_y = PADDING + NAME_OFFSET_Y
             self.add_name_label(gump, text_x, text_y, name)
 
             # Optional numeric values centered on the bar (white with black outline)
@@ -659,8 +736,8 @@ class BossHealthBar:
             now = int(time.time() * 1000)
             if (now - self.last_update) >= self.update_delay_ms:
                 self.last_update = now
-                # Continuous scan maintains boss_info freshness
-                self.scan_for_boss_candidates()
+                # Continuous search maintains boss_info freshness
+                self.search_for_boss_candidates()
                 # If manual target is gone, fall back to auto selection
                 if self.boss_serial and not self.get_boss_mobile():
                     self.boss_serial = None

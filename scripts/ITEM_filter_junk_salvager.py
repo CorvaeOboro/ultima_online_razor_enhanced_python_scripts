@@ -1,30 +1,34 @@
 """
 ITEM Filter Junk Salvager - a Razor Enhanced Python Script for Ultima Online
 
-A Strict Item Filter , configurable to save items by type and by tier of their properties 
-- Moves low tier items to a junk backpack based on Tier configuration
-- Salvages items in the "junk" (red) backpack ( unchained )
-- Configurable Tier reservations by their properties ( Vanquishing , Greater Slaying , Invulnerable )
+An Item Filter , configurable to save items by type and by tier of their properties 
+- Moves low tier items to a junk backpack based on settings
+- Salvages items in the "junk" (red) backpack 
 
 Adjust the settings to your liking , default setting =
-- only save leather , plate , and maces , of tier 1 highest ( invulnable , vanquishing ) 
+- only save leather , plate , and maces , of tier 2  and above ( fortification (t2), invulnerable (t1) , vanquishing (t1) ) 
 
 Requirements:
-- Any configured salvage tool in player's backpack ( tinker tools , or sewing kit )
+- tinker tools or sewing kit 
 - A red dyed backpack that will hold the salvagable items
 
 # TODO:
 - have equip_slot be apart of the item dicts properties 
 - implement single item strictness 
+- add a hue exclusion ( dont salvage hued items ) , since we dont have access to rarity property this could be useful
+- add a mode that will use the armor data json , to save items that we have not yet analyzed
+
+** WARNING item properties are being clipped to 4, this script may miss important properties if they are listed last **
 
 HOTKEY:: O
-VERSION::20250806
+VERSION::20250918
 """
-#//========================================================================================
 
-# SETTINGS
 DEBUG_MODE = False  # Set to True to enable debug/info messages
-AUTO_SALVAGE = True      # Set to False to skip auto-salvaging (for debugging)
+
+SALVAGE_JUNK_ITEMS = True      # Set to False to skip the salvaging , only moving in tot he junk container
+CONSUME_ARCANE_DUST = False # Set to False to skip consuming arcane dust (save for enchanting)
+SAVE_ONE_DAGGER = True # Save  one dagger for skinning
 
 # ITEM TYPE-based filtering , SAVE itmes you favor , set to False types unfavored
 SAVE_ITEM_WEAPON_AXE = False
@@ -323,6 +327,7 @@ ARMOR_BONE_INFO = {
     0x1452: { 'name': 'Bone Leggings', 'id': '0x1452', 'subtype': 'Bone', 'category': 'Armor' },
     0x144F: { 'name': 'Bone Armor Chest', 'id': '0x144F', 'subtype': 'Bone', 'category': 'Armor' },
     0x1451: { 'name': 'Bone Helmet', 'id': '0x1451', 'subtype': 'Bone', 'category': 'Armor' },
+    0x1F0B: { 'name': 'Orc Helmet', 'id': '0x1F0B', 'subtype': 'Bone', 'category': 'Armor' },
 }
 
 ARMOR_RINGMAIL_INFO = {
@@ -393,6 +398,9 @@ class JunkSalvager:
         
         # Show current configuration
         self.show_config()
+
+        # Track whether we already have a saved basic dagger outside the junk bag
+        self.saved_basic_dagger = self._has_existing_basic_dagger_outside_junk()
         
     def show_config(self):
         """Display current configuration settings"""
@@ -402,8 +410,9 @@ class JunkSalvager:
         self.debug_message(f"Reserve Tier 3 items: {'Yes' if RESERVE_TIERS['TIER3'] else 'No'}", self.colors['config'])
         self.debug_message(f"Reserve Tier 4 items: {'Yes' if RESERVE_TIERS['TIER4'] else 'No'}", self.colors['config'])
         self.debug_message(f"Reserve magical items: {'Yes' if RESERVE_TIERS['MAGICAL'] else 'No'}", self.colors['config'])
+        self.debug_message(f"Save one basic dagger: {'Yes' if SAVE_ONE_DAGGER else 'No'}", self.colors['config'])
         self.debug_message(f"Move delay: {str(MOVE_DELAY)}ms", self.colors['config'])
-        self.debug_message(f"Auto-salvage: {'Yes' if AUTO_SALVAGE else 'No'}", self.colors['config'])
+        self.debug_message(f"Auto-salvage: {'Yes' if SALVAGE_JUNK_ITEMS else 'No'}", self.colors['config'])
         self.debug_message(f"Junk backpack serial: 0x{JUNK_BACKPACK_SERIAL:X}", self.colors['config'])
         self.debug_message("==================", self.colors['config'])
         
@@ -412,6 +421,122 @@ class JunkSalvager:
         """Send debug message to client (deprecated, use debug_message instead)"""
         if DEBUG_MODE:
             Misc.SendMessage(f"[JunkSalvager] {message}", self.colors[color] if isinstance(color, str) else color)
+
+    def _iter_container_items_recursive(self, container_serial, skip_serials=None):
+        """Yield items within a container recursively, skipping any containers in skip_serials.
+        Also skips any container that matches the configured junk backpack ID/hues (defensive)."""
+        try:
+            skip_serials = skip_serials or set()
+            container = Items.FindBySerial(int(container_serial))
+            if not container:
+                return
+            # Skip explicit serials or any container that matches junk bag signature
+            if container.Serial in skip_serials or (
+                int(getattr(container, 'ItemID', -1)) == int(JUNK_BACKPACK_ID) and int(getattr(container, 'Hue', -1)) in [int(h) for h in JUNK_BACKPACK_HUES]
+            ):
+                return
+            children = getattr(container, 'Contains', None)
+            if not children:
+                return
+            for child in children:
+                yield child
+                # If child is a container, recurse
+                if getattr(child, 'Contains', None):
+                    # Avoid recursing into explicitly skipped containers or junk-bag lookalikes
+                    if child.Serial not in skip_serials and not (
+                        int(getattr(child, 'ItemID', -1)) == int(JUNK_BACKPACK_ID) and int(getattr(child, 'Hue', -1)) in [int(h) for h in JUNK_BACKPACK_HUES]
+                    ):
+                        for sub in self._iter_container_items_recursive(child.Serial, skip_serials):
+                            yield sub
+        except Exception as e:
+            self.debug_message(f"Error iterating container 0x{int(container_serial):X}: {str(e)}", 'warning')
+
+    def _is_basic_dagger(self, item):
+        """Return True if item is a basic dagger (0x0F52) with no magical properties"""
+        try:
+            if not item:
+                return False
+            if int(item.ItemID) != 0x0F52:
+                return False
+            props = self.get_item_properties(item)
+            # Determine tier as in should_move_to_junk
+            if self.has_affix(props, TIER1_AFFIXES):
+                return False
+            if self.has_affix(props, TIER2_AFFIXES):
+                return False
+            if self.has_affix(props, TIER3_AFFIXES):
+                return False
+            if self.has_affix(props, TIER4_AFFIXES):
+                return False
+            # Use a strict magic check that avoids broad '+' detection
+            if self._has_specific_magic_affix(props):
+                return False
+            return True
+        except Exception as e:
+            self.debug_message(f"Error checking basic dagger: {str(e)}", 'warning')
+            return False
+
+    def _has_specific_magic_affix(self, properties):
+        """Stricter magical detection used for utility exemptions (e.g., basic dagger).
+        Only checks for known magical indicators and ignores generic '+' or 'bonus' text."""
+        if not properties:
+            return False
+        magic_indicators = [
+            "damage increase",
+            "defense chance increase",
+            "faster casting",
+            "faster cast recovery",
+            "hit chance increase",
+            "lower mana cost",
+            "mage armor",
+            "spell channeling",
+            "strength bonus",
+            "swing speed increase",
+            "slayer",
+        ]
+        for prop in properties:
+            prop_lower = str(prop).lower()
+            if any(x in prop_lower for x in magic_indicators):
+                return True
+        return False
+
+    def _has_existing_basic_dagger_outside_junk(self, exclude_serial=None):
+        """Scan backpack (excluding the junk backpack) to see if a basic dagger already exists.
+        Optionally exclude a specific item serial (e.g., the item currently being evaluated)."""
+        try:
+            if not Player.Backpack:
+                return False
+            skip = set()
+            if JUNK_BACKPACK_SERIAL:
+                skip.add(int(JUNK_BACKPACK_SERIAL))
+            for itm in self._iter_container_items_recursive(Player.Backpack.Serial, skip_serials=skip):
+                if exclude_serial is not None and int(getattr(itm, 'Serial', 0)) == int(exclude_serial):
+                    continue
+                if self._is_basic_dagger(itm):
+                    self.debug_message(f"Existing basic dagger detected: 0x{int(itm.Serial):X}", 'config')
+                    return True
+            return False
+        except Exception as e:
+            self.debug_message(f"Error scanning for existing basic dagger: {str(e)}", 'warning')
+            return False
+
+    def _list_basic_daggers_outside_junk(self, exclude_serial=None):
+        """Return list of serials for all basic daggers outside the junk backpack, optionally excluding one."""
+        result = []
+        try:
+            if not Player.Backpack:
+                return result
+            skip = set()
+            if JUNK_BACKPACK_SERIAL:
+                skip.add(int(JUNK_BACKPACK_SERIAL))
+            for itm in self._iter_container_items_recursive(Player.Backpack.Serial, skip_serials=skip):
+                if exclude_serial is not None and int(getattr(itm, 'Serial', 0)) == int(exclude_serial):
+                    continue
+                if self._is_basic_dagger(itm):
+                    result.append(int(itm.Serial))
+        except Exception as e:
+            self.debug_message(f"Error listing basic daggers: {str(e)}", 'warning')
+        return result
     
     def get_item_properties(self, item):
         """Get item properties using multiple methods"""
@@ -531,6 +656,20 @@ class JunkSalvager:
         elif self.has_any_affix(properties):
             tier = 'Magical'
 
+        # Optional exception: keep only ONE basic dagger (0x0F52) with no modifier properties for skinning
+        if SAVE_ONE_DAGGER and item_id == 0x0F52 and self._is_basic_dagger(item):
+            # Do a live check of current inventory (excluding junk and excluding this item)
+            # so we don't count the current dagger and accidentally junk the last one
+            others = self._list_basic_daggers_outside_junk(exclude_serial=item.Serial)
+            self.debug_message(f"Basic daggers outside junk (excluding current): {len(others)} | Serials: {[hex(s) for s in others]}", self.colors['config'])
+            if len(others) == 0:
+                self.saved_basic_dagger = True
+                self.debug_message(f"Keeping one basic dagger for skinning: {name} (ID: {hex(item_id)})", self.colors['info'])
+                return False
+            else:
+                self.debug_message(f"Extra basic dagger detected; sending to junk: {name} (ID: {hex(item_id)})", self.colors['important'])
+                return True
+
         # Debug: show full filtering decision
         self.debug_message(f"[Filter] {name} (ID: {hex(item_id)}) | Cat: {category} | Subtype: {subtype} | Tier: {tier} | Affixes: {affix_str} | SaveFlag: {save_flag}", self.colors['config'])
 
@@ -601,17 +740,18 @@ class JunkSalvager:
         Target.TargetExecute(JUNK_BACKPACK_SERIAL)
         Misc.Pause(1000)
         
-        # Use any resulting arcane dust
-        dust = Items.FindByID(ARCANE_DUST_ITEMID, ARCANE_DUST_COLOR, Player.Backpack.Serial)
-        if dust:
-            self.debug_message(f"Using Arcane Dust (ID: 0x{ARCANE_DUST_ITEMID:X}, Color: 0x{ARCANE_DUST_COLOR:X})", 'info')
-            Items.UseItem(dust)
-            Target.WaitForTarget(1000)
-            Target.TargetExecute(JUNK_BACKPACK_SERIAL)
-            return True
-        else:
-            self.debug_message(f"No Arcane Dust (ID: 0x{ARCANE_DUST_ITEMID:X}, Color: 0x{ARCANE_DUST_COLOR:X}) found after salvaging.", 'warning')
-        return False
+        if CONSUME_ARCANE_DUST:
+            # Use any resulting arcane dust
+            dust = Items.FindByID(ARCANE_DUST_ITEMID, ARCANE_DUST_COLOR, Player.Backpack.Serial)
+            if dust:
+                self.debug_message(f"Using Arcane Dust (ID: 0x{ARCANE_DUST_ITEMID:X}, Color: 0x{ARCANE_DUST_COLOR:X})", 'info')
+                Items.UseItem(dust)
+                Target.WaitForTarget(1000)
+                Target.TargetExecute(JUNK_BACKPACK_SERIAL)
+                return True
+            else:
+                self.debug_message(f"No Arcane Dust (ID: 0x{ARCANE_DUST_ITEMID:X}, Color: 0x{ARCANE_DUST_COLOR:X}) found after salvaging.", 'warning')
+            return False
 
     def process_inventory(self):
         """Process inventory and move unwanted items to junk backpack"""
@@ -670,7 +810,7 @@ def main():
     try:
         salvager = JunkSalvager()
         if salvager.process_inventory():
-            if AUTO_SALVAGE:
+            if SALVAGE_JUNK_ITEMS:
                 salvager.salvage_junk_backpack()
     except Exception as e:
         Misc.SendMessage(f"Error: {str(e)}", 33)

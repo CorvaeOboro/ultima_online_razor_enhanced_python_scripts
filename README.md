@@ -31,11 +31,13 @@ user interface custom gumps
 - [UI_walia_item_inspect.py](scripts/UI_walia_item_inspect.py) – WALIA (What Am I Looking At) in-game item inspection to display detailed properties, crafting info, and custom descriptions
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info.png?raw=true"/>
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info_20250903.png?raw=true"/>
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info_20250910.png?raw=true"/>
 - [UI_journal_filtered.py](scripts/UI_journal_filtered.py) – minimal journal filtered and focused on local chat and events
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_journal_filtered.png?raw=true"/>
 - [UI_layout_preset.py](scripts/UI_layout_preset.py) – move gumps to specified positions
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_layout_preset.png?raw=true"/>
-
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_layout_preset.gif?raw=true"/>
+- [UI_action_buttons.py](scripts/UI_action_buttons.py) – button layout for emotes , say , and scripts
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_UI_action_buttons.png?raw=true"/>
 
 ## RITUAL
 ritual magic 
