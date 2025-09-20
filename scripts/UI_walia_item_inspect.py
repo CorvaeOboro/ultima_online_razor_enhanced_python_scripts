@@ -10,9 +10,8 @@ a custom gump displays the item info and the items that can be crafted with it
 
 TODO: 
 - armor values update ( currently only 30% of modifier combinations known)
-- add materials handling
-- remove the crafting json logic ( we are adding data directly to the script currently )
-- weapon exceptional = +20 dmg
+ - add materials handling
+ - weapon exceptional = + dmg
 
 ** issues = item properties through api limited to 4 ? therefore the display is not displaying the full properties **
 
@@ -20,12 +19,10 @@ TROUBLESHOOTING:
 - if "import" errors , download iron python 3.4.2 and copy the files in its "Lib" folder into your RazorEnhanced "Lib" folder 
 
 HOTKEY:: AutoStart on Login
-VERSION:: 20250909
+VERSION:: 20250920
 """
 
 import re # regex parsing the text
-import os # reading the crafting json , could remove if hardcoded data
-import json # maybe we conditionally load this if a crafting_recipe.json is found? that way no dependency for general use
 
 DEBUG_MODE = False  # Set to True for debugging messages
 SHOW_TECHNICAL_INFO = False  # Set to True to show ItemID, Hue, Serial in results
@@ -45,8 +42,6 @@ DISPLAY = {
     'show_title': True,
     'apply_item_hue': True,
     'show_dev_text': False,
-    'show_crafting': False,
-    'show_crafting_message': False,
 }
 
 # Gump positions
@@ -478,7 +473,6 @@ _IS_TARGETING = False
 _LAST_TARGET_SERIAL = None
 _LAST_TARGET_ITEMID = None
 _LAST_TARGET_NAME = None
-_LAST_USAGES = None
 
 #//=============================================================================
 # Equipment data mapping (by ItemID)
@@ -684,25 +678,6 @@ WEAPON_DATA_BY_ITEMID = {
     0x0900: {'type': 'Sword', 'hands': '1h', 'name': 'stone war sword', 'skill': 'Swordsmanship'},
 }
 
-# Remap common crafting material names to backpack tooltip names
-# we maybe remove this , this is for crafting info 
-MATERIAL_NAME_REMAP = {
-    'flour': 'open sack of flour',
-    'raw ribs': 'cut of raw ribs',
-    'sack of flour': 'open sack of flour',
-    'bag of flour': 'open sack of flour',
-    'flour sack': 'open sack of flour',
-    'water': 'pitcher of water',
-    'water pitcher': 'pitcher of water',
-    'pitcher water': 'pitcher of water',
-    'ball of dough': 'dough',
-    'dough ball': 'dough',
-    'honey': 'jar of honey',
-    'jar honey': 'jar of honey',
-    'honey jar': 'jar of honey',
-    'jar of honey': 'jar of honey',
-    'raw fish steaks': 'raw fish steak',
-}
 
 def debug_msg(message, color=90):
     if not DEBUG_MODE:
@@ -899,83 +874,6 @@ def get_next_results_gump_id():
     _CURRENT_GUMP_OFFSET = (_CURRENT_GUMP_OFFSET + 1) % RESULTS_GUMP_ID_MAX_OFFSET
     return current_id
 
-def _singularize(word: str) -> str:
-    if len(word) > 3 and word.endswith('s'):
-        return word[:-1]
-    return word
-
-def name_to_fuzzy_key(name: str) -> str:
-    try:
-        n = (name or '').strip().lower()
-        if not n or n == 'unknown':
-            return ''
-        n = re.sub(r"[^a-z0-9\s]", " ", n)
-        toks = [t for t in n.split() if t]
-        out = []
-        for t in toks:
-            if t.isdigit():
-                continue
-            if t not in ('raw','cooked'):
-                t = _singularize(t)
-            out.append(t)
-        if not out:
-            return ''
-        out.sort()
-        return ' '.join(out)
-    except Exception:
-        return ''
-
-def _script_root_paths():
-    here = os.path.abspath(os.path.dirname(__file__))
-    project_root = os.path.abspath(os.path.join(here, os.pardir))
-    data_dir = os.path.join(project_root, 'data')
-    return project_root, data_dir
-
-def _find_latest_crafting_json(data_dir: str) -> str:
-    if not os.path.isdir(data_dir):
-        return None
-    candidates = []
-    for name in os.listdir(data_dir):
-        if not name.lower().endswith('.json'):
-            continue
-        if not name.lower().startswith('gump_crafting'):
-            continue
-        full = os.path.join(data_dir, name)
-        try:
-            mtime = os.path.getmtime(full)
-        except Exception:
-            continue
-        candidates.append((mtime, full))
-    if not candidates:
-        return None
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    return candidates[0][1]
-
-def _read_json(path: str):
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-def _normalize_items(json_root):
-    # Case 1: already a list of items
-    if isinstance(json_root, list):
-        return json_root
-    # Case 2: structured by categories
-    items = []
-    cats = (json_root or {}).get('categories', {})
-    for cat_key, cat_data in cats.items():
-        for it in (cat_data.get('items') or []):
-            parsed = (it or {}).get('parsed') or {}
-            if parsed:
-                if 'category' not in parsed:
-                    parsed['category'] = cat_key
-                # carry button ids if present
-                if 'button_info' in it and 'item_info_button_id' not in parsed:
-                    parsed['item_info_button_id'] = it.get('button_info')
-                if 'button_make' in it and 'item_make_button_id' not in parsed:
-                    parsed['item_make_button_id'] = it.get('button_make')
-                items.append(parsed)
-    return items
-
 def _to_int_id(v):
     try:
         if v is None:
@@ -988,42 +886,6 @@ def _to_int_id(v):
         return int(s)
     except Exception:
         return None
-
-def _normalize_material_name(nm: str) -> str:
-    n = (nm or '').strip().lower()
-    if not n:
-        return n
-    return MATERIAL_NAME_REMAP.get(n, n)
-
-def build_material_index(items: list) -> dict:
-    """Build index mapping material identifiers to recipes.
-    Returns dict with:
-    - by_id: {int item_id -> [recipe dicts]}
-    - by_name: {normalized_name -> [recipe dicts]}
-    - by_fuzzy: {fuzzy_key -> [recipe dicts]}
-    """
-    material_index = {
-        'by_id': {},
-        'by_name': {},
-        'by_fuzzy': {},
-    }
-    for recipe_entry in (items or []):
-        material_entries = recipe_entry.get('materials') or []
-        for material_entry in material_entries:
-            # Index by material id (supports both decimal and hex id fields)
-            material_id_value = _to_int_id(
-                material_entry.get('id') if material_entry.get('id') is not None else material_entry.get('id_hex')
-            )
-            if isinstance(material_id_value, int):
-                material_index['by_id'].setdefault(int(material_id_value), []).append(recipe_entry)
-            # Index by normalized material name (and fuzzy key variant)
-            normalized_material_name = _normalize_material_name(material_entry.get('name'))
-            if normalized_material_name:
-                material_index['by_name'].setdefault(normalized_material_name, []).append(recipe_entry)
-                fuzzy_material_key = name_to_fuzzy_key(normalized_material_name)
-                if fuzzy_material_key:
-                    material_index['by_fuzzy'].setdefault(fuzzy_material_key, []).append(recipe_entry)
-    return material_index
 
 # Razor Enhanced helpers -----------------------------
 
@@ -1077,56 +939,6 @@ def _format_hex4(v: int) -> str:
         return "0x0000"
 
 # WALIA core -----------------------------
-
-def _rarity_for_recipe(rec: dict) -> str:
-    # Simple heuristic: use skill_required or material count
-    try:
-        sr = float(rec.get('skill_required') or 0)
-    except Exception:
-        sr = 0.0
-    mats = rec.get('materials') or []
-    if sr >= 90 or len(mats) >= 5:
-        return 'high'
-    if sr >= 70 or len(mats) >= 3:
-        return 'mid'
-    return 'low'
-
-def find_usages_for_item(item, index: dict) -> list:
-    """Return list of recipes that use the targeted item as a material.
-    Matches by itemID, normalized name, or fuzzy name.
-    """
-    matching_recipe_entries = []
-    try:
-        target_item_id = int(item.ItemID)
-    except Exception:
-        target_item_id = None
-    target_item_display_name = get_item_name(item, amount_hint=getattr(item, 'Amount', 1))
-    normalized_target_item_name = _normalize_material_name(target_item_display_name)
-    fuzzy_target_item_key = name_to_fuzzy_key(normalized_target_item_name)
-
-    seen_recipe_keys = set()
-    # Match by exact item id
-    if isinstance(target_item_id, int) and target_item_id in index.get('by_id', {}):
-        for recipe_entry in index['by_id'][target_item_id]:
-            recipe_key = (recipe_entry.get('category'), recipe_entry.get('name'))
-            if recipe_key not in seen_recipe_keys:
-                matching_recipe_entries.append(recipe_entry)
-                seen_recipe_keys.add(recipe_key)
-    # Match by normalized item name
-    if normalized_target_item_name and normalized_target_item_name in index.get('by_name', {}):
-        for recipe_entry in index['by_name'][normalized_target_item_name]:
-            recipe_key = (recipe_entry.get('category'), recipe_entry.get('name'))
-            if recipe_key not in seen_recipe_keys:
-                matching_recipe_entries.append(recipe_entry)
-                seen_recipe_keys.add(recipe_key)
-    # Match by fuzzy key variant
-    if fuzzy_target_item_key and fuzzy_target_item_key in index.get('by_fuzzy', {}):
-        for recipe_entry in index['by_fuzzy'][fuzzy_target_item_key]:
-            recipe_key = (recipe_entry.get('category'), recipe_entry.get('name'))
-            if recipe_key not in seen_recipe_keys:
-                matching_recipe_entries.append(recipe_entry)
-                seen_recipe_keys.add(recipe_key)
-    return matching_recipe_entries
 
 def _stylize_unicode(text: str, style: str = 'fullwidth') -> str:
     """Return a unicode-styled variant of ASCII text.
@@ -1507,7 +1319,7 @@ def _equip_slot_and_type(item_id: int) -> tuple:
         typ = 'Unknown'
     return slot, typ
 
-def build_text_sections(target_item, usages: list) -> list:
+def build_text_sections(target_item) -> list:
     """Build list of TextSection objects for modular gump content."""
     sections = []
     
@@ -1903,11 +1715,11 @@ def build_text_sections(target_item, usages: list) -> list:
     
     return sections
 
-def show_walia_gump(target_item, usages: list, gump_id=None):
-    debug_msg(f"Showing results gump; usages={len(usages) if usages else 0}")
+def show_walia_gump(target_item, gump_id=None):
+    debug_msg("Showing results gump")
 
     # Build modular text sections
-    text_sections = build_text_sections(target_item, usages)
+    text_sections = build_text_sections(target_item)
     debug_msg(f"Built {len(text_sections)} text sections")
     
     item_display_name = get_item_name(target_item, amount_hint=getattr(target_item, 'Amount', 1))
@@ -1924,7 +1736,6 @@ def show_walia_gump(target_item, usages: list, gump_id=None):
     Gumps.AddPage(gump, 0)
 
     # Base sizes with dynamic height based on text lines
-    max_rows_to_render = min(15, len(usages) or 1)
     
     # Calculate height based on text sections
     total_text_height = sum(section.height_estimate() for section in text_sections)
@@ -2051,57 +1862,10 @@ def show_walia_gump(target_item, usages: list, gump_id=None):
             )
             current_y += section_height
     
-    # Track where content ends for crafting table positioning
+    # Track where content ends for layout
     content_bottom_y = current_y + 10
     # Calculate item icon bottom for layout
     item_bottom_y = item_top_y + item_icon_height if DISPLAY.get('show_item_graphic', True) else content_top_y
-
-    # Crafting section (table/messages) can be disabled entirely via master toggle
-    if DISPLAY.get('show_crafting', False):
-        # Only draw crafting table when usages exist AND at least one of Category/Makes is enabled
-        show_category_flag = DISPLAY.get('show_category', True)
-        show_makes_flag = DISPLAY.get('show_makes', True)
-        show_rarity_flag = DISPLAY.get('show_rarity', True)
-        if usages and len(usages) > 0 and (show_category_flag or show_makes_flag):
-            table_top_y = max(content_bottom_y, item_bottom_y)
-            # Column headers for narrower width
-            category_col_x = 10
-            makes_col_x = 92
-            rarity_col_x = max(188, gump_width - 90)
-            if show_category_flag:
-                Gumps.AddLabel(gump, category_col_x, table_top_y, COLORS['cat'], "Category")
-            if show_makes_flag:
-                Gumps.AddLabel(gump, makes_col_x, table_top_y, COLORS['cat'], "Makes")
-            if show_rarity_flag:
-                Gumps.AddLabel(gump, rarity_col_x, table_top_y, COLORS['cat'], "Rarity")
-
-            row_y = table_top_y + 16
-            # Sort by category then name
-            usages_sorted_list = sorted(usages, key=lambda r: ((r.get('category') or '').lower(), (r.get('name') or '').lower()))
-            for usage_record in usages_sorted_list[:max_rows_to_render]:
-                category_name = usage_record.get('category') or 'Unknown'
-                product_name = usage_record.get('name') or 'Unknown'
-                rarity_key = _rarity_for_recipe(usage_record)
-                rarity_hue = MATERIAL_RARITY[rarity_key]['hue']
-                if show_category_flag:
-                    Gumps.AddLabel(gump, category_col_x, row_y, COLORS['label'], str(category_name))
-                # Product name (wrap limited width)
-                if show_makes_flag:
-                    makes_col_width = max(120, gump_width - makes_col_x - 120)
-                    Gumps.AddHtml(gump, makes_col_x, row_y-2, makes_col_width, 22, f"<basefont color=#FFFFFF>{product_name}</basefont>", 0, 0)
-                if show_rarity_flag:
-                    Gumps.AddLabel(gump, rarity_col_x, row_y, rarity_hue, rarity_key.upper())
-                row_y += 24
-        else:
-            # Either no usages or crafting table is hidden by settings; place message below content without blocking
-            if DISPLAY.get('show_crafting_message', False):
-                row_y = max(content_bottom_y, item_bottom_y) + 8
-                if usages and len(usages) > 0 and not (show_category_flag or show_makes_flag):
-                    message_text = "<basefont color=#9A9A9A>Crafting usages hidden (settings).</basefont>"
-                else:
-                    message_text = "<basefont color=#D8D066>No known crafting usages found.</basefont>"
-                # Align with text panel to reduce excess padding
-                Gumps.AddHtml(gump, text_x, row_y, text_width, 22, message_text, 0, 0)
 
     # Close button (optional based on global setting)
     if SHOW_CLOSE_BUTTON:
@@ -2140,7 +1904,7 @@ def send_launcher_gump():
     Gumps.SendGump(LAUNCHER_GUMP_ID, Player.Serial, LAUNCHER_X, LAUNCHER_Y, gd.gumpDefinition, gd.gumpStrings)
     debug_msg("Launcher gump sent")
 
-def process_launcher_input(index: dict) -> bool:
+def process_launcher_input() -> bool:
     """Handle clicks from the launcher. Returns False when launcher should close."""
     Gumps.WaitForGump(LAUNCHER_GUMP_ID, 100)
     gd = Gumps.GetGumpData(LAUNCHER_GUMP_ID)
@@ -2158,7 +1922,7 @@ def process_launcher_input(index: dict) -> bool:
             try:
                 # Debounce to prevent the button click from leaking into the world click buffer
                 Misc.Pause(180)
-                walia_run_once(index)
+                walia_run_once()
             finally:
                 _IS_TARGETING = False
             # Re-send the launcher after action completes
@@ -2189,10 +1953,10 @@ def process_results_input():
             Gumps.CloseGump(gump_id)
             return
 
-def walia_run_once(index: dict):
+def walia_run_once():
     # Prompt for a target using Razor Enhanced Target system
     try:
-        Misc.SendMessage("Target an item to inspect usages...", COLORS['title'])
+        Misc.SendMessage("Target an item to inspect...", COLORS['title'])
     except Exception:
         pass
     debug_msg("Prompting for target")
@@ -2221,19 +1985,16 @@ def walia_run_once(index: dict):
             print("Could not find targeted item.")
         return
     debug_msg(f"Target acquired: serial={hex(sel)} id={_format_hex4(getattr(it,'ItemID',0))}")
-    usages = find_usages_for_item(it, index)
-    debug_msg(f"Usages found: {len(usages)}")
     # cache last results for UI toggles
     try:
-        global _LAST_TARGET_SERIAL, _LAST_TARGET_ITEMID, _LAST_TARGET_NAME, _LAST_USAGES
+        global _LAST_TARGET_SERIAL, _LAST_TARGET_ITEMID, _LAST_TARGET_NAME
         _LAST_TARGET_SERIAL = getattr(it, 'Serial', None)
         _LAST_TARGET_ITEMID = getattr(it, 'ItemID', None)
         _LAST_TARGET_NAME = get_item_name(it, amount_hint=getattr(it, 'Amount', 1))
-        _LAST_USAGES = usages[:]
     except Exception:
         pass
     try:
-        show_walia_gump(it, usages)
+        show_walia_gump(it)
     except Exception as e:
         try:
             Misc.SendMessage(f"Error showing WALIA gump: {e}", COLORS['bad'])
@@ -2241,30 +2002,15 @@ def walia_run_once(index: dict):
             print(f"Error showing WALIA gump: {e}")
 
 def main():
-    # Load latest crafting crawl and build the material index once
-    # this needs rework for crafting recipes , currently focused on equipment
-    debug_msg("Starting WALIA")
-    _, data_dir = _script_root_paths()
-    src = _find_latest_crafting_json(data_dir)
-    if not src:
-        try:
-            Misc.SendMessage("No gump_crafting_*.json found in /data.", COLORS['bad'])
-        except Exception:
-            print("No gump_crafting_*.json found in /data.")
-        return
+    # Initialize UI and enter loop; no external data required
+    debug_msg("Starting WALIA (no external crafting data)")
     try:
-        debug_msg(f"Loading data from: {src}")
-        raw = _read_json(src)
-        items = _normalize_items(raw)
-        debug_msg(f"Items loaded: {len(items)}")
-        index = build_material_index(items)
-        debug_msg("Material index built")
         # Send the persistent launcher and loop handling input
         send_launcher_gump()
         debug_msg("Entering UI loop")
         while True:
             Misc.Pause(50)
-            keep_running = process_launcher_input(index)
+            keep_running = process_launcher_input()
             process_results_input()
             if not keep_running:
                 break
