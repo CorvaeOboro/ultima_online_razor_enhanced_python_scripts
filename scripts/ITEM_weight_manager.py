@@ -15,10 +15,12 @@ adjust "Always drop" list , and "Maintain minimum" list
     - Utility potions (5 each)
 
 TODO:
-add spoons and other water pitcher , other unfavored crafting outputs
+dont drop invisibility potion , it shares id with other potion, check buy hue or name 
+add dye and dyetub
+add cloth , hide , scales , leather to resources 
 
 HOTKEY:: X
-VERSION::20250907
+VERSION::20250920
 """
 
 # Global debug mode switch
@@ -31,6 +33,14 @@ MAX_REAGENT_COUNT = 200  # Maximum number of reagents to keep
 # Potion Quality Management
 ENABLE_POTION_QUALITY_FILTER = True  # Set to True to only keep Greater quality potions
 KEEP_POTION_QUALITIES = ["Greater"]  # List of potion qualities to keep (others will be dropped)
+
+# Potion Special Hue Protection
+# Any potion stack that has a special hue should never be dropped. This is used to protect
+# special variants like Invisibility potions that share ItemID with other potions but use a custom hue.
+# If TREAT_ANY_NONZERO_HUE_AS_SPECIAL is True, any non-zero Hue will be considered special and protected.
+TREAT_ANY_NONZERO_HUE_AS_SPECIAL = True
+# If you want to allow specific hues only, list them here (e.g., [0x0481, 0x081A]) and set the flag above to False
+SPECIAL_POTION_HUES = []
 
 # Disposable Item Category Toggles
 DROP_MAGIC_SCROLLS = True  # Set to True to drop magic scrolls
@@ -266,6 +276,17 @@ MISCELLANEOUS_ITEMS = [
     {"name": "Water Pitcher", "id": 0x1F9D, "hue": None},
 ]
 
+# Items to always drop regardless of category toggles
+ALWAYS_TRASH_ITEMS = [
+    {"name": "5 ore", "id": 0x19B7, "hue": 0x0000},
+    {"name": "cut of raw ribs", "id": 0x09F1, "hue": 0x0000},
+    {"name": "fire horn", "id": 0x0FC7, "hue": 0x0466},
+    {"name": "ore", "id": 0x19B7, "hue": 0x0000},
+    {"name": "fork", "id": 0x09F5, "hue": 0x0000},
+    {"name": "knife", "id": 0x09F6, "hue": 0x0000},
+    {"name": "plate", "id": 0x09D7, "hue": 0x0000},
+]
+
 # Items to always drop (no count management) - Generated dynamically based on toggles
 # This will be populated at runtime by get_enabled_disposable_items()
 DISPOSABLE_ITEMS = []
@@ -297,6 +318,10 @@ def get_enabled_disposable_items():
     if DROP_MISCELLANEOUS_ITEMS:
         enabled_items.extend(MISCELLANEOUS_ITEMS)
         debug_message(f"Added {len(MISCELLANEOUS_ITEMS)} miscellaneous items to disposable list", 67)
+    
+    # Always-trash items are unconditionally added
+    enabled_items.extend(ALWAYS_TRASH_ITEMS)
+    debug_message(f"Added {len(ALWAYS_TRASH_ITEMS)} always-trash items to disposable list", 67)
     
     debug_message(f"Total disposable items enabled: {len(enabled_items)}", 67)
     return enabled_items
@@ -356,6 +381,24 @@ def should_keep_potion(item):
 def is_potion_item(item_id):
     """Check if an item ID corresponds to a potion."""
     return any(potion["id"] == item_id for potion in POTION_ITEMS)
+
+def is_special_hue_potion(item):
+    """Return True if a potion item has a protected special hue.
+
+    Rules:
+    - If TREAT_ANY_NONZERO_HUE_AS_SPECIAL is True: any Hue != 0x0000 is protected
+    - Else: Hue must be in SPECIAL_POTION_HUES to be protected
+    Only applies to potion ItemIDs.
+    """
+    try:
+        if not is_potion_item(item.ItemID):
+            return False
+        hue = item.Hue if hasattr(item, 'Hue') else 0
+        if TREAT_ANY_NONZERO_HUE_AS_SPECIAL:
+            return hue != 0x0000
+        return hue in SPECIAL_POTION_HUES
+    except:
+        return False
 
 def is_excluded_item(item):
     """Check if an item should be excluded from dropping based on ID and hue."""
@@ -620,12 +663,18 @@ def manage_item_count(item_info):
         for item in all_variants:
             if remaining_to_drop <= 0:
                 break
-                
+            
+            # If this is a potion with a special hue, never drop from this stack
+            if is_potion_item(item_info["id"]) and is_special_hue_potion(item):
+                debug_message(f"  Skipping special-hue potion stack (hue: 0x{item.Hue:04X})", 67)
+                continue
+
             item_amount = item.Amount if hasattr(item, 'Amount') else 1
             drop_from_this_stack = min(item_amount, remaining_to_drop)
             
             debug_message(f"  Dropping {drop_from_this_stack} from stack (hue: {item.Hue})", 67)
             amount_dropped = try_drop_items(item, drop_from_this_stack)
+            
             remaining_to_drop -= amount_dropped
             
             Misc.Pause(100)
@@ -654,8 +703,12 @@ def manage_potion_quality(potion_info):
     potions_to_drop = []
     potions_to_keep = []
     
-    # Categorize potions by quality
+    # Categorize potions by quality, but never drop special-hue potions
     for item in all_variants:
+        if is_special_hue_potion(item):
+            debug_message(f"Protecting special-hue potion: {get_item_name(item)} (Hue: 0x{item.Hue:04X})", 67)
+            potions_to_keep.append(item)
+            continue
         if should_keep_potion(item):
             potions_to_keep.append(item)
         else:
@@ -667,7 +720,7 @@ def manage_potion_quality(potion_info):
         
         debug_message(f"Potion quality filter for {potion_info['name']}: Keeping {total_to_keep}, Dropping {total_to_drop}", 67)
         
-        # Drop each unwanted potion
+        # Drop each unwanted potion (excluding any special-hue potions which were already filtered)
         for item in potions_to_drop:
             amount = item.Amount if hasattr(item, 'Amount') else 1
             quality = get_potion_quality(item)

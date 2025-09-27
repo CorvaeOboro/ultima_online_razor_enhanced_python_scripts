@@ -1,23 +1,21 @@
 """
-Kindling User Script - a Razor Enhanced Python Script for Ultima Online
+ITEM use kindling - a Razor Enhanced Python Script for Ultima Online
 
-Automatically finds and uses kindling from the backpack.
-- Checks initial kindling amount
-- Repeatedly tries to use kindling until amount decreases
-- Stops when kindling is successfully used
+use kindling in backpack.
+Repeatedly tries to use kindling until amount decreases
+
+TODO: dont camp if already near campfire
 
 HOTKEY:: Z
-VERSION::20250806
+VERSION::20250923
 """
 
 DEBUG_MODE = False  # Set to False to suppress debug output
+KINDLING_ID = 0x0DE1  #  kindling ItemID
 
 def debug_message(msg, color=67):
     if DEBUG_MODE:
-        Misc.SendMessage(f"[KindlingUser] {msg}", color)
-
-# Kindling item ID
-KINDLING_ID = 0x0DE1  # Standard kindling ItemID
+        Misc.SendMessage(f"[ITEM_use_kindling] {msg}", color)
 
 class KindlingUser:
     def __init__(self):
@@ -35,7 +33,7 @@ class KindlingUser:
             return
         if color is None:
             color = self.debug_color
-        Misc.SendMessage(f"[KindlingUser] {msg}", color)
+        Misc.SendMessage(f"[ITEM_use_kindling] {msg}", color)
 
     def count_kindling_in_backpack(self):
         """Count total amount of kindling in backpack"""

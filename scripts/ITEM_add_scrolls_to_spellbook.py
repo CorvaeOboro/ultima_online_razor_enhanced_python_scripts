@@ -1,19 +1,18 @@
 """
-ITEM Use Spell Scrolls All - a Razor Enhanced Python Script for Ultima Online
+ITEM Add Scrolls to Spellbook - a Razor Enhanced Python Script for Ultima Online
 
-Finds and uses all Magery spell scrolls either in a targeted container
-or in the player's backpack, and adds them to the equipped spellbook
+Searches for Magery spell scrolls in backpack or in a targeted container
+and ADDs them to the "base" spellbook found in the backpack or equipped
 via the scroll's context menu action "Add To Spellbook".
 
-VERSION::20250918
+VERSION::20250923
 """
 
 DEBUG_MODE = False  # Set to False to suppress debug output
-SPELLBOOK_ID = 0x0EFA  # Default spellbook ItemID
 
+USE_CONTAINER_SELECTION = False # prompt for a container or False use backpack directly , by default using backpack this is ment to be used by new character find scrolls along the way 
+SPELLBOOK_ID = 0x0EFA  # Magery Spellbook
 USE_DELAY_MS = 800  # Delay in ms between using scrolls
-TARGET_TIMEOUT_MS = 3000  # Wait up to 3 seconds for target cursor
-BOOK_LAYER = "LeftHand"  # checks equiped for base blessed spell book , if not equipped checks backpack
 JOURNAL_MSG_ALREADY = "That spell is already present in that spellbook."
 
 # Magic Scrolls - All spell scrolls organized by circle
@@ -166,7 +165,7 @@ def get_backpack_scrolls():
 
 def prompt_for_container():
     """Prompt the user to target a container and return its serial or None."""
-    Misc.SendMessage("Target the container with spell scrolls (or press ESC to use backpack)", 65)
+    debug_message("Target the container with spell scrolls (or press ESC to use backpack)", 65)
     try:
         serial = Target.PromptTarget()
     except:
@@ -175,7 +174,7 @@ def prompt_for_container():
         return None
     cont = Items.FindBySerial(serial)
     if not cont:
-        Misc.SendMessage("Invalid target.", 33)
+        debug_message("Invalid target.", 33)
         return None
     # Open to ensure contents loaded
     Items.UseItem(cont.Serial)
@@ -254,23 +253,27 @@ def use_context_menu_add_to_book(scroll, spellbook):
 def main():
     spellbook = find_best_spellbook()
     if not spellbook:
-        Misc.SendMessage("No valid Spellbook found. Equip or place a Blessed 'Spellbook' in your backpack and try again.", 33)
+        debug_message("No valid Spellbook found. Equip or place a Blessed 'Spellbook' in your backpack and try again.", 33)
         return
 
-    target_container = prompt_for_container()
     from_container = False
-    if target_container:
-        scrolls = get_container_scrolls(target_container)
-        from_container = True
+    if USE_CONTAINER_SELECTION:
+        target_container = prompt_for_container()
+        if target_container:
+            scrolls = get_container_scrolls(target_container)
+            from_container = True
+        else:
+            scrolls = get_backpack_scrolls()
     else:
+        # Directly use backpack with no prompt
         scrolls = get_backpack_scrolls()
 
     if not scrolls:
         where = "container" if from_container else "backpack"
-        Misc.SendMessage(f"No spell scrolls found in {where}!", 33)
+        debug_message(f"No spell scrolls found in {where}!", 33)
         return
 
-    Misc.SendMessage(f"Found {len(scrolls)} spell scroll(s) to use.", 90)
+    debug_message(f"Found {len(scrolls)} spell scroll(s) to use.", 90)
     used = 0
     start_count = len(scrolls)
     index = 0
@@ -295,7 +298,7 @@ def main():
             index += 1
             Misc.Pause(150)
 
-    Misc.SendMessage(f"Done using spell scrolls. {used} attempted from {start_count} found.", 90)
+    debug_message(f"Done using spell scrolls. {used} attempted from {start_count} found.", 90)
 
 if __name__ == "__main__":
     main()

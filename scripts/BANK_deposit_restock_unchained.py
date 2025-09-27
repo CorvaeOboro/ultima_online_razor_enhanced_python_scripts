@@ -1,5 +1,5 @@
 """
-BANK Auto Deposit and Restock -  A Razor Enhanced Python script for Ultima Online
+BANK Deposit and Restock -  A Razor Enhanced Python script for Ultima Online
 
 move specific items from backpack to bank ( gems , supplies , special items )
 restock reagents maintaining a "loadout" 
@@ -7,15 +7,11 @@ restock reagents maintaining a "loadout"
 
 this script is similar to using an "Organizer" Agent in Razor ,
 this script is a little slower but has more control and updates and distributes easier then organizer presets
-current item dictionaries are based on UO Unchained , modify as needed
-
-TODO:
-restock reagents either needs profile character name matching or could be based on mana , 
-hybrid mage characters dont need as many regs 
 
 HOTKEY:: N
-VERSION::20250907
+VERSION::20250923
 """
+
 BANK_PHRASE = "bank"
 DEBUG_MODE = False # Set to True to enable debug/info messages
 MOVE_GEMS = True # Set to True to enable moving gems to bank
@@ -33,9 +29,15 @@ REAGENTS_CONFIG = {
     'Spider Silk': {'id': 0x0F8D, 'min': 100, 'max': 200},     # Standard amounts
     'Sulfurous Ash': {'id': 0x0F8C, 'min': 100, 'max': 200},   # Standard amounts
 }
+
+# Mana-based reagent restock profile
+# If player's max mana is below this threshold, use lower targets and remove extra Nightshade/Black Pearl bias
+LOW_MANA_THRESHOLD = 100
+LOW_MANA_MIN = 70
+LOW_MANA_MAX = 100
 # RESOURCES - crafting or imbue materials 
 MOVE_RESOURCES = True  # Set to True to enable moving resources to sub-container
-RESOURCE_CONTAINER_SERIALS = [0x40050F9D, 0x40047C80]  # List of possible resource container serials (inside the bank box, by priority)
+RESOURCE_CONTAINER_SERIALS = [0x40050F9D, 0x40047C80,0x4191C850,0x403047BA]  # List of possible resource container serials (inside the bank box, by priority)
 RESOURCE_CONTAINER_PRIORITY = 0  # Index of the preferred container in the list
 # POTION RESTOCK
 POTION_RESTOCK = True  # Set to True to enable potion restocking
@@ -75,10 +77,8 @@ SUPPLIES_TO_DEPOSIT = {
     'gold': 0x0EED,
 }
 
-
-
 # Dictionary of resources to deposit: Name -> ItemID
-# These are imbueing materials , we are placing them in a sub-container inside the bank box
+# These are imbueing / enchanting materials , we are placing them in a sub-container inside the bank box
 # Orbs end up in here because of Void Obrs
 # TODO: use hue to differentiate 
 RESOURCES_TO_DEPOSIT = {
@@ -180,6 +180,81 @@ def debug_message(msg, color=67):
     if DEBUG_MODE:
         Misc.SendMessage(msg, color)
 
+def log_player_mana_info():
+    """Log detailed mana information for debugging purposes."""
+    try:
+        try:
+            mm = Player.ManaMax
+        except Exception:
+            mm = None
+        try:
+            m = Player.Mana
+        except Exception:
+            m = None
+        debug_message(f"[Mana Debug] ManaMax={mm} (type={type(mm).__name__}), Mana={m} (type={type(m).__name__})", 68)
+    except Exception as e:
+        debug_message(f"[Mana Debug] Error reading mana fields: {e}", 33)
+
+def get_player_max_mana():
+    """Return player's maximum mana capacity using Player.ManaMax like the UI scripts do."""
+    try:
+        try:
+            mm = Player.ManaMax
+        except Exception:
+            mm = 0
+        try:
+            im = int(mm)
+        except Exception:
+            im = 0
+        if im and im > 0:
+            debug_message(f"[Mana Debug] Using ManaMax={mm} -> int={im} for profile selection", 68)
+            return im
+        # Fallback: derive max mana from components if ManaMax is unavailable on this shard/client
+        try:
+            base_int = int(Player.Int or 0)
+        except Exception:
+            base_int = 0
+        try:
+            max_mana_inc = int(Player.MaximumManaIncrease or 0)
+        except Exception:
+            max_mana_inc = 0
+        try:
+            mana_inc = int(Player.ManaIncrease or 0)
+        except Exception:
+            mana_inc = 0
+        try:
+            cur_mana = int(Player.Mana or 0)
+        except Exception:
+            cur_mana = 0
+        computed = base_int + max_mana_inc + mana_inc
+        # Ensure we never report less than current mana
+        chosen = max(computed, cur_mana)
+        debug_message(
+            f"[Mana Debug] Fallback compute: Int={base_int}, MaximumManaIncrease={max_mana_inc}, ManaIncrease={mana_inc}, current Mana={cur_mana} => computed={computed}, chosen={chosen}",
+            68
+        )
+        return chosen
+    except Exception:
+        return 0
+
+def get_reagents_config_for_mana():
+    """Build a reagent config adjusted for player's total mana.
+    - If max mana < LOW_MANA_THRESHOLD: use LOW_MANA_MIN..LOW_MANA_MAX for ALL reagents (no extra NS/BP).
+    - Otherwise: use REAGENTS_CONFIG as-is (pure mage/higher mana profile).
+    """
+    total_mana = get_player_max_mana()
+    # Shallow copy preserving ids
+    adjusted = {}
+    if total_mana < LOW_MANA_THRESHOLD:
+        debug_message(f"Using low-mana reagent profile (max mana: {total_mana}) -> {LOW_MANA_MIN}-{LOW_MANA_MAX} each, no NS/BP extra", 65)
+        for name, cfg in REAGENTS_CONFIG.items():
+            adjusted[name] = {'id': cfg['id'], 'min': LOW_MANA_MIN, 'max': LOW_MANA_MAX}
+    else:
+        debug_message(f"Using standard reagent profile (max mana: {total_mana})", 65)
+        for name, cfg in REAGENTS_CONFIG.items():
+            adjusted[name] = {'id': cfg['id'], 'min': cfg['min'], 'max': cfg['max']}
+    return adjusted
+
 def manage_reagents(bankBox):
     """Manage reagents based on individual min/max thresholds"""
     if not REAGENT_RESTOCK:
@@ -187,7 +262,10 @@ def manage_reagents(bankBox):
         
     debug_message("Managing reagents...", 65)
     
-    for reagent_name, reagent_config in REAGENTS_CONFIG.items():
+    # Build mana-aware configuration
+    mana_reagents_config = get_reagents_config_for_mana()
+    
+    for reagent_name, reagent_config in mana_reagents_config.items():
         reagent_id = reagent_config['id']
         reagent_min = reagent_config['min']
         reagent_max = reagent_config['max']
@@ -252,7 +330,6 @@ def manage_potions(bankBox):
             if potions_needed > 0:
                 debug_message(f"Warning: Still need {potions_needed} {potion_name} but none available in bank", 33)
 
-
 def move_resources_to_subcontainer(bankBox, resourceContainer):
     """
     Move all resource items (from RESOURCES_TO_DEPOSIT) from backpack to a specific sub-container in the bank box.
@@ -291,6 +368,11 @@ def main():
     debug_message("Bank box serial: " + hex(bankBox.Serial), 65)
     # Log player's backpack serial
     debug_message("Backpack serial: " + hex(Player.Backpack.Serial), 65)
+
+    # Verbose mana debug and threshold info
+    log_player_mana_info()
+    current_max_mana = get_player_max_mana()
+    debug_message(f"[Mana Debug] LOW_MANA_THRESHOLD={LOW_MANA_THRESHOLD}, resolved max mana={current_max_mana}", 68)
 
     # Check if bank box serial is valid
     if bankBox.Serial == 0:

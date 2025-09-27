@@ -14,17 +14,25 @@ import time
 import random
 
 DEBUG_MODE = False # default = false , set to true for debug messages
-SAFE_MODE = False  # extra-conservative pacing and movement
+SAFE_MODE = False  # extra slow pacing and movement
 
-# Preview mode: when True, do not move or place real items. Instead, render client-side
+# Preview mode: when True, does not move or place real items. Instead, render client-side
 # fake items at the target coordinates using PacketLogger.SendToClient
 PREVIEW_MODE = False
 PREVIEW_DEFAULT_HUE = 0x0000  # 0 means no hue
 
-# Black Pearl Item Configuration
+# Item Configuration
+# Default spiral: Black Pearl (0x0F7A)
+# Antispiral: Arcane Dust (0x5745)
 BLACK_PEARL_ITEM_IDS = {
     "Black Pearl": [0x0F7A],
 }
+ARCANE_DUST_ITEM_IDS = {
+    "Arcane Dust": [0x5745],
+}
+ITEM_NAME_LOOKUP = {}
+ITEM_NAME_LOOKUP.update(BLACK_PEARL_ITEM_IDS)
+ITEM_NAME_LOOKUP.update(ARCANE_DUST_ITEM_IDS)
 
 # Spiral generation parameters
 SPIRAL_RADIUS = 15  # Maximum radius of spiral (increased for larger scale)
@@ -45,19 +53,44 @@ ENFORCE_STACK_LIMIT = True   # If True, strictly enforce the stack limit per loc
 SKIP_ITEM_COUNT_CHECK = True  # If True, place whatever items available without checking total needed
 
 # Phase toggles for spiral components
+# Enable exactly one (or both if desired) to place default spiral and/or antispiral.
 PLACE_COMPONENTS = {
-    "spiral_pattern": True,
+    "spiral_pattern": True,       # Default spiral with Black Pearl
+    "antispiral_pattern": True,  # Antispiral with Arcane Dust
 }
 
-# Component Configuration: spiral pattern
+# Component Configuration: spiral patterns
+# Both use the same algorithm; antispiral uses an angle_offset to interleave points without overlap.
 RITUAL_CONFIG = {
     "spiral_pattern": {
+        "label": "Black Pearl spiral",
         "item_ids": BLACK_PEARL_ITEM_IDS["Black Pearl"],
         "pattern": "spiral",
+        "angle_offset": 0.0,  # radians
         "max_radius": SPIRAL_RADIUS,
         "spacing": SPIRAL_SPACING,
         "turns": SPIRAL_TURNS,
         "thickness": SPIRAL_THICKNESS,
+        "radius_offset": 0.0,           # additional radial shift
+        "theta_phase": 0.0,             # phase of theta sampling in [0,1) of one increment
+        "random_stacking": RANDOM_STACKING_ENABLED,
+        "max_stack_height": MAX_STACK_HEIGHT,
+        "center_stack_bias": CENTER_STACK_BIAS,
+        "skip_count_check": SKIP_ITEM_COUNT_CHECK,
+        "max_stacks_per_location": MAX_STACKS_PER_LOCATION,
+        "enforce_stack_limit": ENFORCE_STACK_LIMIT,
+    },
+    "antispiral_pattern": {
+        "label": "Arcane Dust antispiral",
+        "item_ids": ARCANE_DUST_ITEM_IDS["Arcane Dust"],
+        "pattern": "spiral",
+        "angle_offset": 1.57079632679,  # ~pi/2 radians (90 degrees)
+        "max_radius": SPIRAL_RADIUS,
+        "spacing": SPIRAL_SPACING,
+        "turns": SPIRAL_TURNS,
+        "thickness": SPIRAL_THICKNESS,
+        "radius_offset": SPIRAL_SPACING / 2.0,  # shift half the inter-arm spacing to sit between arms
+        "theta_phase": 0.5,                     # sample halfway between base points to avoid rounding overlaps
         "random_stacking": RANDOM_STACKING_ENABLED,
         "max_stack_height": MAX_STACK_HEIGHT,
         "center_stack_bias": CENTER_STACK_BIAS,
@@ -67,21 +100,21 @@ RITUAL_CONFIG = {
     },
 }
 
-# Constants (copied/tuned from modern ritual base)
+# Constants 
 PAUSE_DURATION = 350        # General pause between actions (ms)
 PAUSE_DURATION_PLACE = 550  # Pause after placing item (ms)
 PREVIEW_PAUSE_DURATION = 25 # Fast pause for preview mode (ms)
 PREVIEW_PAUSE_PLACE = 35    # Fast pause after preview placement (ms)
 MAX_DISTANCE = 2
 
-# Movement tuning (graceful handling)
+# Movement tuning 
 GOTO_BASE_DELAY = 250       # base delay between movement attempts (ms)
 GOTO_MAX_RETRIES = 1        # minimal retries
 WIGGLE_RADII = [0]          # in SAFE_MODE we only try exact tile
 WIGGLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
 WALK_REPEATS_PER_DIR = 2    # attempts per direction
 
-# Center bias tuning (keep minimal to avoid backtracking)
+# Center bias tuning 
 CENTER_BIAS_ENABLED = True
 CENTER_NUDGE_DISTANCE = 3
 CENTER_NUDGE_STEPS = 2
@@ -91,9 +124,9 @@ PLACE_MAX_RETRIES = 1
 PLACE_BACKOFF_BASE = 250
 POINT_TIMEOUT_MS = 1500
 POINT_BREATHER_MS = 250
-PREVIEW_BREATHER_MS = 15    # Fast breather for preview mode
+PREVIEW_BREATHER_MS = 15    # Fast when using preview mode
 
-# Global throttling / jitter to protect client and server
+# Global throttling / jitter 
 RATE_MIN_GAP_MS = 350
 LOOP_YIELD_MS = 40
 JITTER_MS = 50
@@ -104,6 +137,8 @@ LAST_ACTION_MS = 0
 # Phase fail-safe and dedupe
 MAX_PHASE_FAILURES = 6
 PLACED_COORDS_BY_ITEM = {}
+ALL_PLACED_COORDS = set()  # legacy/global view (kept for debugging)
+ALL_PLACED_COORDS_BY_COMPONENT = {}  # dict[str -> set[(x,y)]]
 BAD_COORDS = set()
 
 #//========================================================
@@ -170,16 +205,20 @@ def preview_item_at(x, y, z, item_id, hue=PREVIEW_DEFAULT_HUE):
     hue_hex = _format_hex_4_with_space(hue)
     _send_fake_item(x, y, z, item_hex, hue_hex)
 
-def generate_spiral_points(center_x, center_y, max_radius, spacing=SPIRAL_SPACING, turns=SPIRAL_TURNS, thickness=1):
-    """Generate Archimedean spiral points with thickness and random stacking."""
+def generate_spiral_points(center_x, center_y, max_radius, spacing=SPIRAL_SPACING, turns=SPIRAL_TURNS, thickness=1, angle_offset=0.0, radius_offset=0.0, theta_phase=0.0, theta_increment=0.15):
+    """Generate Archimedean spiral points with thickness and optional angular offset.
+
+    angle_offset rotates the spiral around the center to create an "antispiral" that interleaves
+    with the default spiral without overlapping.
+    """
     points = []
     a = 0  # Start at center
     b = spacing / (2 * math.pi)  # Controls the distance between spiral arms
-    theta = 0
+    theta = float(theta_phase) * float(theta_increment)
     max_theta = turns * 2 * math.pi
     added_points = set()  # Track unique points to avoid duplicates
     
-    debug_message(f"Generating spiral: center=({center_x},{center_y}), radius={max_radius}, turns={turns}, thickness={thickness}", 67)
+    debug_message(f"Generating spiral: center=({center_x},{center_y}), radius={max_radius}, turns={turns}, thickness={thickness}, angle_offset={round(angle_offset,3)}", 67)
     
     # Safety limit to prevent infinite loops
     max_iterations = 10000
@@ -187,7 +226,7 @@ def generate_spiral_points(center_x, center_y, max_radius, spacing=SPIRAL_SPACIN
     
     # Generate base spiral
     while theta <= max_theta and iteration_count < max_iterations:
-        r = a + b * theta
+        r = a + b * theta + float(radius_offset)
         if r > max_radius:
             break
         
@@ -197,8 +236,8 @@ def generate_spiral_points(center_x, center_y, max_radius, spacing=SPIRAL_SPACIN
             if offset_r > max_radius:
                 continue
                 
-            x = int(round(center_x + offset_r * math.cos(theta)))
-            y = int(round(center_y + offset_r * math.sin(theta)))
+            x = int(round(center_x + offset_r * math.cos(theta + angle_offset)))
+            y = int(round(center_y + offset_r * math.sin(theta + angle_offset)))
             
             if (x, y) not in added_points:
                 points.append((x, y))
@@ -207,7 +246,7 @@ def generate_spiral_points(center_x, center_y, max_radius, spacing=SPIRAL_SPACIN
                 if len(points) % 10 == 0:
                     debug_message(f"Generated {len(points)} spiral points so far...", 68)
         
-        theta += 0.15  # Adjusted for better spacing with larger scale
+        theta += float(theta_increment)  # keep consistent spacing
         iteration_count += 1
     
     if iteration_count >= max_iterations:
@@ -395,7 +434,7 @@ def goto_location_with_wiggle(x, y, max_retries=GOTO_MAX_RETRIES, center=None):
 def place_item(x, y, item_id, z=None, stack_level=0):
     if PREVIEW_MODE:
         if z is None:
-            z = Player.Position.Z - 1  # Always use z-1 for auto-stacking
+            z = -1 #Player.Position.Z - 1  # Always use z-1 for auto-stacking
         # Adjust z for stacking in preview
         preview_z = z - stack_level
         preview_item_at(x, y, preview_z, item_id, PREVIEW_DEFAULT_HUE)
@@ -404,7 +443,7 @@ def place_item(x, y, item_id, z=None, stack_level=0):
         return False
     offsets = [(0, 0)] if SAFE_MODE else [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)]
     if z is None:
-        z = Player.Position.Z - 1  # Always use z-1 for auto-stacking
+        z = -1 #Player.Position.Z - 1  # Always use z-1 for auto-stacking
 
     for dx_off, dy_off in offsets:
         tx = x + dx_off
@@ -429,8 +468,8 @@ def place_item(x, y, item_id, z=None, stack_level=0):
                 return False
 
             try:
-                # Force all items to be placed at Player.Position.Z - 1 for auto-stacking
-                force_z = Player.Position.Z - 1
+                # Force all items to be placed at actual -1 , not just Player.Position.Z - 1 for auto-stacking
+                force_z = -1 # Player.Position.Z - 1
                 Items.MoveOnGround(item, 1, tx, ty, force_z)
             except Exception as e:
                 debug_message(f"MoveOnGround failed at ({tx},{ty},{force_z}): {e}", 33)
@@ -455,7 +494,7 @@ def place_item(x, y, item_id, z=None, stack_level=0):
 
     return False
 
-def place_items_at_points(points, item_id, z=None, progress_msg="Placing spiral", center=None):
+def place_items_at_points(points, item_id, z=None, progress_msg="Placing spiral", center=None, component_key=None):
     if not points or item_id is None:
         return set()
 
@@ -480,7 +519,21 @@ def place_items_at_points(points, item_id, z=None, progress_msg="Placing spiral"
             debug_message(f"Skipping known-bad coord ({x},{y})", 33)
             continue
 
-        # Allow multiple items at same location for stacking
+        # Cross-component dedupe: never place on a tile used by a different component
+        if component_key is not None:
+            for comp, coords_set in ALL_PLACED_COORDS_BY_COMPONENT.items():
+                if comp == component_key:
+                    continue  # allow stacking within same component
+                if (x, y) in coords_set:
+                    debug_message(f"Skipping coord used by component '{comp}' at ({x},{y})", 68)
+                    continue_outer = True
+                    break
+            else:
+                continue_outer = False
+            if continue_outer:
+                continue
+
+        # Allow multiple items at same location for stacking within a component (handled by stack_level)
         # if (x, y) in PLACED_COORDS_BY_ITEM[item_id]:
         #     debug_message(f"Duplicate coords for Black Pearl at ({x},{y}), skipping.", 68)
         #     continue
@@ -498,6 +551,11 @@ def place_items_at_points(points, item_id, z=None, progress_msg="Placing spiral"
             if place_item(x, y, item_id, z, stack_level):
                 placed.add((x, y, stack_level))
                 PLACED_COORDS_BY_ITEM[item_id].add((x, y))
+                ALL_PLACED_COORDS.add((x, y))
+                if component_key is not None:
+                    if component_key not in ALL_PLACED_COORDS_BY_COMPONENT:
+                        ALL_PLACED_COORDS_BY_COMPONENT[component_key] = set()
+                    ALL_PLACED_COORDS_BY_COMPONENT[component_key].add((x, y))
                 break
             if PREVIEW_MODE:
                 break
@@ -529,7 +587,7 @@ def get_first_available_item_id(item_ids, required_count):
             return item_id
     return None
 
-def place_pattern_component(center_x, center_y, config, z=None):
+def place_pattern_component(center_x, center_y, config, z=None, component_key=None):
     points = []
     if config["pattern"] == "spiral":
         # Generate base spiral points
@@ -539,7 +597,10 @@ def place_pattern_component(center_x, center_y, config, z=None):
             config["max_radius"],
             config["spacing"],
             config["turns"],
-            config.get("thickness", 1)
+            config.get("thickness", 1),
+            config.get("angle_offset", 0.0),
+            config.get("radius_offset", 0.0),
+            config.get("theta_phase", 0.0)
         )
         
         # Add random stacking if enabled
@@ -570,12 +631,13 @@ def place_pattern_component(center_x, center_y, config, z=None):
         points,
         item_id,
         z,
-        f"{verb} Black Pearl spiral",
-        center=(center_x, center_y)
+        f"{verb} {config.get('label', 'spiral')}",
+        center=(center_x, center_y),
+        component_key=component_key
     )
 
 def get_item_name(item_id):
-    for name, ids in BLACK_PEARL_ITEM_IDS.items():
+    for name, ids in ITEM_NAME_LOOKUP.items():
         if isinstance(ids, list) and item_id in ids:
             return name
         if ids == item_id:
@@ -604,7 +666,7 @@ def calculate_item_totals():
         if key not in totals:
             totals[key] = 0
         # Calculate spiral points to get required count
-        base_points = generate_spiral_points(0, 0, config["max_radius"], config["spacing"], config["turns"], config.get("thickness", 1))
+        base_points = generate_spiral_points(0, 0, config["max_radius"], config["spacing"], config["turns"], config.get("thickness", 1), config.get("angle_offset", 0.0), config.get("radius_offset", 0.0), config.get("theta_phase", 0.0))
         if config.get("random_stacking", False):
             stacked_points = generate_stacked_points(
                 base_points, 0, 0, 
@@ -631,7 +693,7 @@ def calculate_item_totals():
 def create_spiral_arrangement(center_x, center_y):
     debug_message("Beginning spiral arrangement...", 67)
 
-    center_z = Player.Position.Z - 1  # Always use z-1 for auto-stacking
+    center_z = -1 # Player.Position.Z  # Always use z-1 for auto-stacking
 
     if not PREVIEW_MODE:
         if not goto_location_with_wiggle(center_x, center_y, center=(center_x, center_y)):
@@ -642,7 +704,7 @@ def create_spiral_arrangement(center_x, center_y):
         if not PLACE_COMPONENTS[phase]:
             continue
         item_ids = config["item_ids"] if isinstance(config["item_ids"], list) else [config["item_ids"]]
-        base_points = generate_spiral_points(center_x, center_y, config["max_radius"], config["spacing"], config["turns"], config.get("thickness", 1))
+        base_points = generate_spiral_points(center_x, center_y, config["max_radius"], config["spacing"], config["turns"], config.get("thickness", 1), config.get("angle_offset", 0.0), config.get("radius_offset", 0.0), config.get("theta_phase", 0.0))
         if config.get("random_stacking", False):
             spiral_points = generate_stacked_points(
                 base_points, center_x, center_y, 
@@ -669,7 +731,7 @@ def create_spiral_arrangement(center_x, center_y):
                 debug_message(f"Proceeding with {phase}: have {have} {get_item_name(item_id)} (will place what we can)", 68)
         temp_config = dict(config)
         temp_config["item_ids"] = [item_id]
-        placed = place_pattern_component(center_x, center_y, temp_config, center_z)
+        placed = place_pattern_component(center_x, center_y, temp_config, center_z, component_key=phase)
         debug_message(
             (f"Previewed {len(placed)} items for {phase}" if PREVIEW_MODE else f"Placed {len(placed)} items for {phase}"),
             68 if placed else 33

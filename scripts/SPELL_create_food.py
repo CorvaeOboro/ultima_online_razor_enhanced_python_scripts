@@ -2,13 +2,18 @@
 SPELL Create Food - a Razor Enhanced Python script for Ultima Online
 
 cast the Create Food spell to summon a mana restorative item
-- Finding and equipping a (basic) spellbook from backpack ( we dont want to waste durability on our good spellbook )
-- Casting Create Food repeatedly until 20 items created
+Finds and equips a basic spellbook from backpack , as we dont want to waste durability on our good spellbook
+Casts Create Food repeatedly until 20 items are created
 
 common to custom shards create food will produce mana restoring items if cast while holding a spellbook
 
+TODO: this maybe could be merged with ready check script , if not enough mana restorative then create it
+
+HOTKEY:: None 
 VERSION::20250918
 """
+
+import re
 
 DEBUG_MODE = False  # Controls whether debug_message outputs to the client
 
@@ -44,6 +49,8 @@ class CreateFoodManager:
         
         # Current spellbook tracking
         self.current_spellbook = None
+        # Previously equipped (non-base) spellbook to restore after sequence
+        self.previous_spellbook_serial = None
 
         # Spellbook detection configuration
         self.spellbook_item_id = 0x0EFA
@@ -200,20 +207,34 @@ class CreateFoodManager:
         return True
         
     def get_item_properties(self, item):
-        """Return a set of property strings for an item using multiple APIs."""
+        """Return a set of property strings for an item using multiple APIs.
+
+        Uses serial-based queries to ensure consistent behavior.
+        """
         props = set()
         try:
-            lst = Items.GetPropStringList(item)
+            serial = int(getattr(item, 'Serial', item))
+        except Exception:
+            serial = item
+        # Try to wait for props to be available
+        try:
+            Items.WaitForProps(int(serial), 750)
+        except Exception:
+            pass
+        # Method 1: full list
+        try:
+            lst = Items.GetPropStringList(int(serial))
             if lst:
                 for p in lst:
                     if p:
                         props.add(str(p))
         except Exception:
             pass
+        # Method 2: iterate indices
         try:
-            for i in range(0, 32):
+            for i in range(0, 64):
                 try:
-                    s = Items.GetPropStringByIndex(item, i)
+                    s = Items.GetPropStringByIndex(int(serial), i)
                 except Exception:
                     s = None
                 if not s:
@@ -247,6 +268,10 @@ class CreateFoodManager:
                 if any('spellbook' in str(p).lower() for p in props):
                     name_ok = True
             if not name_ok:
+                return False
+        # If any Durability pattern is present, it's NOT a base book
+        for p in list(props):
+            if re.search(r"durability\s*\d+\s*/\s*\d+", str(p), re.IGNORECASE):
                 return False
         if REQUIRE_BLESSED_FOR_BASE:
             # Must be Blessed and must not contain any modifier keyword
@@ -307,6 +332,11 @@ class CreateFoodManager:
         # If equipped and not base, unequip it
         if equipped_book and not self.is_base_spellbook(equipped_book):
             self.debug_message("Unequipping non-base spellbook from hands...")
+            # Remember this equipped non-base spellbook to restore later
+            try:
+                self.previous_spellbook_serial = int(equipped_book.Serial)
+            except Exception:
+                self.previous_spellbook_serial = None
             try:
                 Items.Move(equipped_book, Player.Backpack.Serial, 0)
                 Misc.Pause(self.equip_delay)
@@ -339,6 +369,30 @@ class CreateFoodManager:
                 self.current_spellbook = item
                 return True
         self.debug_message("Failed to equip base spellbook!", self.error_color)
+        return False
+
+    def re_equip_previous_spellbook(self):
+        """Try to re-equip the previously equipped non-base spellbook by serial."""
+        if not self.previous_spellbook_serial:
+            return False
+        try:
+            prev = Items.FindBySerial(int(self.previous_spellbook_serial))
+        except Exception:
+            prev = None
+        if not prev:
+            return False
+        try:
+            # Only re-equip if it's still a spellbook and not already equipped
+            if getattr(prev, 'ItemID', None) == self.spellbook_item_id and not self.is_item_equipped(prev):
+                Player.EquipItem(prev)
+                Misc.Pause(self.equip_delay)
+                # Verify
+                for layer in ['LeftHand', 'RightHand']:
+                    it = Player.GetItemOnLayer(layer)
+                    if it and int(getattr(it, 'Serial', 0)) == int(self.previous_spellbook_serial):
+                        return True
+        except Exception:
+            return False
         return False
         
     def create_food_sequence(self):
@@ -378,9 +432,11 @@ class CreateFoodManager:
                 
         self.debug_message(f"Cast Create Food {casts} times")
         
-        # Unequip and dress
-        self.unequip_spellbook()
-        self.run_dress_macro()
+        # Restore gear: re-equip previous non-base spellbook if we switched
+        if not self.re_equip_previous_spellbook():
+            # If we couldn't re-equip previous, at least unequip base and run dress macro
+            self.unequip_spellbook()
+            self.run_dress_macro()
         
         self.debug_message("Create Food sequence complete!", self.success_color)
         return True

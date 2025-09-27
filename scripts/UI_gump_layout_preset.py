@@ -1,35 +1,32 @@
 """
 UI gump layout preset - a Razor Enhanced Python Script for Ultima Online
 
-Moves custom gumps to a specified layout location
+Moves ui gumps to specified layout positions
 
-Goal:
-custom shard gumps and custom gumps from scripts dont automatically save their location into the settings or profile gumps.xml . 
-custom gumps positioning is not stored by the settings like core gumps 
-, and  while the player profile settings holds the positions there isnt a LOCK option
- so drit over time from small nudges accumulates . 
- therefore we want to store an external gump position settings file 
- and be able to conditionally arrange elements ( spells , custom gump locations ) 
- we will try to handle this in the custom gump scripts ( positioning themselves on start from a settings file ) , but this might be a good catch all 
- 
-Razor Enhanced API of ClassicUO MoveGump = CUO.MoveGump(serial,x,y)
+CURRENT LAYOUT =  ui areas on right side and lower side 
+Gameplay Window Size = 1509 x 758 
+spell icons , counters , and character status info under the gameplay 
+right side is map , character , and skills , with backpack just to the left of skills at the bot
+
+Notes : Razor Enhanced API of ClassicUO MoveGump = CUO.MoveGump(serial,x,y)
+# 0xFFFFFFF = 4294967295 # max int , make sure gump ids are under this
+# in razor enhanced we can use Inspect Gump then close or open the gump in game to get the gump id serial
 
 TODO: 
 - core game gumps were not detected , maybe through the gumps.xml we can reference them
-- restore closed gumps , the buff icon gump was not detected , an in game macro ToggleBuffIconGump can open it maybe we can send that macro , but its a toggle and we cant detect it it
+- restore closed gumps , the buff icon gump was not detected , an in game macro ToggleBuffIconGump can open it maybe we can send that macro , but its a toggle and we cant detect it
+- use check gump open so that we dont need to delay between gump moves if the gump is not open
+Check Gump Open = Syntax	Gumps.HasGump( )
+- converter function for the hexidecimal , we want to make sure not overlapping existing ids , inspected gumps are hexidecimal 
 
 HOTKEY:: P
-VERSION:: 20250901
+VERSION:: 20250924
 """
+
 DEBUG_MODE = False
-
 MOVE_GUMPS = True
-RESTORE_CLOSED_GUMPS = False # not working currently
-DELAY_MS = 100
 
-# =============================================================================
-
-GUMP_LOCATIONS = {
+GUMP_LAYOUT = {
     # Custom Shard Gumps (Unchained)
     0xafb24ef0: {"name": "Unchained Toolbar", "x": 400, "y": 825},
     0x431beab3: {"name": "Dungeon Progress", "x": 255, "y": 815},
@@ -37,16 +34,25 @@ GUMP_LOCATIONS = {
     0x7d050c60: {"name": "Expedition Progress", "x": 255, "y": 850},
     0x4a3bd2b1: {"name": "chat", "x": 0, "y": 920},
     0xbacf07e2: {"name": "spell proc bar", "x": 400, "y": 645},
+    0x7da9a7ba: {"name": "emotes", "x": 400, "y": 645},
+    0xdbae5952: {"name": "nature mastery forms", "x": 400, "y": 645},
+    0xbf26ed43: {"name": "death mastery rage", "x": 400, "y": 645},
+    0xb8108206: {"name": "summoner ritual dark lantern", "x": 400, "y": 645},
     # custom UI gumps 
     0xc671ea51: {"name": "Progress Tracker", "x": 0, "y": 755},
     3411114321: {"name": "Health Bar", "x": 465, "y": 715},
     3229191321: {"name": "Summon Monitor", "x": 790, "y": 720},
     0xc0798c99: {"name": "Summon Monitor", "x": 790, "y": 720},
-    0x7a11a12: {"name": "Walia Info", "x": 350, "y": 760},
-    # other custom gumps
-    0xbeefdade: {"name": "Durability percents", "x": 350, "y": 760},
+    0x7a11a12: {"name": "Item Info WAILA", "x": 350, "y": 760},
+    3135545776: {"name": "Local Chat", "x": 1500, "y": -20},
+    4191917191: {"name": "Action Buttons", "x": 1520, "y": 185},
+    0x75A11E6: {"name": "Loot", "x": 350, "y": 810},
+    3636346736: {"name": "Durability", "x": 465, "y": 715},
+    4191917201: {"name": "Command", "x": 465, "y": 715},
 }
 
+RESTORE_CLOSED_GUMPS = False # not working currently
+DELAY_MS = 100
 # =============================================================================
 
 class GumpLayoutManager:
@@ -62,12 +68,12 @@ class GumpLayoutManager:
     
     def get_all_configured_gumps(self):
         """Get list of all configured gumps"""
-        return list(GUMP_LOCATIONS.keys())
+        return list(GUMP_LAYOUT.keys())
     
     def move_gump_to_preset(self, gump_id):
         """Move a specific gump to its preset location"""
         try:
-            layout = GUMP_LOCATIONS
+            layout = GUMP_LAYOUT
             if gump_id not in layout:
                 self.debug_message(f"No preset location for gump {hex(gump_id)}", 0x33)
                 return False
@@ -103,7 +109,7 @@ class GumpLayoutManager:
         self.debug_message("Starting gump layout preset application...")
         
         all_gumps = self.get_all_configured_gumps()
-        layout = GUMP_LOCATIONS
+        layout = GUMP_LAYOUT
         moved_count = 0
         total_gumps = len(all_gumps)
         
@@ -163,10 +169,10 @@ def list_configured_gumps():
     manager = GumpLayoutManager()
     manager.debug_message("=== Configured Gumps ===", 0x44)
     
-    for gump_id, preset in GUMP_LOCATIONS.items():
+    for gump_id, preset in GUMP_LAYOUT.items():
         manager.debug_message(f"{hex(gump_id)}: {preset['name']} -> ({preset['x']}, {preset['y']})")
     
-    manager.debug_message(f"Total configured gumps: {len(GUMP_LOCATIONS)}")
+    manager.debug_message(f"Total configured gumps: {len(GUMP_LAYOUT)}")
 
 def reset_layout():
     """Reset all gumps to their preset positions"""
