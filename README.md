@@ -37,7 +37,7 @@ user interface custom gumps
 - [UI_layout_preset.py](scripts/UI_layout_preset.py) – move gumps to specified positions
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_layout_preset.gif?raw=true"/>
 - [UI_action_buttons.py](scripts/UI_action_buttons.py) – button layout for emotes , say , and scripts
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_UI_action_buttons.png?raw=true"/>
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_UI_action_buttons.png?raw=true"/>
 
 ## RITUAL
 ritual magic 

@@ -2,21 +2,17 @@
 ITEM Food Eater - a Razor Enhanced Python Script for Ultima Online
 
 eat food items until full
+- prioritize least amount first
+- excludes specific hued items that share food item ids ( mana restorative foods )
 
 HOTKEY:: Y
-VERSION::20250918
+VERSION::20250925
 """
 
 import time
 
 DEBUG_MODE = False  # Set to False to suppress debug output
 PRIORITIZE_LEAST_AMOUNT_FIRST = True  #  eat food with least amount first
-
-# Exempt specific hued items from being eaten
-# Format: {(ItemID, Hue)} where both are integers
-EXCLUDED_HUED_ITEMS = {
-    (0x097B, 0x0825),  # Blue mana fish steak is a mana restorative
-}
 
 # Food Categories with ID
 FOOD_ITEMS = {
@@ -55,7 +51,13 @@ FOOD_ITEMS = {
     }
 }
 
-
+# Format: {(ItemID, Hue)} where both are hexidecimal
+EXCLUDED_HUED_ITEMS = {
+    (0x097B, 0x0825),  # Blue mana fish steak is a mana restorative
+    # Apple variants to exclude: Arcane Berries and Tribal Berries
+    (0x09D0, 0x0480),  # Arcane Berries (Apple ItemID with hue 0x0480)
+    (0x09D0, 0x0006),  # Tribal Berries (Apple ItemID with hue 0x0006)
+}
 
 def debug_message(msg, color=67):
     if DEBUG_MODE:

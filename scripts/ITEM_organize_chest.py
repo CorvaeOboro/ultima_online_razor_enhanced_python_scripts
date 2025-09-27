@@ -1,7 +1,7 @@
 """
 ITEM Organize Chest - a Razor Enhanced Python Script for Ultima Online
 
-Organizes items in any targeted container dynamically by grouping similar items into bins
+Organizes items in targeted container by grouping similar items into bins
 and distributing them evenly across the container space.
 
 this script is similar to ITEM_organize_backpack.py which is a version specific to the players backpack
@@ -9,23 +9,18 @@ this script is similar to ITEM_organize_backpack.py which is a version specific 
 These positions are tuned for a "150" container size without scaling items sizes 
 the default is "100" container size so you may want to adjust the x and y values for your settings
 
-Dynamic binning rules:
+binning rules:
 - Items are grouped by (ItemID, Hue). This separates e.g., red/blue/yellow scrolls into distinct bins.
 - Each bin is assigned a region in a grid layout sized to the number of bins.
 - Within a bin, items are placed in a compact grid. Stackables consolidate naturally.
 
-Usage:n
-- a target cursor appears. Target any container 
-- The script scans that container and organizes its contents.
-
-Notes:
-- Coordinates assume a standard container gump; margins are used to keep items visible.
-- Adjust SPACING and MARGINS to fit your UI scale if needed.
+TODO:
+- add a dict of known graphics with their dimensions and sub region bounding box , we can use this be better pack things like magic scrolls  , or deal with items that have a lot of alpha tranparent canvas
 
 HOTKEY:: CTRL + U
 VERSION::20250823
 """
-DEBUG_MODE = False  # Set to True to enable debug/info messages
+DEBUG_MODE = True  # Set to True to enable debug/info messages
 
 # Items will be placed within [MIN_X..MAX_X] x [MIN_Y..MAX_Y] after applying margins.
 MIN_X = 40

@@ -10,7 +10,7 @@ TODO:
 HOTKEY:: K ( Kwuest )
 VERSION:: 20250926
 """
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 # Quest Configurations
 

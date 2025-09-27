@@ -324,13 +324,17 @@ KNOWN_QUEST_ITEMS = {
 
 KNOWN_SCROLL_ITEMS = {
     # Key: (ItemID, Hue or None) -> list[str]
+    # Known hues (from game data):
+    #  - 0x0808: Spellbook Enhancement Scrolls
+    #  - 0x086C: Weapon Enhancement Scrolls
+    #  - 0x081A: Armor Enhancement Scrolls
     (0x0E34, 0x0808): [  # Spellbook Enhancement Scroll
         "apply to a <basefont color=#FF6B6B>Spellbook</basefont>",
     ],
-    (0x0E34, 0x0808): [  # Weapon Enhancement Scroll
+    (0x0E34, 0x086C): [  # Weapon Enhancement Scroll
         "apply to a <basefont color=#FF6B6B>Weapon</basefont>",
     ],
-    (0x0E34, 0x0808): [  # Armor Enhancement Scroll
+    (0x0E34, 0x081A): [  # Armor Enhancement Scroll
         "apply to a <basefont color=#FF6B6B>Armor</basefont>",
     ],
 }
@@ -887,6 +891,207 @@ def _to_int_id(v):
     except Exception:
         return None
 
+# ----------------------------------------
+# Enhancement Scroll parsing and rendering
+# ----------------------------------------
+
+def _detect_scroll_type_from_hue(hue_val: int) -> str or None:
+    """Return 'spellbook' | 'weapon' | 'armor' for known enhancement scroll hues, else None."""
+    try:
+        h = int(hue_val)
+    except Exception:
+        return None
+    if h == 0x0808:
+        return 'spellbook'
+    if h == 0x086C:
+        return 'weapon'
+    if h == 0x081A:
+        return 'armor'
+    return None
+
+def _parse_scroll_effects(property_list: list) -> dict:
+    """Parse enhancement scroll property lines.
+
+    Returns dict with keys:
+      - level_text: first line like '4 Armor Enhancement Scroll' (optional)
+      - enhances_text: e.g. 'Enhances Arachnid Protection by +2%'
+      - max_text: e.g. 'Maximum enhancement: 6%'
+      - effect_name: extracted effect core like 'Arachnid Protection' if available
+      - effect_value: numeric string like '2' if available
+      - max_value: numeric string like '6' if available
+    """
+    out = {
+        'level_text': None,
+        'enhances_text': None,
+        'max_text': None,
+        'effect_name': None,
+        'effect_value': None,
+        'max_value': None,
+    }
+    if not property_list:
+        return out
+
+    # Keep first 6-8 lines to be safe (scrolls are concise)
+    for ln in property_list[:10]:
+        s = str(ln).strip()
+        low = s.lower()
+        # Capture the header line with tier and type
+        if out['level_text'] is None and ('enhancement scroll' in low):
+            out['level_text'] = s
+            continue
+        # Capture the enhances line
+        if out['enhances_text'] is None and low.startswith('enhances '):
+            out['enhances_text'] = s
+            # Extract effect name and value
+            m = re.search(r'^enhances\s+(.+?)\s+by\s*\+(\d+)%', low, flags=re.IGNORECASE)
+            if m:
+                out['effect_name'] = m.group(1).strip().title()
+                out['effect_value'] = m.group(2).strip()
+            continue
+        # Capture maximum enhancement line
+        if out['max_text'] is None and 'maximum enhancement' in low:
+            out['max_text'] = s
+            m2 = re.search(r'(\d+)%', low)
+            if m2:
+                out['max_value'] = m2.group(1)
+            continue
+
+    return out
+
+def _build_scroll_known_lines(scroll_type: str, parsed: dict) -> list:
+    """Return formatted, color-coded known lines for an enhancement scroll."""
+    if not scroll_type:
+        return []
+    lines = []
+
+    # Color scheme
+    type_color = '#FF6B6B'  # red/orange for target type
+    prop_color = '#B084FF'  # purple for property/effect
+    info_color = '#888888'  # grey for meta
+
+    # Human label
+    label = {
+        'spellbook': 'Spellbook Enhancement',
+        'weapon': 'Weapon Enhancement',
+        'armor': 'Armor Enhancement',
+    }.get(scroll_type, 'Enhancement')
+
+    # Line 1: Specific effect, if available
+    effect_name = parsed.get('effect_name')
+    effect_val = parsed.get('effect_value')
+    max_val = parsed.get('max_value')
+
+    if effect_name:
+        # Normalize odd tokens to spaced names (simple prettifier)
+        pretty = re.sub(r'([a-z])([A-Z])', r'\1 \2', effect_name).replace('  ', ' ')
+        # Example: "Armor Enhancement: Enhances Arachnid Protection by +2% (max 6%)"
+        suffix = f" (max {max_val}%)" if max_val else ""
+        if effect_val:
+            main = f"<basefont color={type_color}>{label}:</basefont> <basefont color={prop_color}>Enhances {pretty} by +{effect_val}%</basefont><basefont color={info_color}>{suffix}</basefont>"
+        else:
+            main = f"<basefont color={type_color}>{label}:</basefont> <basefont color={prop_color}>Enhances {pretty}</basefont>"
+        lines.append(main)
+
+        # Append effect-specific guidance footnotes if known
+        fn_lines = _effect_footnotes(scroll_type, effect_name)
+        for fn in fn_lines:
+            lines.append(f"<basefont color={info_color}>{fn}</basefont>")
+
+    return lines
+
+def _normalize_effect_key(s: str) -> str:
+    try:
+        s = re.sub(r'([a-z])([A-Z])', r'\1 \2', str(s))  # split camel case
+        s = s.replace("’", "'")
+        s = re.sub(r'[^a-z0-9\s\'\-]+', ' ', s, flags=re.IGNORECASE)
+        s = re.sub(r'\s+', ' ', s).strip().lower()
+        return s
+    except Exception:
+        return (s or '').strip().lower()
+
+# Per-effect footnotes by scroll type. Keep lines short; more can be added easily.
+EFFECT_FOOTNOTES = {
+    'armor': {
+        # monster type proteciton
+        "arachnid protection": ["Reduces damage taken from spiders"],
+        "vermin protection": ["Reduces damage taken from vermin"],
+        "daemonic protection": ["Reduces damage taken from daemons"],
+        "draconic protection": ["Reduces damage taken from dragons"],
+        "elemental protection": ["Reduces damage taken from elementals"] ,
+        "infidel protection": ["Reduces damage taken from humanoid"],
+        "giant protection": ["Reduces damage taken from giants"],
+        # effect protection
+        "poison resistance": ["Reduces the effect or chance of being poisoned"],
+        "curse resistance": ["Reduces the effect or chance of being cursed "],
+        # crafting gathering
+        "harvesting luck": ["Increased chance to harvest double the amount of resources"],
+        "crafting luck": ["Increased chance to craft an item of exceptional quality"],
+        # increased effects
+        "warding resonance": ["Increased Buff effectiveness"],
+        "wardingresonance": ["Increased Buff effectiveness"],
+        "concoction bonus": ["Increased potion effectiveness"],
+        "concoctionbonus": ["Increased potion effectiveness"],
+        # 
+        "reflective": ["Chance to reflect incoming damage."],
+        "scholarship": ["Increased mastery experience gains"],
+        "archeologist": ["Chance to summon a resource creature while harvesting"],
+        "evasion": ["Chance to evade hits "],
+    },
+    'spellbook': {
+        "flamestrike": ["Increase Flamestrike damage."],
+        "fireball": ["Increase Fireball damage."],
+        "explosion": ["Increase Explosion damage."],
+        "lightning": ["Increase Lightning damage."],
+        "mind blast": ["Increase Mind Blast damage"],
+        "harm": ["Increase Harm damage."],
+        "summon daemon": ["Enhance Summon Daemon strength/uptime."],
+        "summon creature": ["Enhance summoned creature "],
+        "summon heal": ["Summons heal based on the damage they deal when this effect triggers"],
+        "energy vortex": ["Enhance Energy Vortex "],
+        "blade spirits": ["Enhance Blade Spirits"],
+        "earth elemental": ["Enhance Earth Elemental"],
+        "fire elemental": ["Enhance Fire Elemental"],
+        "water elemental": ["Enhance Water Elemental"],
+        "mastery damage": ["Increases Mastery ability damage."] ,
+        "casting speed": ["Faster Casting "],
+        "castingspeed": ["Faster Casting"],
+        "castingrecovery": ["Faster Cast Recovery"],
+        "lower mana cost": ["Reduce mana cost of spells."],
+        "lower reagent cost": ["Chance to not consume reagent"],
+        "surging": ["Chance on cast to trigger 30% spell damage surge"],
+        "summon surge": ["Chance on cast to trigger 30% summon damage surge"],
+    },
+    'weapon': {
+        "attack speed bonus": ["Increases the weapon's attack speed"],
+        "accuracy bonus": ["Grants a bonus to hit chance"],
+        "area damage chance": ["Chance to damage nearby enemies when striking"],
+        "critical hit chance": ["Chance to deal +50% damage on a hit"],
+        "life leech chance": ["Steals health from the enemy on hit"],
+        "mastery ability damage bonus": ["Increases the damage of the weapon's mastery special ability	"],
+        "weapon damage bonus": ["Adds a flat bonus to total weapon damage"],
+        "boss damage bonus": ["Extra damage vs bosses , mini-bosses , and abominations"],
+        "paragon conversion chance": ["Chance to convert enemies into paragons"], # legacy 
+        "savagery trigger chance": ["Chance to trigger a temporary buff that boosts both attack speed and damage"],
+        "mage killer bonus": ["Increases damage to spellcasting monsters	"],
+        "poison resistance": ["Reduces the effect or chance of being poisoned"],
+        "curse resistance": ["Reduces the effect or chance of being cursed"],
+    },
+}
+
+def _effect_footnotes(scroll_type: str, effect_name: str) -> list:
+    data = EFFECT_FOOTNOTES.get(scroll_type or '', {})
+    if not data or not effect_name:
+        return []
+    nk = _normalize_effect_key(effect_name)
+    # Exact match first
+    if nk in data:
+        return data[nk]
+    # Fallback: substring match any known key within normalized name
+    for key, lines in data.items():
+        if key in nk:
+            return lines
+    return []
+
 # Razor Enhanced helpers -----------------------------
 
 def _clean_leading_amount(name: str, amount: int) -> str:
@@ -1322,6 +1527,7 @@ def _equip_slot_and_type(item_id: int) -> tuple:
 def build_text_sections(target_item) -> list:
     """Build list of TextSection objects for modular gump content."""
     sections = []
+    scroll_known_lines = []  # enhancement scroll-specific known lines parsed from properties
     
     # Get basic item info
     item_display_name = get_item_name(target_item, amount_hint=getattr(target_item, 'Amount', 1))
@@ -1510,6 +1716,20 @@ def build_text_sections(target_item) -> list:
             except Exception as prop_error:
                 debug_msg(f"  ERROR processing property {prop_idx+1}: {prop_error}", COLORS['bad'])
                 continue
+
+        # If this item is an Enhancement Scroll (ItemID 0x0E34), build specific, color-coded lines
+        try:
+            item_hue_local = int(getattr(target_item, 'Hue', 0) or 0)
+        except Exception:
+            item_hue_local = 0
+        if item_id == 0x0E34:
+            scroll_type = _detect_scroll_type_from_hue(item_hue_local)
+            parsed = _parse_scroll_effects(property_list or [])
+            scroll_known_lines = _build_scroll_known_lines(scroll_type, parsed)
+            # Suppress all raw property render lines for scrolls; custom description is sufficient
+            modifier_lines = []
+            regular_lines = []
+            durability_lines = []
         
         debug_msg("\nPROPERTY SEPARATION RESULTS:", COLORS['cat'])
         debug_msg(f"  Modifier lines ({len(modifier_lines)}):", COLORS['cat'])
@@ -1602,7 +1822,25 @@ def build_text_sections(target_item) -> list:
         except Exception:
             item_hue = 0
 
-        known_lines = _resolve_known_item_lines(item_id, item_hue, treat_hue_as_agnostic=treat_hue_as_agnostic)
+        # Render scroll-specific lines first if present
+        if scroll_known_lines:
+            have_rendered_any_known = False
+            need_separator_before_next = False
+            for i, desc_line in enumerate(scroll_known_lines):
+                debug_msg(f"  Scroll desc [{i}] (hue={item_hue}): {repr(desc_line)}", COLORS['cat'])
+                formatted_line = _wrap_line_with_default_color(desc_line, '#BBBBBB')
+                wrapped_lines = _split_line_for_wrapping(formatted_line, 30)
+                for j, wl in enumerate(wrapped_lines):
+                    sep_flag = (j == 0) and ((have_rendered_any_known) or (need_separator_before_next))
+                    sections.append(TextSection([wl], 'known', 8, separator_before=sep_flag))
+                    if j == 0:
+                        have_rendered_any_known = True
+                        need_separator_before_next = False
+            # Add a separator after scroll-specific block
+            sections.append(TextSection([], 'known_end_separator', 9, separator_before=True))
+
+        # For enhancement scrolls, skip generic KNOWN_ITEMS lines; only show custom scroll block
+        known_lines = [] if item_id == 0x0E34 else _resolve_known_item_lines(item_id, item_hue, treat_hue_as_agnostic=treat_hue_as_agnostic)
         if known_lines:
             debug_msg(
                 f"Adding {len(known_lines)} known item descriptions (hue-aware: {'yes' if not treat_hue_as_agnostic else 'no'})",
