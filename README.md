@@ -48,6 +48,9 @@ ritual magic
 - [RITUAL_feast.py](scripts/RITUAL_feast.py) – Places a feast with radial food items
 - [RITUAL_pentagram_expanded.py](scripts/RITUAL_pentagram_expanded.py) – Places a pentagram ritual with star, circles, and candle 
 - [RITUAL_spiral_round.py](scripts/RITUAL_spiral_round.py) – Places a rotated spiral with smooth corners using black pearls
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_the_spiral.png?raw=true"/>
+- [RITUAL_maze.py](scripts/RITUAL_maze.py) – Places a maze ritual with star, circles, and candle
+- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_the_maze.png?raw=true"/>
 
 ## ITEM
 - [ITEM_organize_backpack.py](scripts/ITEM_organize_backpack.py) – Organizes backpack items by type into position
@@ -64,18 +67,19 @@ ritual magic
 
 ## MISC
 - [LOOT_treasure.py](scripts/LOOT_treasure.py) – Unlocks, opens, and loot nearby treasure chests
-- [QUEST_turn_in_items.py](scripts/QUEST_turn_in_items.py) – Automate Quest turn-ins 
-- [RECALL_bank.py](scripts/RECALL_bank.py) – Recall bank or home , specific rune # in runebook
+- [QUEST_turn_in_items.py](scripts/QUEST_turn_in_items.py) – Quest turn-in Item 
+- [QUEST_accept_all_daily.py](scripts/QUEST_accept_all_daily.py) – Accepts all daily quests
+- [RECALL_bank.py](scripts/RECALL_bank.py) – Recall to bank then home if at bank , location based rune # in runebook
 - [COMBAT_pouch_stunbreak.py](scripts/COMBAT_pouch_stunbreak.py) – stun break using trapped pouch
 - [PICKUP_gold_and_meditate.py](scripts/PICKUP_gold_and_meditate.py) – meditate
 
 ## SPELL
 - [SPELL_attack_nearest.py](scripts/SPELL_attack_nearest.py) – Attack spells at nearest enemy, prioritizing Energy Bolt, conditional based on available reagents and mana
-- [SPELL_bless_other.py](scripts/SPELL_bless_other.py) – Bless the nearest friendly player
-- [SPELL_buff_self.py](scripts/SPELL_buff_self.py) – Buff yourself with Magic Reflect, ArchProtection, Bless
-- [SPELL_create_food.py](scripts/SPELL_create_food.py) – Create Food until out of mana
-- [SPELL_invis_self.py](scripts/SPELL_invis_self.py) – Cast Invisibility on yourself and re-cast as needed
-- [SPELL_cure_heal_self.py](scripts/SPELL_cure_heal_self.py) – ArchCure poison and heal self based on conditional 
+- [SPELL_bless_other.py](scripts/SPELL_bless_other.py) – Bless nearby friendly player
+- [SPELL_buff_self.py](scripts/SPELL_buff_self.py) – Cast Buffs on yourself Magic Reflect, ArchProtection, Bless
+- [SPELL_create_food.py](scripts/SPELL_create_food.py) – Create Food until 20 mana restorative items
+- [SPELL_invis_self.py](scripts/SPELL_invis_self.py) – Cast Invisibility on yourself
+- [SPELL_cure_heal_self.py](scripts/SPELL_cure_heal_self.py) – ArchCure poison and heal self based on conditions 
 
 ## TRAIN
 - [TRAIN_alchemy.py](scripts/TRAIN_alchemy.py) – Trains Alchemy skill , optional poison-only mode
@@ -84,8 +88,8 @@ ritual magic
 
 ## GATHER
 - [GATHER_fishing_directional_loop.py](scripts/GATHER_fishing_directional_loop.py) – Fishes in facing direction, chops fish, drops unwanted items
-- [GATHER_lumberjack_loop.py](scripts/GATHER_lumberjack_loop.py) – Continuously chops trees for rare resources , drops logs
-- [GATHER_mining_loop.py](scripts/GATHER_mining_loop.py) – Continuously mines for rare resources , drops ore
+- [GATHER_lumberjack_loop.py](scripts/GATHER_lumberjack_loop.py) – Chop trees for rare resources , drops logs
+- [GATHER_mining_loop.py](scripts/GATHER_mining_loop.py) – Mine for rare resources , drops ore
 
 ## DEV
 - [DEV_gump_debugger.py](scripts/DEV_gump_debugger.py) – Analyze ingame gumps outputs JSON 
