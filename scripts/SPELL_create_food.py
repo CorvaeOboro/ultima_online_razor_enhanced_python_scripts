@@ -2,7 +2,7 @@
 SPELL Create Food - a Razor Enhanced Python script for Ultima Online
 
 cast the Create Food spell to summon a mana restorative item
-Finds and equips a basic spellbook from backpack , as we dont want to waste durability on our good spellbook
+Finds and equips a blessed base spellbook from backpack or hands
 Casts Create Food repeatedly until 20 items are created
 
 common to custom shards create food will produce mana restoring items if cast while holding a spellbook
@@ -13,13 +13,9 @@ HOTKEY:: None
 VERSION::20250918
 """
 
-import re
-
 DEBUG_MODE = False  # Controls whether debug_message outputs to the client
 
-EQUIP_BASE_SPELLBOOK = True # When True, will ensure a basic (no modifiers) spellbook is equipped before casting
-REQUIRE_BLESSED_FOR_BASE = True # When True, a base spellbook must explicitly have the 'Blessed' property
-REQUIRE_SPELLBOOK_NAME = True # When True, require the item name/properties to indicate 'Spellbook' to avoid runebooks
+EQUIP_BASE_SPELLBOOK = True # When True, will ensure a blessed base spellbook is equipped before casting
 
 # Mana-restorative items produced by Create Food on custom shards while equipped a spellbook
 # Using IDs consistent with prior scripts (grapes, dates, peach)
@@ -49,29 +45,11 @@ class CreateFoodManager:
         
         # Current spellbook tracking
         self.current_spellbook = None
-        # Previously equipped (non-base) spellbook to restore after sequence
+        # Previously equipped (non-blessed) spellbook to restore after sequence
         self.previous_spellbook_serial = None
 
         # Spellbook detection configuration
         self.spellbook_item_id = 0x0EFA
-        # Property keywords that indicate modifiers (i.e., NOT a base spellbook)
-        self.modifier_keywords = [
-            "Slayer",
-            "Lower Reagent Cost",
-            "Lower Mana Cost",
-            "Faster Casting",
-            "Faster Cast Recovery",
-            "Spell Damage Increase",
-            "Mana Regeneration",
-            "Hit Chance Increase",
-            "Defense Chance Increase",
-            "Luck",
-            "Durability",
-            "Exceptional",
-            "Charges",
-        ]
-        # Properties considered safe/neutral on a base spellbook
-        self.neutral_properties = {"Blessed", "Insured", "Spellbook"}
         
     def debug_message(self, message, color=None):
         """Send a debug message to the game client (gated by DEBUG_MODE)."""
@@ -206,122 +184,64 @@ class CreateFoodManager:
         Misc.Pause(self.dress_delay)
         return True
         
-    def get_item_properties(self, item):
-        """Return a set of property strings for an item using multiple APIs.
-
-        Uses serial-based queries to ensure consistent behavior.
-        """
-        props = set()
+    def is_blessed_spellbook(self, item):
+        """Return True if item is a blessed spellbook named 'Spellbook'."""
         try:
-            serial = int(getattr(item, 'Serial', item))
-        except Exception:
-            serial = item
-        # Try to wait for props to be available
-        try:
-            Items.WaitForProps(int(serial), 750)
-        except Exception:
-            pass
-        # Method 1: full list
-        try:
-            lst = Items.GetPropStringList(int(serial))
-            if lst:
-                for p in lst:
-                    if p:
-                        props.add(str(p))
-        except Exception:
-            pass
-        # Method 2: iterate indices
-        try:
-            for i in range(0, 64):
-                try:
-                    s = Items.GetPropStringByIndex(int(serial), i)
-                except Exception:
-                    s = None
-                if not s:
-                    break
-                props.add(str(s))
-        except Exception:
-            pass
-        return props
-
-    def is_base_spellbook(self, item):
-        """True if the spellbook has no modifiers.
-
-        If REQUIRE_BLESSED_FOR_BASE is True, the book must explicitly contain
-        the 'Blessed' property and have no modifier keywords.
-        Otherwise, allows books with only neutral/no properties.
-        """
-        if not item or item.ItemID != self.spellbook_item_id:
-            return False
-        props = self.get_item_properties(item)
-        # Verify the item is indeed a spellbook by name or properties
-        if REQUIRE_SPELLBOOK_NAME:
+            if not item or item.ItemID != self.spellbook_item_id:
+                return False
+            # Name check (fallback)
             name_ok = False
             try:
-                nm = getattr(item, 'Name', '')
-                if nm and 'spellbook' in str(nm).lower():
-                    name_ok = True
+                name = getattr(item, 'Name', None)
+                if name:
+                    name_ok = 'spellbook' in name.lower()
             except Exception:
-                pass
-            if not name_ok:
-                # Check properties for 'Spellbook'
-                if any('spellbook' in str(p).lower() for p in props):
-                    name_ok = True
-            if not name_ok:
-                return False
-        # If any Durability pattern is present, it's NOT a base book
-        for p in list(props):
-            if re.search(r"durability\s*\d+\s*/\s*\d+", str(p), re.IGNORECASE):
-                return False
-        if REQUIRE_BLESSED_FOR_BASE:
-            # Must be Blessed and must not contain any modifier keyword
-            has_blessed = any("blessed" in str(p).lower() for p in props)
-            if not has_blessed:
-                return False
-            for p in props:
-                ps = str(p)
-                for kw in self.modifier_keywords:
-                    if kw.lower() in ps.lower():
-                        return False
-            return True
-        # Fallback mode: allow empty or only neutral properties
-        if not props:
-            return True
-        all_neutral = True
-        for p in list(props):
-            ps = str(p)
-            for kw in self.modifier_keywords:
-                if kw.lower() in ps.lower():
-                    return False
-            if ps not in self.neutral_properties and ps.strip() != "":
-                all_neutral = False
-        return all_neutral
+                name_ok = False
+            # Properties check for 'Blessed'
+            blessed_ok = False
+            try:
+                props = Items.GetPropStringList(item)
+                if props:
+                    blessed_ok = any('blessed' in p.lower() for p in props)
+            except Exception:
+                blessed_ok = False
+            return name_ok and blessed_ok
+        except Exception:
+            return False
 
-    def find_base_spellbook_in_backpack(self):
-        """Find a base spellbook (no modifiers) in backpack. Prefer Blessed if multiple."""
-        items = Items.FindByID(self.spellbook_item_id, -1, Player.Backpack.Serial)
-        if not items:
+    def find_best_spellbook(self):
+        """Find the best spellbook to use: prefer blessed 'Spellbook' in hands, else in backpack, else any equipped spellbook."""
+        candidates = []
+        # Hands
+        left = Player.GetItemOnLayer("LeftHand")
+        right = Player.GetItemOnLayer("RightHand")
+        for itm in [left, right]:
+            if itm and itm.ItemID == self.spellbook_item_id:
+                candidates.append(itm)
+        # Backpack
+        try:
+            bp = Items.FindBySerial(Player.Backpack.Serial)
+            for itm in (bp.Contains if bp and bp.Contains else []):
+                if itm and itm.ItemID == self.spellbook_item_id:
+                    candidates.append(itm)
+        except Exception:
+            pass
+        if not candidates:
             return None
-        if not isinstance(items, list):
-            items = [items]
-        base_books = []
-        for itm in items:
-            if itm.Container != Player.Backpack.Serial:
-                continue
-            if self.is_base_spellbook(itm):
-                base_books.append(itm)
-        if not base_books:
-            return None
-        # Prefer Blessed if available
-        for itm in base_books:
-            props = self.get_item_properties(itm)
-            if any("blessed" in str(p).lower() for p in props):
-                return itm
-        return base_books[0]
+        # Prefer blessed + named
+        blessed_named = [it for it in candidates if self.is_blessed_spellbook(it)]
+        if blessed_named:
+            return blessed_named[0]
+        # Else prefer any in hands
+        for it in [left, right]:
+            if it and it in candidates:
+                return it
+        # Else first found
+        return candidates[0]
 
     def equip_basic_spellbook(self):
-        """Ensure a base spellbook is equipped. Unequip non-base if necessary."""
-        self.debug_message("Ensuring base spellbook is equipped...")
+        """Ensure a blessed base spellbook is equipped. Unequip non-blessed if necessary."""
+        self.debug_message("Ensuring blessed base spellbook is equipped...")
         # Check equipped book
         equipped_book = None
         for layer in ['LeftHand', 'RightHand']:
@@ -329,10 +249,10 @@ class CreateFoodManager:
             if item and item.ItemID == self.spellbook_item_id:
                 equipped_book = item
                 break
-        # If equipped and not base, unequip it
-        if equipped_book and not self.is_base_spellbook(equipped_book):
-            self.debug_message("Unequipping non-base spellbook from hands...")
-            # Remember this equipped non-base spellbook to restore later
+        # If equipped and not blessed, unequip it
+        if equipped_book and not self.is_blessed_spellbook(equipped_book):
+            self.debug_message("Unequipping non-blessed spellbook from hands...")
+            # Remember this equipped non-blessed spellbook to restore later
             try:
                 self.previous_spellbook_serial = int(equipped_book.Serial)
             except Exception:
@@ -343,36 +263,41 @@ class CreateFoodManager:
             except Exception as e:
                 self.debug_message(f"Error unequipping book: {e}", self.error_color)
                 Misc.Pause(self.equip_delay)
-        # If base already equipped, done
+        # If blessed already equipped, done
         for layer in ['LeftHand', 'RightHand']:
             item = Player.GetItemOnLayer(layer)
-            if item and item.ItemID == self.spellbook_item_id and self.is_base_spellbook(item):
+            if item and item.ItemID == self.spellbook_item_id and self.is_blessed_spellbook(item):
                 self.current_spellbook = item
-                self.debug_message("Base spellbook already equipped.")
+                self.debug_message("Blessed base spellbook already equipped.")
                 return True
-        # Find base in backpack
-        base_book = self.find_base_spellbook_in_backpack()
-        if not base_book:
-            self.debug_message("No base spellbook found in backpack.", self.error_color)
+        # Find blessed spellbook using find_best_spellbook
+        blessed_book = self.find_best_spellbook()
+        if not blessed_book:
+            self.debug_message("No blessed spellbook found.", self.error_color)
             return False
-        self.debug_message("Equipping base spellbook from backpack...")
+        # If it's already equipped, we're done
+        if self.is_item_equipped(blessed_book):
+            self.current_spellbook = blessed_book
+            return True
+        # Otherwise equip it
+        self.debug_message("Equipping blessed spellbook from backpack...")
         try:
-            Player.EquipItem(base_book)
+            Player.EquipItem(blessed_book)
             Misc.Pause(self.equip_delay)
         except Exception as e:
-            self.debug_message(f"Error equipping base book: {e}", self.error_color)
+            self.debug_message(f"Error equipping blessed book: {e}", self.error_color)
             return False
         # Verify
         for layer in ['LeftHand', 'RightHand']:
             item = Player.GetItemOnLayer(layer)
-            if item and item.Serial == base_book.Serial:
+            if item and item.Serial == blessed_book.Serial:
                 self.current_spellbook = item
                 return True
-        self.debug_message("Failed to equip base spellbook!", self.error_color)
+        self.debug_message("Failed to equip blessed spellbook!", self.error_color)
         return False
 
     def re_equip_previous_spellbook(self):
-        """Try to re-equip the previously equipped non-base spellbook by serial."""
+        """Try to re-equip the previously equipped non-blessed spellbook by serial."""
         if not self.previous_spellbook_serial:
             return False
         try:

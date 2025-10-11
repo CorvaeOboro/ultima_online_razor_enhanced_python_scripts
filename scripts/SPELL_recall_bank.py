@@ -13,18 +13,19 @@ VERSION::20250718
 """
 DEBUG_MODE = False  # If False, suppress all Misc.SendMessage output
 
+BANK_RUNE_NUMBER = 1  # Rune number to use when not at bank (recall to bank)
+HOME_RUNE_NUMBER = 2  # Rune number to use when at bank (recall to home)
+
 # Location-based switching configuration
 LOCATION_BASED_SWITCH = True  # Enable/disable location-based rune selection
 BANK_COORDINATES = (1416, 1687)  # Bank location coordinates
-BANK_RANGE = 10  # Range to consider "near" the bank
-HOME_RUNE_NUMBER = 14  # Rune number to use when at bank (recall to home)
-BANK_RUNE_NUMBER = 1  # Rune number to use when not at bank (recall to bank)
+BANK_RANGE = 20  # Range to consider "near" the bank
 
-RUNEBOOK_ID = 0x0EFA  # Runebook item ID
+RUNEBOOK_ID = 0x0EFA  # Runebook itbem ID
 RUNEBOOK_NAME = "Runebook"  # Name of the runebook to find
 GUMP_ID = 89  # Runebook gump ID
 RUNE_NUMBER = 1  # Default rune number (will be overridden by location logic if enabled)
-RECALL_BUTTON = 49 + RUNE_NUMBER
+RECALL_BUTTON_NUMBER = 49 # add this to the rune number for the button
 GUMP_TIMEOUT = 10000  # Timeout for gump operations in milliseconds
 
 #//==================================================================
@@ -42,7 +43,7 @@ def is_near_bank():
     player_y = Player.Position.Y
     bank_x, bank_y = BANK_COORDINATES
     
-    # Calculate distance using simple Euclidean distance
+    # Calculate distance 
     distance = ((player_x - bank_x) ** 2 + (player_y - bank_y) ** 2) ** 0.5
     
     debug_message(f"Player position: ({player_x}, {player_y}), Bank: ({bank_x}, {bank_y}), Distance: {distance:.1f}", 66)
@@ -87,7 +88,7 @@ def use_runebook():
         
     # Determine which rune to use based on location
     target_rune = get_target_rune_number()
-    target_button = 49 + target_rune
+    target_button = RECALL_BUTTON_NUMBER + target_rune
         
     # Use runebook
     Items.UseItem(runebook)
@@ -108,7 +109,6 @@ def main():
     """Main script function"""
     debug_message("[RECALL] Starting bank recall...", 66)
     
-    # Try to recall
     if use_runebook():
         debug_message("[RECALL] Successfully recalled to bank!", 67)
     else:

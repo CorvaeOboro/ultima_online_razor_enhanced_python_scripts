@@ -44,11 +44,12 @@ GUMP_LAYOUT = {
     3229191321: {"name": "Summon Monitor", "x": 790, "y": 720},
     0xc0798c99: {"name": "Summon Monitor", "x": 790, "y": 720},
     0x7a11a12: {"name": "Item Info WAILA", "x": 350, "y": 760},
-    3135545776: {"name": "Local Chat", "x": 1500, "y": -20},
-    4191917191: {"name": "Action Buttons", "x": 1520, "y": 185},
+    3135545776: {"name": "Local Chat", "x": 1600, "y": -20},
+    4191917191: {"name": "Action Buttons", "x": 1520, "y": 90},
     0x75A11E6: {"name": "Loot", "x": 350, "y": 810},
     3636346736: {"name": "Durability", "x": 465, "y": 715},
     4191917201: {"name": "Command", "x": 465, "y": 715},
+    4291161196: {"name": "Loot", "x": 280, "y": 760},
 }
 
 RESTORE_CLOSED_GUMPS = False # not working currently

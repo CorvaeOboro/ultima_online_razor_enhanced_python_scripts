@@ -1,30 +1,23 @@
 """
 TRAIN Lockpicking - a Razor Enhanced Python script for Ultima Online
-Trains Lockpicking skill to 90 using a training box and lockpicks
 
-Features:
-- finds and uses lockpick training box
-- Uses lockpicks from backpack
-- Continues until skill reaches 90
-- Provides feedback on training progress
+Training Lockpicking skill using a training box and lockpicks
+Searches for lockpick training box in backpack
 
-VERSION::20250621
+VERSION::20250925
 """
 
-# Configuration
 DEBUG_MODE = True  # Set to True to enable debug messages
+
+TARGET_SKILL = 100.0  # Stop training at this skill level
+LOCKPICK_ID = 0x14FC  # Item ID for lockpicks
+TRAINING_BOX_ID = 0x09AA  # Training box item ID
+DELAY_BETWEEN_PICKS = 1000  # Delay in ms between lockpicking attempts
 
 def debug_message(msg, color=67):
     """Show debug messages only when DEBUG_MODE is enabled."""
     if DEBUG_MODE:
         Misc.SendMessage(f"[Lockpicking] {msg}", color)
-
-# Training parameters
-TARGET_SKILL = 100.0  # Stop training at this skill level
-LOCKPICK_ID = 0x14FC  # Item ID for lockpicks
-TRAINING_BOX_ID = 0x09AA  # Training box item ID
-# TRAINING_BOX_HUE = 0x0000  # Default hue for training box
-DELAY_BETWEEN_PICKS = 1000  # Delay in ms between lockpicking attempts
 
 def find_training_box():
     """Find the lockpicking training box in player's backpack"""

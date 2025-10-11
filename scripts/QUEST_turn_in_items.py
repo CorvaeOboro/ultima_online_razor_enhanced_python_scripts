@@ -7,12 +7,42 @@ for example : Daemon Bones to Canute , Ancient Vases to Sasha , Strange Eggs to 
 TODO:
 - restore the orb , treasure map , and paragon turn in to griphook when returns
 
+
+620 2195 = chaos island blood quest 
+the remains of a blood elemental 
+
+diseased blood 0x0E24 , hue 0x09a7 ,  turn into canute
+gather diseased blood , around chaos island 499 2183 , a bloody corpse , the remains of a blood elemental
+
 HOTKEY:: K ( Kwuest )
 VERSION:: 20250926
 """
 DEBUG_MODE = False
 
 # Quest Configurations
+QUESTS_WORLD = {
+      "daily_hiddenvalley_lizardman_scales": {
+        "name": "Daily: Collect Lizardman Scales",
+        "description": "Gather Lizardman Scales in Hidden Valley and turn in to Canute the Daily Quest Master.",
+        "category": "daily",
+        "region": "hiddenvalley",
+        "locations": [
+            {
+                "name": "Canute The Daily Quest Master",
+                "x": 1433,
+                "y": 1710,
+                "z": 31,
+                "npc_serial": 0x000000D4,
+                "mobile_id": 0x0190
+            }
+        ],
+        "items": [
+            {"name": "Lizardman Scale", "id": 0x26B2, "hue": 0x0ad5}
+        ],
+        "turn_in_type": "direct_transfer",
+        "container_type": "npc"
+    }  
+}
 
 QUESTS_DUNGEON_SANDSTORM = {
         "ancient_vase": {
@@ -84,6 +114,26 @@ QUESTS_DUNGEON_SHAME = {
         ],
         "turn_in_type": "direct_transfer",
         "container_type": "npc"
+    },
+    "daily_diseased_blood": {
+        "name": "Daily: Collect Diseased Blood",
+        "description": "Collect Diseased Blood and turn in to Canute the Daily Quest Master.",
+        "category": "daily",
+        "region": "shame",
+        "locations": [
+            {
+                "name": "Canute the Daily Quest Giver",
+                "x": 1433,
+                "y": 1710,
+                "z": 31,
+                "npc_serial": 0x000000D4
+            }
+        ],
+        "items": [
+            {"name": "Diseased Blood", "id": 0x0E24, "hue": 0x09A7}
+        ],
+        "turn_in_type": "direct_transfer",
+        "container_type": "npc"
     }
 }
 
@@ -128,6 +178,29 @@ QUESTS_DUNGEON_DESTARD = {
         ],
         "items": [
             {"name": "Moltendust", "id": 0xB8B1, "hue": 0x093D}
+        ],
+        "turn_in_type": "direct_transfer",
+        "container_type": "npc"
+    }
+}
+
+QUESTS_DUNGEON_WRONG = {
+    "daily_wrong_elfic_artifact": {
+        "name": "Daily: Collect Elfic Artifact",
+        "description": "Collect Elfic Artifact in Wrong and turn in to Canute the Daily Quest Master.",
+        "category": "daily",
+        "region": "wrong",
+        "locations": [
+            {
+                "name": "Canute the Daily Quest Giver",
+                "x": 1433,
+                "y": 1710,
+                "z": 31,
+                "npc_serial": 0x000000D4
+            }
+        ],
+        "items": [
+            {"name": "Elfic Artifact", "id": 0x241E, "hue": -1}
         ],
         "turn_in_type": "direct_transfer",
         "container_type": "npc"
@@ -227,7 +300,7 @@ QUESTS_GRIPHOOK_GENERAL_DISABLED = {
 # Combine all groups into a single QUESTS dictionary 
 # currently excluding the QUESTS_GRIPHOOK_GENERAL_DISABLED , until NPC return
 QUESTS = {}
-for group in ( QUESTS_DUNGEON_SANDSTORM, QUESTS_DUNGEON_SHAME, QUESTS_DUNGEON_DECEIT, QUESTS_DUNGEON_DESTARD):
+for group in ( QUESTS_WORLD, QUESTS_DUNGEON_SANDSTORM, QUESTS_DUNGEON_SHAME, QUESTS_DUNGEON_DECEIT, QUESTS_DUNGEON_DESTARD, QUESTS_DUNGEON_WRONG):
     QUESTS.update(group)
 
 # Lastly , if not near any item turn in we try to attack specific quest objectives 
@@ -377,12 +450,32 @@ def handle_direct_transfer(items, quest_config, location):
                 debug_message(f"Failed to move close enough to NPC at {npc.Position.X}, {npc.Position.Y}, {npc.Position.Z}", 33)
                 return False
 
-    for item_list in items.values():
-        for item in item_list:
-            Items.Move(item, npc.Serial, 0)
-            Misc.Pause(500)
-    
-    return True
+    # Sequentially re-scan and move items one-by-one. This handles non-stacking
+    moved_any = False
+    attempt_round = 0
+    MAX_ROUNDS = 15
+    while attempt_round < MAX_ROUNDS:
+        attempt_round += 1
+        remaining = find_quest_items(quest_config)
+        if not remaining:
+            break
+
+        # Move each found item individually with safe pacing
+        for item_list in remaining.values():
+            for item in item_list:
+                try:
+                    # Non-stackables should move amount=1. For stackables, server treats 1 as single unit; repeated loop drains stack.
+                    Items.Move(item, npc.Serial, 1)
+                    Misc.Pause(650)
+                    moved_any = True
+                except Exception as e:
+                    debug_message(f"Move failed for item 0x{getattr(item, 'Serial', 0):X}: {e}", 33)
+                    Misc.Pause(300)
+
+        # Small backoff between rounds to allow server/inventory refresh
+        Misc.Pause(600)
+
+    return moved_any
 
 def handle_location_drop(items, quest_config, location):
     """Handle dropping items at specific coordinates."""

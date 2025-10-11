@@ -2,10 +2,10 @@
 UI Journal Filtered - a Razor Enhanced Python Script for Ultima Online
 
 a minimal journal gump focused on locally spoken and quest events
-filters command words , colorized speakers and events persistent
+filters command words , includes colorized speakers and events displayed persistently
 
 using multiple filters to reduce to player and npc spoken words without "command words"
-names are colorized consistently by deterministic seed to visually separate
+different names are colorized consistently by deterministic seed to visually separate
 only "Quest" and "Event" related system messages are whitelisted 
 
 global chat may be displayed as well , tho is turned off by default
@@ -20,13 +20,16 @@ events =
 events are colorized and condensed into a single line 
 harvest and kill global quests , virtue shrine corruption , danger zone rotation  
 
+TROUBLESHOOTING:
+- if "import" errors , download iron python 3.4.2 and copy the files in its "Lib" folder into your RazorEnhanced "Lib" folder 
+
 STATUS:: working
 VERSION::20250909
 """
 
 import time # timestamps and delays 
 import random # jitter for desynchronize updates
-import re # regex parsing the text
+import re # regex , regular expression for parsing the text
 
 DEBUG_MODE = False
 
@@ -75,6 +78,8 @@ SHOW_BONDED_PET_LINES = False     # lines from bonded pets or lines that are onl
 Offline preview settings: when enabled, reads a plain text journal file and produces an HTML preview
 that simulates how this gump would render in-game after filtering.  this is for testing the colors and formatting
 it is not representative of the actual gump because of the in game "channel" filtering , but lets us review how specific instances will be formatted 
+
+not needed , you only need to change these if want to test local logs
 """
 OFFLINE_JOURNAL_SIMULATE = False # setting this to true will read external journal log then exit for testing purposes .
 OFFLINE_JOURNAL_INPUT_PATH = r"D:\ULTIMA\example\Data\Client\JournalLogs\2025_09_09_20_37_33_journal.txt"
@@ -88,7 +93,7 @@ GUMP_ID = 3135545776
 DEFAULT_GUMP_X = 200
 DEFAULT_GUMP_Y = 0
 DEFAULT_GUMP_WIDTH = 400
-DEFAULT_GUMP_HEIGHT = 500
+DEFAULT_GUMP_HEIGHT = 300
 
 # TIMING
 UPDATE_INTERVAL_MS = 750
@@ -172,7 +177,7 @@ FILTER_SYSTEM_PATTERNS = [
 FILTER_GENERIC_SUBSTRINGS = [
     "you see nothing useful to carve from the corpse",
     "(summoned)",
-    "the spell fizzles.","you cannot heal that.",
+    "the spell fizzles.","you cannot heal that.","you sense ",
     "You have accepted quest:","You have accepted the quest:",
     "bank container has ",
     "Take a look at my goods",
@@ -244,11 +249,15 @@ FILTER_SPEAKER_OPTIONAL_NPC = [
 
 # talkative monsters like lizardmen are filtered from local chat by default
 FILTER_SPEAKER_MONSTER_NPC = [
-    "a lizardman berserker", # 
-    "a mephite lizardman", # 
-    "a lizardman warlock", # 
-    "a molten lizardman", # 
+    "a lizardman berserker","a lizardman stoneguard",  
+    "a mephite lizardman", 
+    "a lizardman warlock", 
+    "a molten lizardman","a mephitic lizardman", "a thornscale lizardman",  "a smoke lizardman",    
     "a lizardman berserker", 
+    "a lizardman", 
+    "a ratman","a ratman warrior","a ratman mage",
+    "a gnoll","a gnoll warrior","a gnoll mage","a gnoll defender",
+    "Tsycieth","Yslish" # lizardman name
 ]
 
 #//==================================================================================

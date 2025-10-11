@@ -6,9 +6,10 @@ Casts Invisibility and targets self.
 TODO:
 make mana check optional ( "lower mana cost" modifiers might make this fail when it could cast it )
 deal with already casting or existing target 
+errors on fail ( not invisible ) 
 
-HOTKEY:: W
-VERSION::20250722
+HOTKEY:: I ( for Invisible )
+VERSION::20250925
 """
 
 import time

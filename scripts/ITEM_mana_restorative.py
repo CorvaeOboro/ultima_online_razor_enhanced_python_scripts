@@ -1,38 +1,36 @@
 """
 ITEM mana restorative - a Razor Enhanced Python script for Ultima Online
 
-Consumes a mana restorative item , based on missing mana:
-1) Blue Mana Food ( fish steak or mushroom ) (by hue) if missing >= 10 (+10)
-2) Greater Mana Potion if current mana < 50 and missing >= 27 (+27)
+Consumes a mana restorative item , based on missing mana to conserve greater mana potions :
+Blue Mana Food (+10) > Greater Mana Potion (+27)
 
-Optional Emote after consuming
+Optional Cooldown file to prevent overuse to avoid that big red message overhead
+Optional Emote after consuming greater mana potions
 
 HOTKEY:: W
-VERSION:: 20250822
+VERSION:: 20250925  
 """
 
+import os # file handling for the .lastuse cooldown file to prevent overhead spam
+import time
+
 DEBUG_MODE = False # Prints messages if true
-EMOTE_GIGGLE_ON_POTION = True # Toggle to say an emote when a mana potion is used
-EMOTE_COMMAND = "[emote giggle"
 
-# Known base item IDs
-MANA_FOOD_ID = [0x097A, 0x097B] # fishsteaks , mushrooms
-# Candidate hues for "blue"  , Colors are stored as hexidecimal IDs 
+# MANA restorative items
+MANA_FOOD_ID = [0x097A, 0x097B] # fishsteaks , mushrooms # Known mana food item IDs
 BLUE_HUES = [0x0825,0x0005, 0x0008, 0x051E, 0x0492]  # some blue-ish hues
-
-# Shard-specific mana potion configuration
-# Greater Mana potion (example): ItemID 0x0F0D, Hue 0x0387
-MANA_POTION_IDS = [0x0F0D]
-MANA_POTION_HUES = [0x0387]
-
-# Restoration amounts (tune per shard if needed)
 MANA_FOOD_RESTORE = 10
+MANA_POTION_IDS = [0x0F0D] # Greater Mana potion (example): ItemID 0x0F0D, Hue 0x0387
+MANA_POTION_HUES = [0x0387] 
 MANA_POTION_RESTORE = 27
 
-# Policy: only use big potion when current mana is below this threshold
-BIG_POTION_MIN_MANA = 50
+USE_COOLDOWN_FILE = True
+LAST_USE_FILENAME = "ITEM_mana_restorative.lastuse"
 
-# Delays
+BIG_POTION_MIN_MANA = 50 # we conserve big mana potions , using only when low on mana
+EMOTE_GIGGLE_ON_POTION = True # Toggle to say an emote when a big mana potion is used
+EMOTE_COMMAND = "[emote giggle"
+
 BASE_DELAY_MS = 700
 COOLDOWN_MS = 2500   # minimal time between successful consumes
 TIMEOUT_MS = 4000    # max wait after use to consider it processed
@@ -77,10 +75,61 @@ def get_mana_values():
     except Exception:
         return 0, 0
 
+#//================== External cooldown file helpers ====================
+
+def get_script_dir():
+    try:
+        return os.path.dirname(__file__)
+    except Exception:
+        try:
+            return os.getcwd()
+        except Exception:
+            return "."
+
+def get_last_use_path():
+    return os.path.join(get_script_dir(), LAST_USE_FILENAME)
+
+def read_last_used_epoch():
+    path = get_last_use_path()
+    try:
+        if not os.path.exists(path):
+            return 0.0
+        with open(path, "r") as f:
+            txt = f.read().strip()
+            return float(txt) if txt else 0.0
+    except Exception:
+        return 0.0
+
+def write_last_used_now():
+    path = get_last_use_path()
+    try:
+        with open(path, "w") as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
+
+def is_on_cooldown_now():
+    if not USE_COOLDOWN_FILE:
+        return False
+    try:
+        last_epoch = read_last_used_epoch()
+        if last_epoch <= 0:
+            return False
+        elapsed_ms = (time.time() - last_epoch) * 1000.0
+        return elapsed_ms < COOLDOWN_MS
+    except Exception:
+        return False
+
 def consume_mana_priority():
     cur, mx = get_mana_values()
     if mx <= 0:
         debug_message("Mana values unavailable.", 33)
+        return
+
+    # Respect external cooldown file
+    if is_on_cooldown_now():
+        if DEBUG_MODE:
+            debug_message("On cooldown from last restorative use; skipping.", 53)
         return
 
     label, item = choose_item_to_consume(cur, mx)
@@ -94,6 +143,9 @@ def consume_mana_priority():
         return
 
     if use_item_and_wait(item, label, cur):
+        # Record last-use time on successful consume
+        if USE_COOLDOWN_FILE:
+            write_last_used_now()
         if EMOTE_GIGGLE_ON_POTION and label == "Mana Potion":
             say_emote()
         return
@@ -154,7 +206,6 @@ def use_item_and_wait(item, label, pre_mana):
 def say_emote():
     """Says the in-game emote command if available."""
     try:
-        # Prefer in-game speech so the command is executed server-side
         if hasattr(Player, 'ChatSay'):
             try:
                 Player.ChatSay(EMOTE_COMMAND)
@@ -163,7 +214,7 @@ def say_emote():
                 pass
     except Exception:
         try:
-            print("[MANA] emote command: ", EMOTE_COMMAND)
+            print("[ITEM_MANA_RESTORE] emote command error : ", EMOTE_COMMAND)
         except Exception:
             pass
 

@@ -1,27 +1,26 @@
 """
 TRAIN Magery and Spiritspeak - a Razor Enhanced Python Script for Ultima Online
 
-This script trains magery and spiritspeak skills by casting spells and meditating.
-includes reagent checks,
-includes mana regen like food management, and mana potions.
+Training Magery and Spiritspeak skills by casting spells and meditating.
+Mana Drain > Invisibility > Mana Vampire 
+includes reagent checks, and includes mana regen like food management, and mana potions.
 
-VERSION::20250621
+VERSION::20250925
 """
 from collections import namedtuple
 
 MEDITATION_COOLDOWN = 10000  # 10 seconds
-SPIRIT_SPEAK_COOLDOWN = 2100  # 1.1 seconds for faster spam
-ADDITIONAL_SHARD_COOLDOWN = 500  # Extra delay for server lag
+SPIRIT_SPEAK_COOLDOWN = 2100  # 2.1 seconds
+ADDITIONAL_SHARD_COOLDOWN = 500  # Extra delay 
 REAGENT_CHECK_COOLDOWN = 30000  # Check reagents every 30 seconds
 FOOD_CHECK_COOLDOWN = 60000  # Check food every 60 seconds
-MANA_POTION_COOLDOWN = 10000  # Check mana potions every 10 seconds
+MANA_POTION_COOLDOWN = 100000  # Check mana potions every 100 seconds
 
-SHOW_DEBUG = True
+DEBUG_MODE = True
 
 # Create a namedtuple for spells
 Spell = namedtuple('Spell', ['name', 'mana_cost', 'delay_ms', 'reagents'])
 
-# Define spells with their properties
 # Name , Mana Cost , Delay , Reagents
 SPELLS = {
     'Mana Drain': Spell('Mana Drain', 6, 1500, ['Black Pearl', 'Mandrake Root', 'Spider Silk']),
@@ -36,7 +35,6 @@ SKILL_SPELLS = {
     (74.5, 120): SPELLS['Mana Vampire']
 }
 
-# Item IDs
 ITEM_IDS = {
     # Reagents
     'Black Pearl': 0x0F7A,
@@ -55,10 +53,8 @@ ITEM_IDS = {
     'Mana Fish Steak': 0x0F0B,
 }
 
-# Food priority (try these in order)
-FOOD_ITEMS = ['Fish Steak', 'Ribs', 'Bird', 'Lamb', 'Chicken']
-# Mana potion priority
-MANA_POTIONS = ['Mana Potion', 'Mana Fish Steak']
+FOOD_ITEMS = ['Fish Steak', 'Ribs', 'Bird', 'Lamb', 'Chicken'] # Food priority (try these in order)
+MANA_POTIONS = ['Mana Potion', 'Mana Fish Steak'] # Mana potion priority
 
 class Colors:
     """ANSI color codes for messages"""
@@ -66,9 +62,10 @@ class Colors:
     GREEN = 68
     YELLOW = 53
 
-    
+#//===========================================================
+
 def debug_message(msg, color):
-    if SHOW_DEBUG:
+    if DEBUG_MODE:
         Misc.SendMessage(msg, color)
 
 def find_item(item_names):
