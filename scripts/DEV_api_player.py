@@ -1,7 +1,25 @@
 """
-Development API Player object - a Razor Enhanced script for Ultima Online.
+DEV API Player - a Razor Enhanced Python Script for Ultima Online
+
+Comprehensive testing of Player API properties
+Tests and displays information about all Player object properties
 
 REFERENCE = https://razorenhanced.readthedocs.io/api/Player.html
+
+=== PLAYER API OVERVIEW ===
+The Player class provides access to all player character information including:
+- Stats (STR, DEX, INT, HP, Mana, Stamina)
+- Equipment and containers (Backpack, Bank, Mount, Quiver)
+- Resistances and bonuses
+- Position and movement
+- Buffs and status effects
+- Followers and pets
+
+This script comprehensively tests ALL Player properties and generates:
+1. Console output showing each property value or error
+2. JSON report with test results and property values
+3. Summary statistics of working vs failed properties
+
 Player.AR Int32 Resistance to Phisical damage.
 Player.Backpack Item Player backpack, as Item object.
 Player.Bank Item Player bank chest, as Item object.
@@ -71,18 +89,35 @@ Player.Visible Boolean Player is visible, false if hidden.
 Player.WarMode Boolean Player has war mode active.
 Player.Weight Int32 Player current weight.
 Player.YellowHits Boolean Player HP bar is not blue, but yellow.
+
+VERSION::20251014
 """
 
 # Non-destructive probe of Player.* properties listed above
 
 import time
+import os
+import json
 
+
+# GLOBAL SETTINGS
+BASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+OUTPUT_FILE = os.path.join(BASE_PATH, "api_player_test_output.json")
+RUN_USAGE_EXAMPLES = True
+DEBUG_MODE = True
 
 def out(msg, color=90):
     try:
-        Misc.SendMessage(f"[PLAYER] {msg}", color)
+        # Don't add prefix for empty messages (used for spacing)
+        if msg:
+            Misc.SendMessage(f"[PLAYER] {msg}", color)
+        else:
+            Misc.SendMessage("", color)
     except Exception:
-        print(f"[PLAYER] {msg}")
+        if msg:
+            print(f"[PLAYER] {msg}")
+        else:
+            print("")
 
 
 def _fmt_item(it):
@@ -116,12 +151,88 @@ def _fmt_point3d(p):
         return str(p)
 
 
+def test_property(name, getter_func, json_output, formatter=None):
+    """
+    Test a single Player property and record results
+    
+    Args:
+        name: Property name
+        getter_func: Function that returns the property value
+        json_output: JSON output dictionary to update
+        formatter: Optional function to format the value for display
+    
+    Returns:
+        Tuple of (success, value, error_msg)
+    """
+    try:
+        value = getter_func()
+        
+        # Format for display
+        if formatter:
+            display_value = formatter(value)
+        else:
+            display_value = str(value)
+        
+        out(f"{name}: {display_value}")
+        
+        # Store in JSON with proper type conversion
+        if value is None:
+            json_value = None
+        elif isinstance(value, bool):
+            json_value = bool(value)
+        elif isinstance(value, (int, float)):
+            json_value = int(value) if isinstance(value, int) else float(value)
+        elif isinstance(value, str):
+            json_value = str(value)
+        elif isinstance(value, list):
+            json_value = [str(item) for item in value]
+        else:
+            # For complex objects, store string representation
+            json_value = str(value)
+        
+        json_output["properties"][name] = json_value
+        json_output["test_report"][name] = {
+            "works": True,
+            "error": None,
+            "has_value": value is not None
+        }
+        
+        return True, value, None
+        
+    except Exception as e:
+        error_msg = str(e)
+        out(f"{name}: ERROR {error_msg}", 33)
+        
+        json_output["errors"].append({
+            "property": name,
+            "error": error_msg
+        })
+        json_output["test_report"][name] = {
+            "works": False,
+            "error": error_msg,
+            "has_value": False
+        }
+        
+        return False, None, error_msg
+
+
 def main():
+    # Initialize JSON output structure
+    json_output = {
+        "test_report": {},  # Summary of which properties work
+        "test_timestamp": str(Misc.ScriptCurrent(False)),
+        "properties": {},
+        "errors": []
+    }
+    
     # Preliminary quick access check 
     try:
-        out(f"Player.Serial quick check: {Player.Serial}")
+        serial = Player.Serial
+        out(f"Player.Serial quick check: {serial}")
+        json_output["quick_check"] = {"success": True, "serial": int(serial)}
     except Exception as e:
         out(f"Player.Serial quick check: ERROR {e}", 33)
+        json_output["quick_check"] = {"success": False, "error": str(e)}
 
     # Brief wait for Player to initialize 
     start = time.time()
@@ -139,295 +250,319 @@ def main():
         except Exception:
             time.sleep(0.1)
 
-    out("— Player API Probe —", 67)
+    out("=" * 60, 88)
+    out("  PLAYER API COMPREHENSIVE TEST", 88)
+    out("=" * 60, 88)
+    out("")
 
-    # Item-like 
-    try:
-        out(f"Backpack: {_fmt_item(Player.Backpack)}")
-    except Exception as e:
-        out(f"Backpack: ERROR {e}", 33)
-    try:
-        out(f"Bank: {_fmt_item(Player.Bank)}")
-    except Exception as e:
-        out(f"Bank: ERROR {e}", 33)
-    try:
-        out(f"Mount: {_fmt_item(Player.Mount)}")
-    except Exception as e:
-        out(f"Mount: ERROR {e}", 33)
-    try:
-        out(f"Quiver: {_fmt_item(Player.Quiver)}")
-    except Exception as e:
-        out(f"Quiver: ERROR {e}", 33)
+    # SECTION: Item-like Properties
+    out("=" * 60, 88)
+    out("  ITEM-LIKE PROPERTIES", 88)
+    out("=" * 60, 88)
+    
+    test_property("Backpack", lambda: Player.Backpack, json_output, _fmt_item)
+    test_property("Bank", lambda: Player.Bank, json_output, _fmt_item)
+    test_property("Mount", lambda: Player.Mount, json_output, _fmt_item)
+    test_property("Quiver", lambda: Player.Quiver, json_output, _fmt_item)
+    out("")
 
-    # Basic identifiers and flags 
-    try:
-        out(f"Serial: {Player.Serial}")
-    except Exception as e:
-        out(f"Serial: ERROR {e}", 33)
-    try:
-        out(f"Name: {Player.Name}")
-    except Exception as e:
-        out(f"Name: ERROR {e}", 33)
-    try:
-        out(f"Body: {Player.Body}")
-    except Exception as e:
-        out(f"Body: ERROR {e}", 33)
-    try:
-        out(f"MobileID: {Player.MobileID}")
-    except Exception as e:
-        out(f"MobileID: ERROR {e}", 33)
-    try:
-        out(f"StaticMount: {Player.StaticMount}")
-    except Exception as e:
-        out(f"StaticMount: ERROR {e}", 33)
-    try:
-        out(f"Female: {Player.Female}")
-    except Exception as e:
-        out(f"Female: ERROR {e}", 33)
-    try:
-        out(f"IsGhost: {Player.IsGhost}")
-    except Exception as e:
-        out(f"IsGhost: ERROR {e}", 33)
-    try:
-        out(f"Visible: {Player.Visible}")
-    except Exception as e:
-        out(f"Visible: ERROR {e}", 33)
-    try:
-        out(f"WarMode: {Player.WarMode}")
-    except Exception as e:
-        out(f"WarMode: ERROR {e}", 33)
-    try:
-        out(f"InParty: {Player.InParty}")
-    except Exception as e:
-        out(f"InParty: ERROR {e}", 33)
-    try:
-        out(f"Notoriety: {Player.Notoriety}")
-    except Exception as e:
-        out(f"Notoriety: ERROR {e}", 33)
-    try:
-        out(f"Map: {Player.Map}")
-    except Exception as e:
-        out(f"Map: ERROR {e}", 33)
+    # SECTION: Basic Identifiers and Flags
+    out("=" * 60, 88)
+    out("  BASIC IDENTIFIERS AND FLAGS", 88)
+    out("=" * 60, 88)
+    
+    test_property("Serial", lambda: Player.Serial, json_output)
+    test_property("Name", lambda: Player.Name, json_output)
+    test_property("Body", lambda: Player.Body, json_output)
+    test_property("MobileID", lambda: Player.MobileID, json_output)
+    test_property("StaticMount", lambda: Player.StaticMount, json_output)
+    test_property("Female", lambda: Player.Female, json_output)
+    test_property("IsGhost", lambda: Player.IsGhost, json_output)
+    test_property("Visible", lambda: Player.Visible, json_output)
+    test_property("WarMode", lambda: Player.WarMode, json_output)
+    test_property("InParty", lambda: Player.InParty, json_output)
+    test_property("Notoriety", lambda: Player.Notoriety, json_output)
+    test_property("Map", lambda: Player.Map, json_output)
+    out("")
 
-    # Stats and caps 
-    try:
-        out(f"Str: {Player.Str}")
-    except Exception as e:
-        out(f"Str: ERROR {e}", 33)
-    try:
-        out(f"Dex: {Player.Dex}")
-    except Exception as e:
-        out(f"Dex: ERROR {e}", 33)
-    try:
-        out(f"Int: {Player.Int}")
-    except Exception as e:
-        out(f"Int: ERROR {e}", 33)
-    try:
-        out(f"StatCap: {Player.StatCap}")
-    except Exception as e:
-        out(f"StatCap: ERROR {e}", 33)
-    try:
-        out(f"Hits: {Player.Hits}")
-    except Exception as e:
-        out(f"Hits: ERROR {e}", 33)
-    try:
-        out(f"HitsMax: {Player.HitsMax}")
-    except Exception as e:
-        out(f"HitsMax: ERROR {e}", 33)
-    try:
-        out(f"Stam: {Player.Stam}")
-    except Exception as e:
-        out(f"Stam: ERROR {e}", 33)
-    try:
-        out(f"StamMax: {Player.StamMax}")
-    except Exception as e:
-        out(f"StamMax: ERROR {e}", 33)
-    try:
-        out(f"Mana: {Player.Mana}")
-    except Exception as e:
-        out(f"Mana: ERROR {e}", 33)
-    try:
-        out(f"ManaMax: {Player.ManaMax}")
-    except Exception as e:
-        out(f"ManaMax: ERROR {e}", 33)
-    try:
-        out(f"HitPointsIncrease: {Player.HitPointsIncrease}")
-    except Exception as e:
-        out(f"HitPointsIncrease: ERROR {e}", 33)
-    try:
-        out(f"MaximumHitPointsIncrease: {Player.MaximumHitPointsIncrease}")
-    except Exception as e:
-        out(f"MaximumHitPointsIncrease: ERROR {e}", 33)
-    try:
-        out(f"StaminaIncrease: {Player.StaminaIncrease}")
-    except Exception as e:
-        out(f"StaminaIncrease: ERROR {e}", 33)
-    try:
-        out(f"MaximumStaminaIncrease: {Player.MaximumStaminaIncrease}")
-    except Exception as e:
-        out(f"MaximumStaminaIncrease: ERROR {e}", 33)
-    try:
-        out(f"ManaIncrease: {Player.ManaIncrease}")
-    except Exception as e:
-        out(f"ManaIncrease: ERROR {e}", 33)
-    try:
-        out(f"MaximumManaIncrease: {Player.MaximumManaIncrease}")
-    except Exception as e:
-        out(f"MaximumManaIncrease: ERROR {e}", 33)
+    # SECTION: Stats and Caps
+    out("=" * 60, 88)
+    out("  STATS AND CAPS", 88)
+    out("=" * 60, 88)
+    
+    test_property("Str", lambda: Player.Str, json_output)
+    test_property("Dex", lambda: Player.Dex, json_output)
+    test_property("Int", lambda: Player.Int, json_output)
+    test_property("StatCap", lambda: Player.StatCap, json_output)
+    test_property("Hits", lambda: Player.Hits, json_output)
+    test_property("HitsMax", lambda: Player.HitsMax, json_output)
+    test_property("Stam", lambda: Player.Stam, json_output)
+    test_property("StamMax", lambda: Player.StamMax, json_output)
+    test_property("Mana", lambda: Player.Mana, json_output)
+    test_property("ManaMax", lambda: Player.ManaMax, json_output)
+    test_property("HitPointsIncrease", lambda: Player.HitPointsIncrease, json_output)
+    test_property("MaximumHitPointsIncrease", lambda: Player.MaximumHitPointsIncrease, json_output)
+    test_property("StaminaIncrease", lambda: Player.StaminaIncrease, json_output)
+    test_property("MaximumStaminaIncrease", lambda: Player.MaximumStaminaIncrease, json_output)
+    test_property("ManaIncrease", lambda: Player.ManaIncrease, json_output)
+    test_property("MaximumManaIncrease", lambda: Player.MaximumManaIncrease, json_output)
+    out("")
 
-    # Regeneration and bonuses 
-    try:
-        out(f"HitPointsRegeneration: {Player.HitPointsRegeneration}")
-    except Exception as e:
-        out(f"HitPointsRegeneration: ERROR {e}", 33)
-    try:
-        out(f"StaminaRegeneration: {Player.StaminaRegeneration}")
-    except Exception as e:
-        out(f"StaminaRegeneration: ERROR {e}", 33)
-    try:
-        out(f"ManaRegeneration: {Player.ManaRegeneration}")
-    except Exception as e:
-        out(f"ManaRegeneration: ERROR {e}", 33)
-    try:
-        out(f"DamageChanceIncrease: {Player.DamageChanceIncrease}")
-    except Exception as e:
-        out(f"DamageChanceIncrease: ERROR {e}", 33)
-    try:
-        out(f"DefenseChanceIncrease: {Player.DefenseChanceIncrease}")
-    except Exception as e:
-        out(f"DefenseChanceIncrease: ERROR {e}", 33)
-    try:
-        out(f"EnhancePotions: {Player.EnhancePotions}")
-    except Exception as e:
-        out(f"EnhancePotions: ERROR {e}", 33)
-    try:
-        out(f"FasterCasting: {Player.FasterCasting}")
-    except Exception as e:
-        out(f"FasterCasting: ERROR {e}", 33)
-    try:
-        out(f"FasterCastRecovery: {Player.FasterCastRecovery}")
-    except Exception as e:
-        out(f"FasterCastRecovery: ERROR {e}", 33)
-    try:
-        out(f"LowerManaCost: {Player.LowerManaCost}")
-    except Exception as e:
-        out(f"LowerManaCost: ERROR {e}", 33)
-    try:
-        out(f"LowerReagentCost: {Player.LowerReagentCost}")
-    except Exception as e:
-        out(f"LowerReagentCost: ERROR {e}", 33)
-    try:
-        out(f"Luck: {Player.Luck}")
-    except Exception as e:
-        out(f"Luck: ERROR {e}", 33)
-    try:
-        out(f"ReflectPhysicalDamage: {Player.ReflectPhysicalDamage}")
-    except Exception as e:
-        out(f"ReflectPhysicalDamage: ERROR {e}", 33)
-    try:
-        out(f"SpellDamageIncrease: {Player.SpellDamageIncrease}")
-    except Exception as e:
-        out(f"SpellDamageIncrease: ERROR {e}", 33)
-    try:
-        out(f"SwingSpeedIncrease: {Player.SwingSpeedIncrease}")
-    except Exception as e:
-        out(f"SwingSpeedIncrease: ERROR {e}", 33)
-    try:
-        out(f"DexterityIncrease: {Player.DexterityIncrease}")
-    except Exception as e:
-        out(f"DexterityIncrease: ERROR {e}", 33)
-    try:
-        out(f"IntelligenceIncrease: {Player.IntelligenceIncrease}")
-    except Exception as e:
-        out(f"IntelligenceIncrease: ERROR {e}", 33)
-    try:
-        out(f"StrengthIncrease: {Player.StrengthIncrease}")
-    except Exception as e:
-        out(f"StrengthIncrease: ERROR {e}", 33)
+    # SECTION: Regeneration and Bonuses
+    out("=" * 60, 88)
+    out("  REGENERATION AND BONUSES", 88)
+    out("=" * 60, 88)
+    
+    test_property("HitPointsRegeneration", lambda: Player.HitPointsRegeneration, json_output)
+    test_property("StaminaRegeneration", lambda: Player.StaminaRegeneration, json_output)
+    test_property("ManaRegeneration", lambda: Player.ManaRegeneration, json_output)
+    test_property("DamageChanceIncrease", lambda: Player.DamageChanceIncrease, json_output)
+    test_property("DefenseChanceIncrease", lambda: Player.DefenseChanceIncrease, json_output)
+    test_property("EnhancePotions", lambda: Player.EnhancePotions, json_output)
+    test_property("FasterCasting", lambda: Player.FasterCasting, json_output)
+    test_property("FasterCastRecovery", lambda: Player.FasterCastRecovery, json_output)
+    test_property("LowerManaCost", lambda: Player.LowerManaCost, json_output)
+    test_property("LowerReagentCost", lambda: Player.LowerReagentCost, json_output)
+    test_property("Luck", lambda: Player.Luck, json_output)
+    test_property("ReflectPhysicalDamage", lambda: Player.ReflectPhysicalDamage, json_output)
+    test_property("SpellDamageIncrease", lambda: Player.SpellDamageIncrease, json_output)
+    test_property("SwingSpeedIncrease", lambda: Player.SwingSpeedIncrease, json_output)
+    test_property("DexterityIncrease", lambda: Player.DexterityIncrease, json_output)
+    test_property("IntelligenceIncrease", lambda: Player.IntelligenceIncrease, json_output)
+    test_property("StrengthIncrease", lambda: Player.StrengthIncrease, json_output)
+    out("")
 
-    # Resistances 
-    try:
-        out(f"AR: {Player.AR}")
-    except Exception as e:
-        out(f"AR: ERROR {e}", 33)
-    try:
-        out(f"FireResistance: {Player.FireResistance}")
-    except Exception as e:
-        out(f"FireResistance: ERROR {e}", 33)
-    try:
-        out(f"ColdResistance: {Player.ColdResistance}")
-    except Exception as e:
-        out(f"ColdResistance: ERROR {e}", 33)
-    try:
-        out(f"PoisonResistance: {Player.PoisonResistance}")
-    except Exception as e:
-        out(f"PoisonResistance: ERROR {e}", 33)
-    try:
-        out(f"EnergyResistance: {Player.EnergyResistance}")
-    except Exception as e:
-        out(f"EnergyResistance: ERROR {e}", 33)
+    # SECTION: Resistances
+    out("=" * 60, 88)
+    out("  RESISTANCES", 88)
+    out("=" * 60, 88)
+    
+    test_property("AR", lambda: Player.AR, json_output)
+    test_property("FireResistance", lambda: Player.FireResistance, json_output)
+    test_property("ColdResistance", lambda: Player.ColdResistance, json_output)
+    test_property("PoisonResistance", lambda: Player.PoisonResistance, json_output)
+    test_property("EnergyResistance", lambda: Player.EnergyResistance, json_output)
+    out("")
 
-    # Position and direction 
-    try:
-        out(f"Position: {_fmt_point3d(Player.Position)}")
-    except Exception as e:
-        out(f"Position: ERROR {e}", 33)
-    try:
-        out(f"Direction: {Player.Direction}")
-    except Exception as e:
-        out(f"Direction: ERROR {e}", 33)
+    # SECTION: Position and Direction
+    out("=" * 60, 88)
+    out("  POSITION AND DIRECTION", 88)
+    out("=" * 60, 88)
+    
+    test_property("Position", lambda: Player.Position, json_output, _fmt_point3d)
+    test_property("Direction", lambda: Player.Direction, json_output)
+    out("")
 
-    # Followers and containers 
-    try:
-        out(f"Followers: {Player.Followers}")
-    except Exception as e:
-        out(f"Followers: ERROR {e}", 33)
-    try:
-        out(f"FollowersMax: {Player.FollowersMax}")
-    except Exception as e:
-        out(f"FollowersMax: ERROR {e}", 33)
-    try:
-        out(f"Gold: {Player.Gold}")
-    except Exception as e:
-        out(f"Gold: ERROR {e}", 33)
-    try:
-        out(f"MaxWeight: {Player.MaxWeight}")
-    except Exception as e:
-        out(f"MaxWeight: ERROR {e}", 33)
-    try:
-        out(f"Weight: {Player.Weight}")
-    except Exception as e:
-        out(f"Weight: ERROR {e}", 33)
+    # SECTION: Followers and Resources
+    out("=" * 60, 88)
+    out("  FOLLOWERS AND RESOURCES", 88)
+    out("=" * 60, 88)
+    
+    test_property("Followers", lambda: Player.Followers, json_output)
+    test_property("FollowersMax", lambda: Player.FollowersMax, json_output)
+    test_property("Gold", lambda: Player.Gold, json_output)
+    test_property("MaxWeight", lambda: Player.MaxWeight, json_output)
+    test_property("Weight", lambda: Player.Weight, json_output)
+    out("")
 
-    # State flags 
-    try:
-        out(f"Paralized: {Player.Paralized}")
-    except Exception as e:
-        out(f"Paralized: ERROR {e}", 33)
-    try:
-        out(f"Poisoned: {Player.Poisoned}")
-    except Exception as e:
-        out(f"Poisoned: ERROR {e}", 33)
-    try:
-        out(f"HasSpecial: {Player.HasSpecial}")
-    except Exception as e:
-        out(f"HasSpecial: ERROR {e}", 33)
-    try:
-        out(f"YellowHits: {Player.YellowHits}")
-    except Exception as e:
-        out(f"YellowHits: ERROR {e}", 33)
+    # SECTION: State Flags
+    out("=" * 60, 88)
+    out("  STATE FLAGS", 88)
+    out("=" * 60, 88)
+    
+    test_property("Paralized", lambda: Player.Paralized, json_output)
+    test_property("Poisoned", lambda: Player.Poisoned, json_output)
+    test_property("HasSpecial", lambda: Player.HasSpecial, json_output)
+    test_property("YellowHits", lambda: Player.YellowHits, json_output)
+    out("")
 
-    # Buffs list 
-    try:
-        lst = Player.Buffs
+    # SECTION: Buffs and Lists
+    out("=" * 60, 88)
+    out("  BUFFS AND LISTS", 88)
+    out("=" * 60, 88)
+    
+    # Buffs list with custom formatter
+    def fmt_buffs(lst):
         n = len(lst) if lst else 0
         sample = ', '.join(lst[:5]) + (' …' if n > 5 else '') if lst else ''
-        out(f"Buffs: {n} [{sample}]")
+        return f"{n} [{sample}]"
+    
+    test_property("Buffs", lambda: Player.Buffs, json_output, fmt_buffs)
+    
+    # BuffsInfo with custom formatter
+    def fmt_buffs_info(info):
+        return f"{len(info) if info else 0} detailed buffs"
+    
+    test_property("BuffsInfo", lambda: Player.BuffsInfo, json_output, fmt_buffs_info)
+    
+    # Corpses with custom formatter
+    def fmt_corpses(corpses):
+        return f"{len(corpses) if corpses else 0} corpses"
+    
+    test_property("Corpses", lambda: Player.Corpses, json_output, fmt_corpses)
+    
+    # Pets with custom formatter
+    def fmt_pets(pets):
+        return f"{len(pets) if pets else 0} pets"
+    
+    test_property("Pets", lambda: Player.Pets, json_output, fmt_pets)
+    out("")
+    
+    # SECTION: Additional Properties
+    out("=" * 60, 88)
+    out("  ADDITIONAL PROPERTIES", 88)
+    out("=" * 60, 88)
+    
+    test_property("Connected", lambda: Player.Connected, json_output)
+    test_property("Fame", lambda: Player.Fame, json_output)
+    test_property("Karma", lambda: Player.Karma, json_output)
+    test_property("KarmaTitle", lambda: Player.KarmaTitle, json_output)
+    test_property("HasPrimarySpecial", lambda: Player.HasPrimarySpecial, json_output)
+    test_property("HasSecondarySpecial", lambda: Player.HasSecondarySpecial, json_output)
+    test_property("HitChanceIncrease", lambda: Player.HitChanceIncrease, json_output)
+    test_property("PrimarySpecial", lambda: Player.PrimarySpecial, json_output)
+    test_property("SecondarySpecial", lambda: Player.SecondarySpecial, json_output)
+    out("")
+
+    out("=" * 60, 88)
+    out("  TEST COMPLETE", 88)
+    out("=" * 60, 88)
+    out("")
+    
+    # Generate summary report
+    total_properties = len(json_output["test_report"])
+    working_properties = sum(1 for prop in json_output["test_report"].values() if prop["works"])
+    failed_properties = sum(1 for prop in json_output["test_report"].values() if prop["works"] == False)
+    
+    out("=" * 60, 88)
+    out("  TEST SUMMARY", 88)
+    out("=" * 60, 88)
+    out(f"Total properties tested: {total_properties}", 67)
+    out(f"Working properties: {working_properties}", 68)
+    out(f"Failed properties: {failed_properties}", 33 if failed_properties > 0 else 67)
+    out(f"Success rate: {(working_properties/total_properties*100):.1f}%", 68)
+    out("")
+    
+    if failed_properties > 0:
+        out("Failed properties:", 33)
+        for prop_name, prop_data in json_output["test_report"].items():
+            if prop_data["works"] == False:
+                out(f"  - {prop_name}: {prop_data['error']}", 33)
+        out("")
+    
+    # Add summary to JSON
+    json_output["summary"] = {
+        "total_properties": total_properties,
+        "working_properties": working_properties,
+        "failed_properties": failed_properties,
+        "success_rate": round(working_properties/total_properties*100, 1)
+    }
+    
+    # Save JSON output
+    out("=" * 60, 88)
+    out("  SAVING JSON OUTPUT", 88)
+    out("=" * 60, 88)
+    
+    try:
+        # Ensure directory exists
+        if not os.path.exists(BASE_PATH):
+            os.makedirs(BASE_PATH)
+        
+        # Write JSON file
+        with open(OUTPUT_FILE, 'w') as f:
+            json.dump(json_output, f, indent=2)
+        
+        out(f"JSON output saved to: {OUTPUT_FILE}", 68)
+        out("")
     except Exception as e:
-        out(f"Buffs: ERROR {e}", 33)
+        out(f"Error saving JSON: {e}", 33)
+        out("")
+    
+    return json_output
 
-    out("— End of Player API Probe —", 67)
+
+# ============================================================================
+# USAGE EXAMPLES
+# ============================================================================
+
+def example_check_player_stats():
+    """Example: Display player stats summary"""
+    Misc.SendMessage(f"=== {Player.Name} Stats ===", 88)
+    Misc.SendMessage(f"STR: {Player.Str}  DEX: {Player.Dex}  INT: {Player.Int}", 67)
+    Misc.SendMessage(f"HP: {Player.Hits}/{Player.HitsMax}", 68)
+
+def example_check_buffs():
+    """Example: Check for specific buff"""
+    if Player.BuffsExist("Strength", False):
+        time_left = Player.BuffTime("Strength")
+        Misc.SendMessage(f"Strength active: {time_left}s", 68)
+    else:
+        Misc.SendMessage("Strength not active", 33)
+
+def example_attack_nearest():
+    """Example: Attack nearest hostile"""
+    if Player.AttackType(-1, 10, "Nearest", [], [6]):
+        Misc.SendMessage("Attacking nearest enemy", 68)
+    else:
+        Misc.SendMessage("No enemies found", 33)
+
+def example_use_skill():
+    """Example: Use a skill"""
+    skill_value = Player.GetSkillValue("Magery")
+    Misc.SendMessage(f"Magery: {skill_value}", 67)
+    Player.UseSkill("Magery")
+
+def example_check_equipment():
+    """Example: Check equipped weapon"""
+    weapon = Player.GetItemOnLayer("RightHand")
+    if weapon:
+        Misc.SendMessage(f"Weapon: {weapon.Name}", 67)
+    else:
+        Misc.SendMessage("No weapon equipped", 33)
+
+def example_pathfind():
+    """Example: Pathfind to location"""
+    Player.PathFindTo(2500, 500, 0)
+    Misc.SendMessage("Pathfinding...", 67)
+
+def example_chat_party():
+    """Example: Send party message"""
+    if Player.InParty:
+        Player.ChatParty("Ready!")
+        Misc.SendMessage("Party message sent", 68)
+
+def example_check_area():
+    """Example: Get current area"""
+    area = Player.Area()
+    Misc.SendMessage(f"Current area: {area}", 67)
 
 
-if __name__ == '__main__':
-    main()
+# Main execution
+try:
+    json_output = main()
+    
+    # Optionally run usage examples
+    if RUN_USAGE_EXAMPLES:
+        out("")
+        out("")
+        out("=" * 60, 88)
+        out("  USAGE EXAMPLES - PRACTICAL DEMONSTRATIONS", 88)
+        out("=" * 60, 88)
+        out("Usage examples are defined as functions above", 67)
+        out("Call them individually as needed:", 67)
+        out("  - example_check_player_stats()", 67)
+        out("  - example_check_buffs()", 67)
+        out("  - example_attack_nearest()", 67)
+        out("  - example_use_skill()", 67)
+        out("  - example_check_equipment()", 67)
+        out("  - example_pathfind()", 67)
+        out("  - example_chat_party()", 67)
+        out("  - example_check_area()", 67)
+        out("=" * 60, 88)
+        out("  USAGE EXAMPLES COMPLETE", 88)
+        out("=" * 60, 88)
+
+except Exception as e:
+    out(f"FATAL ERROR: {e}", 33)
+    import traceback
+    out(traceback.format_exc(), 33)

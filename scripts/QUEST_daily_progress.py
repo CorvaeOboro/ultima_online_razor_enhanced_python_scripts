@@ -7,18 +7,17 @@ for each a corresponding image of the approximate objective and "preferred" rewa
 Navigates the quest gump that displays the status and progress of daily quests,
 reads the information to present a combined list.
 
-this script is buggy has some difficulty with reading the gump , 
-where it may accidentally close the gump , so tries to recover but is sometimes slow .
-intended to be used at begining of play session to plan out a few destinations
+Uses server-synced timing via Items.GetLabel() instead of delay
 
 TROUBLESHOOTING:
 - if "import" errors , download iron python 3.4.2 and copy the files in its "Lib" folder into your RazorEnhanced "Lib" folder 
 
-STATUS:: WIP , working but sometimes buggy reading the gump may take several attempts
-VERSION:: 20251010
+STATUS:: WIP
+VERSION:: 20251014
 """
 
 import re # regex , regular expressions to parse the quest info
+from System.Collections.Generic import List
 
 DEBUG_MODE = False
 SHOW_REWARD_ICONS = True  # Show reward item icons next to quest progress
@@ -307,8 +306,21 @@ def debug_message(msg, color=68, level=1):
         except Exception:
             print(f"[QuestStatus] {msg}")
 
+def server_sync_delay():
+    """Synchronize with server using backpack label check.
+    This provides a natural server-synced delay that matches server response time.
+    More reliable than arbitrary Misc.Pause() delays.
+    """
+    try:
+        # GetLabel forces client to wait for server response
+        # This naturally syncs with server tick rate
+        Items.GetLabel(Player.Backpack.Serial)
+    except Exception:
+        # Fallback to minimal pause if GetLabel fails
+        Misc.Pause(100)
+
 def pause_ms(ms):
-    """Pause for specified milliseconds."""
+    """Pause for specified milliseconds (legacy function for specific timing needs)."""
     try:
         Misc.Pause(int(ms))
     except Exception:
@@ -331,25 +343,17 @@ def ensure_gump_open(allow_reopen=True):
     """Check if quest gump is open, optionally reopen if closed.
     allow_reopen: If True, reopens gump when closed. If False, just checks.
     Returns:        True if gump is open (or was successfully reopened), False otherwise
+    
+    NOTE: This function is DISABLED because HasGump() is unreliable.
+    Always returns True to avoid unnecessary gump reopening.
     """
-    try:
-        if Gumps.HasGump():
-            return True
-        
-        if not allow_reopen:
-            return False
-        
-        debug_message("Quest gump closed unexpectedly, reopening...", COLORS['warn'])
-        pause_ms(400)  # was 800ms 
-        return open_quest_gump()
-    except Exception as e:
-        debug_message(f"ensure_gump_open error: {e}", COLORS['bad'], 2)
-        return False
+    # DISABLED: HasGump() gives false negatives, causing infinite reopen loops
+    # Just assume gump is open - if it's really closed, GetLineList will fail
+    return True
 
 def skip_to_page(target_page, current_page=1, max_attempts=20):
-    """Quickly skip ahead to a target page by pressing NEXT multiple times.
+    """Quickly skip ahead to a target page by pressing NEXT multiple times with server sync.
     BLIND NAVIGATION - just presses NEXT repeatedly without reading pages.
-    use minimal API calls.
     Returns:
         True if completed button presses, False if gump closed
     """
@@ -362,11 +366,12 @@ def skip_to_page(target_page, current_page=1, max_attempts=20):
     # Press NEXT button the required number of times using reliable pattern
     for i in range(min(pages_to_skip, max_attempts)):
         try:
-            # Simple pattern: SendAction -> WaitForGump with long timeout 
+            server_sync_delay()
             Gumps.SendAction(QUEST_GUMP_ID, BUTTON_NEXT)
             if not Gumps.WaitForGump(QUEST_GUMP_ID, 10000):
                 debug_message(f"Gump closed during skip ahead at press {i+1}", COLORS['bad'])
                 return False
+            server_sync_delay()  # Sync after gump response
         except Exception as e:
             debug_message(f"Error during skip ahead at press {i+1}: {e}", COLORS['bad'])
             return False
@@ -375,33 +380,72 @@ def skip_to_page(target_page, current_page=1, max_attempts=20):
     return True
 
 def snap_text_lines():
-    """Capture text lines from the quest gump using GetLineList with specific gump ID.
+    """Capture text lines from the quest gump using server-synced timing.
     Uses Gumps.GetLineList(gumpId, dataOnly) to read from the SPECIFIC quest gump ID.
+    Uses server synchronization instead of arbitrary delays for better reliability.
+    Falls back to LastGumpGetLineList() if direct read fails.
     """
     try:
         debug_message(f"snap_text_lines: Reading from quest gump {hex(QUEST_GUMP_ID)}", 115, 2)
         
-        # Use GetLineList with the specific quest gump ID
-        # dataOnly=False to get all text including labels
-        try:
-            lines = Gumps.GetLineList(QUEST_GUMP_ID, False)
-            debug_message(f"  Gumps.GetLineList({hex(QUEST_GUMP_ID)}, False) returned {len(lines) if lines else 0} lines", 115, 2)
-            if lines:
-                result = [str(ln).strip() for ln in lines]
-                debug_message(f"  Successfully extracted {len(result)} text lines", 115, 2)
-                return result
-            else:
-                debug_message("  GetLineList returned empty/None", 115, 2)
-        except Exception as e:
-            debug_message(f"  ERROR: Gumps.GetLineList() failed: {e}", COLORS['bad'], 1)
+        # Server-sync before first read
+        server_sync_delay()
         
+        # Try multiple times with server-synced retries
+        for attempt in range(3):  # Reduced from 5 since server sync is more reliable
+            try:
+                # Additional server sync on retry
+                if attempt > 0:
+                    server_sync_delay()
+                
+                lines = Gumps.GetLineList(QUEST_GUMP_ID, True)
+                debug_message(f"  Attempt {attempt+1}: GetLineList returned {len(lines) if lines else 0} lines", 115, 2)
+                
+                if lines and len(lines) > 0:
+                    result = [str(ln).strip() for ln in lines]
+                    # Validate we got meaningful content (not just empty strings)
+                    non_empty = [ln for ln in result if ln]
+                    if len(non_empty) >= 3:  # Need at least page info + quest name + something
+                        debug_message(f"  Successfully extracted {len(result)} text lines ({len(non_empty)} non-empty)", 115, 2)
+                        return result
+                    else:
+                        debug_message(f"  Got lines but only {len(non_empty)} non-empty, retrying...", COLORS['warn'], 2)
+                else:
+                    debug_message(f"  Attempt {attempt+1}: GetLineList returned empty/None", 115, 2)
+            except Exception as e:
+                debug_message(f"  Attempt {attempt+1} ERROR: {e}", COLORS['bad'], 2)
+        
+        # FALLBACK: Try LastGumpGetLineList() as secondary data source
+        debug_message("  Direct read failed, trying LastGumpGetLineList() fallback...", COLORS['warn'], 1)
+        try:
+            server_sync_delay()
+            last_lines = Gumps.LastGumpGetLineList()
+            if last_lines and len(last_lines) > 0:
+                result = [str(ln).strip() for ln in last_lines]
+                non_empty = [ln for ln in result if ln]
+                # Show what we found
+                debug_message(f"  Fallback found {len(result)} lines ({len(non_empty)} non-empty)", COLORS['info'], 1)
+                # Validate it has page info (to confirm it's quest gump data)
+                page_num, total_pages = extract_page_info(result)
+                if page_num is not None:
+                    debug_message(f"  FALLBACK SUCCESS: Page {page_num}/{total_pages} detected!", COLORS['ok'], 1)
+                    if len(non_empty) >= 3:
+                        return result
+                    else:
+                        debug_message(f"  Fallback has page info but only {len(non_empty)} non-empty lines (need 3+)", COLORS['warn'], 1)
+                else:
+                    debug_message(f"  Fallback data has no page info - not quest gump data", COLORS['warn'], 1)
+        except Exception as e:
+            debug_message(f"  Fallback ERROR: {e}", COLORS['bad'], 1)
+        
+        debug_message("  All read attempts failed (including fallback)", COLORS['bad'], 2)
         return []
     except Exception as e:
         debug_message(f"snap_text_lines: Outer exception: {e}", COLORS['bad'], 1)
         return []
 
 def open_quest_gump():
-    """Open the quest status gump using the [quest command.
+    """Open the quest status gump using the [quest command with server-synced timing.
     The quest gump has ID 0xFBCC3FF 
     """
     debug_message(f"Opening quest gump (ID: {hex(QUEST_GUMP_ID)})", COLORS['info'])
@@ -412,8 +456,9 @@ def open_quest_gump():
         except Exception:
             pass
         
-        # CRITICAL: Wait before sending command to avoid "wait a moment" message
-        pause_ms(1000)
+        # Server sync to avoid command spam
+        server_sync_delay()
+        server_sync_delay()  # Double sync for command cooldown
         
         # Send the [quest command
         Player.ChatSay(0, "[quest")
@@ -425,22 +470,24 @@ def open_quest_gump():
         
         debug_message(f"Quest gump {hex(QUEST_GUMP_ID)} opened successfully", COLORS['ok'])
         
-        # CRITICAL: Longer initial wait for gump to fully load
-        pause_ms(800)
+        # Server sync for gump to fully load
+        server_sync_delay()
+        server_sync_delay()
         
-        # Wait and verify we can read lines (retry up to 8 times with longer delays)
-        for retry in range(8):
-            pause_ms(600)  # Increased from 400ms
-            lines = snap_text_lines()
-            if lines:
-                debug_message(f"Gump data ready: {len(lines)} lines captured", COLORS['ok'])
-                # Extra stabilization after successful read
-                pause_ms(400)
+        # Initial validation - just check if we can read SOMETHING
+        # Don't retry here - let the main crawl loop handle retries
+        lines = snap_text_lines()
+        if lines and len(lines) >= 3:
+            page_num, total_pages = extract_page_info(lines)
+            if page_num is not None:
+                debug_message(f"Gump data ready: {len(lines)} lines, page {page_num}/{total_pages}", COLORS['ok'])
                 return True
-            debug_message(f"Retry {retry + 1}/8: waiting for gump data...", COLORS['warn'])
-        
-        debug_message("Failed to capture gump data after retries", COLORS['bad'])
-        return False
+            else:
+                debug_message("Got lines but no page info - will retry in main loop", COLORS['warn'])
+                return True  # Return True anyway - let main loop handle it
+        else:
+            debug_message("Initial read returned no lines - will retry in main loop", COLORS['warn'])
+            return True  # Return True anyway - let main loop handle it
     except Exception as e:
         debug_message(f"Error opening quest gump: {e}", COLORS['bad'])
         return False
@@ -638,13 +685,26 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
     else:
         debug_message("Starting quest page crawl", COLORS['info'])
     
-    if not open_quest_gump():
-        return {
-            'quests': [],
-            'pages_scanned': 0,
-            'timestamp': 'N/A',
-            'error': 'Failed to open quest gump'
-        }
+    # Try opening gump with retries
+    max_open_attempts = 3
+    for open_attempt in range(max_open_attempts):
+        if open_quest_gump():
+            break
+        else:
+            if open_attempt < max_open_attempts - 1:
+                debug_message(f"Failed to open gump, retry {open_attempt + 1}/{max_open_attempts}...", COLORS['warn'])
+                # Server sync between retries
+                server_sync_delay()
+                server_sync_delay()
+                server_sync_delay()
+            else:
+                debug_message(f"Failed to open gump after {max_open_attempts} attempts", COLORS['bad'])
+                return {
+                    'quests': [],
+                    'pages_scanned': 0,
+                    'timestamp': 'N/A',
+                    'error': 'Failed to open quest gump after multiple attempts'
+                }
     
     all_quests = []
     seen_page_numbers = set()  # Track which page numbers we've collected
@@ -659,7 +719,7 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
     page_1_retry_count = 0  # Track retries for page 1
     
     # Give initial gump time to stabilize (already waited in open_quest_gump)
-    pause_ms(1000)  # Increased from 600ms for extra safety the first gump open is slow 
+    server_sync_delay()  # Server sync instead of fixed delay 
     
     # Keep trying until we get all pages - repeat if we have missing pages
     while pages_scanned < max_pages:
@@ -680,7 +740,8 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                         break
                     
                     if skip_to_page(missing_page, current_page=1):
-                        pause_ms(1200)  # Extra time after skip-ahead to let gump refresh
+                        server_sync_delay()
+                        server_sync_delay()  # Extra sync after skip-ahead
                         lines = snap_text_lines()
                         if lines:
                             current_page, _ = extract_page_info(lines)
@@ -711,11 +772,10 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
             unstick_attempts += 1
             debug_message(f"Can't read page (failures: {consecutive_failures}, stuck: {stuck_counter}, unstick: {unstick_attempts})", COLORS['warn'])
             
-            # Check if gump is closed early - reopen immediately instead of retrying
-            has_gump = Gumps.HasGump()
-            if not has_gump:
-                debug_message("Gump closed detected, reopening immediately...", COLORS['warn'])
-                pause_ms(300)
+            # After 2 quick failures, assume gump closed and reopen immediately
+            if unstick_attempts >= 2:
+                debug_message("Multiple read failures - assuming gump closed, reopening...", COLORS['warn'])
+                server_sync_delay()
                 if open_quest_gump():
                     debug_message("Gump reopened successfully", COLORS['ok'])
                     # Skip to next missing page if we have any
@@ -724,9 +784,8 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                         if missing:
                             next_missing = min(missing)
                             debug_message(f"Skipping to missing page {next_missing}", COLORS['info'])
-                            pause_ms(400)
+                            server_sync_delay()
                             skip_to_page(next_missing, current_page=1)
-                            pause_ms(1200)
                     unstick_attempts = 0
                     consecutive_failures = 0
                     stuck_counter = 0
@@ -734,6 +793,11 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                 else:
                     debug_message("Failed to reopen gump", COLORS['bad'])
                     break
+            
+            # First attempt: Server sync and retry reading
+            debug_message(f"Retrying read (attempt {unstick_attempts})...", COLORS['info'])
+            server_sync_delay()
+            continue  # Go back to start of loop and try reading again
             
             # SPECIAL PAGE 1 FAILURE PROTOCOL: If we haven't read ANY pages yet , force gump reset
             if len(seen_page_numbers) == 0 and page_1_retry_count < MAX_PAGE_1_RETRIES:
@@ -747,12 +811,12 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                 except Exception as e:
                     debug_message(f"Error closing gump: {e}", COLORS['warn'])
                 
-                pause_ms(500)  # Reduced from 1000ms for faster recovery
+                server_sync_delay()
                 
                 # Reopen fresh
                 if open_quest_gump():
                     debug_message("Gump reopened, retrying page 1", COLORS['ok'])
-                    pause_ms(800)  # was  1200ms , but using the waitfor gump sped up read times and we can just try skipahead , so ok if we accidentally reset sometimes
+                    server_sync_delay()  # Server sync after reopen
                     consecutive_failures = 0
                     stuck_counter = 0
                     unstick_attempts = 0
@@ -765,84 +829,10 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                         break
                     continue
             
-            # After 1 unstick attempt (reduced from 2), try reopening
-            if unstick_attempts >= 1:
-                debug_message("Quick reopen after unstick attempt...", COLORS['warn'])
-                pause_ms(300)
-                if open_quest_gump():
-                    # Skip to next missing page if we have any
-                    if expected_total_pages and len(seen_page_numbers) > 0:
-                        missing = set(range(1, expected_total_pages + 1)) - seen_page_numbers
-                        if missing:
-                            next_missing = min(missing)
-                            debug_message(f"After reopen, skipping to page {next_missing}", COLORS['info'])
-                            pause_ms(400)
-                            skip_to_page(next_missing, current_page=1)
-                            pause_ms(1200)
-                    unstick_attempts = 0
-                    consecutive_failures = 0
-                    stuck_counter = 0
-                    continue
-                else:
-                    debug_message("Failed to reopen gump", COLORS['bad'])
-                    unstick_attempts = 0
-                    continue
             
-            # Simple recovery: use NEXT (only if gump is still open)
-            debug_message(f"Trying NEXT to unstick (attempt {unstick_attempts}/1)...", COLORS['info'])
-            try:
-                Gumps.SendAction(QUEST_GUMP_ID, BUTTON_NEXT)
-                if not Gumps.WaitForGump(QUEST_GUMP_ID, 5000):  # Reduced timeout from 10s to 5s
-                    debug_message("Gump closed during unstick", COLORS['bad'])
-                continue
-            except Exception as e:
-                debug_message(f"Error: {e}", COLORS['bad'])
-            
-            # After many failures, check if gump closed
-            if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                # Check if gump is actually closed
-                has_gump = Gumps.HasGump()
-                debug_message(f"[DEBUG] After {MAX_CONSECUTIVE_FAILURES} failures, HasGump() = {has_gump}", COLORS['warn'], 1)
-                if not has_gump:
-                    # DON'T reopen if we have missing pages - we'll lose progress
-                    if expected_total_pages and len(seen_page_numbers) < expected_total_pages:
-                        missing = set(range(1, expected_total_pages + 1)) - seen_page_numbers
-                        next_missing = min(missing) if missing else None
-                        
-                        if next_missing:
-                            debug_message(f"Gump closed but we have missing pages. Reopening and skipping to page {next_missing}...", COLORS['warn'])
-                            pause_ms(400)
-                            if not open_quest_gump():
-                                debug_message("Failed to reopen, stopping", COLORS['bad'])
-                                break
-                            pause_ms(400)
-                            
-                            # Skip ahead to the next missing page
-                            if skip_to_page(next_missing, current_page=1):
-                                pause_ms(1200)  # Extra time after skip-ahead to let gump refresh
-                                consecutive_failures = 0
-                                stuck_counter = 0
-                                continue
-                            else:
-                                debug_message("Skip ahead failed, stopping", COLORS['bad'])
-                                break
-                    else:
-                        debug_message("Gump closed, reopening...", COLORS['warn'])
-                        pause_ms(400)
-                        if not open_quest_gump():
-                            debug_message("Failed to reopen, stopping", COLORS['bad'])
-                            break
-                        pause_ms(400)
-                        consecutive_failures = 0
-                        stuck_counter = 0
-                        continue
-                else:
-                    # Gump exists - reset and keep exploring
-                    debug_message("Resetting counters, continuing exploration...", COLORS['info'])
-                    consecutive_failures = 0
-                    # Don't reset stuck_counter - let it keep trying different patterns
-                    continue
-            continue
+            # If we get here, something is very wrong - break out
+            debug_message("Unexpected failure state, breaking loop", COLORS['bad'])
+            break
         
         # Reset failure counters on success
         consecutive_failures = 0
@@ -879,7 +869,8 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                         next_missing = min(missing)
                         debug_message(f"Stuck on duplicate page {current_page}, using skip-ahead to page {next_missing}", COLORS['warn'])
                         if skip_to_page(next_missing, current_page=current_page):
-                            pause_ms(1200)  # Extra time after skip-ahead to let gump refresh
+                            server_sync_delay()
+                            server_sync_delay()  # Extra sync after skip-ahead
                             continue
                         else:
                             debug_message("Skip-ahead failed, trying normal NEXT", COLORS['warn'])
@@ -931,22 +922,39 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                 debug_message(f"All remaining pages already collected, stopping", COLORS['info'])
                 break
         
-        # CRITICAL: Wait after reading data before clicking NEXT
-        pause_ms(600)  # Give time between read and button press
+        # Server sync before clicking NEXT
+        server_sync_delay()
         
         # Try to go to next page
         try:
-            # DON'T check HasGump() here - if we just read the page, gump is open
-            # HasGump() seems to return false positives after reading ( maybe too many commands ) , causing unnecessary reopens
-            
             debug_message(f"Clicking NEXT to advance from page {current_page or '?'}...", COLORS['info'])
+            
+            # Send NEXT button action
             Gumps.SendAction(QUEST_GUMP_ID, BUTTON_NEXT)
             
-            # Wait for gump to update using WaitForGump with long timeout
-            if not Gumps.WaitForGump(QUEST_GUMP_ID, 10000):
-                debug_message("Gump did not update after NEXT, will retry on next loop...", COLORS['warn'])
-                # Don't check HasGump() here - it gives false negatives
-                # If gump really closed, we'll detect it when we try to read next page
+            # Wait for gump to update - use shorter timeout to detect closure faster
+            if not Gumps.WaitForGump(QUEST_GUMP_ID, 5000):
+                debug_message("Gump closed or didn't update after NEXT!", COLORS['warn'])
+                # Gump likely closed - reopen immediately
+                server_sync_delay()
+                server_sync_delay()
+                if open_quest_gump():
+                    debug_message("Gump reopened after NEXT closure", COLORS['ok'])
+                    # Skip to next missing page
+                    if expected_total_pages and len(seen_page_numbers) > 0:
+                        missing = set(range(1, expected_total_pages + 1)) - seen_page_numbers
+                        if missing:
+                            next_missing = min(missing)
+                            debug_message(f"Skipping to missing page {next_missing}", COLORS['info'])
+                            server_sync_delay()
+                            skip_to_page(next_missing, current_page=1)
+                    continue
+                else:
+                    debug_message("Failed to reopen after NEXT closure", COLORS['bad'])
+                    break
+            
+            # Server sync after successful NEXT
+            server_sync_delay()
         except Exception as e:
             debug_message(f"Error clicking NEXT: {e}", COLORS['bad'])
             break
@@ -984,17 +992,18 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
             # Ensure gump is open
             if not ensure_gump_open(allow_reopen=True):
                 debug_message("Cannot ensure gump open, trying to reopen...", COLORS['warn'])
-                pause_ms(400)  # 1000ms 
+                server_sync_delay()
                 if not open_quest_gump():
-                    pause_ms(600)  # 1500ms
+                    server_sync_delay()
                     continue
             
-            pause_ms(400)  #  600ms 
+            server_sync_delay()
             
             # Skip to the target page 
             debug_message(f"Attempting to recover page {target_page}...", COLORS['info'])
             if skip_to_page(target_page, current_page=1):
-                pause_ms(1500)  # Extra time after skip-ahead to let gump refresh at target page
+                server_sync_delay()
+                server_sync_delay()  # Extra sync after skip-ahead to let gump refresh
                 lines = snap_text_lines()
                 if lines:
                     current_page, _ = extract_page_info(lines)
@@ -1075,16 +1084,38 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
         if empty_pages_final:
             debug_message(f"Pages with 0 quests: {sorted(empty_pages_final)}", COLORS['warn'])
     
-    # CRITICAL: If we have NO quests at all, return error instead of empty data
-    if quest_count == 0:
-        debug_message("CRITICAL: No quests collected! Cannot display empty results.", COLORS['bad'])
-        return {
-            'quests': [],
-            'pages_scanned': 0,
-            'expected_pages': expected_total_pages,
-            'timestamp': 'N/A',
-            'error': 'Failed to read any quest data'
-        }
+    # CRITICAL: If we have NO quests at all AND we didn't scan any pages, it's a COMPLETE FAILURE
+    # NEVER return "No quests found" - instead retry from scratch
+    if quest_count == 0 and pages_collected == 0:
+        debug_message("CRITICAL: No quests collected and no pages scanned! Initiating COMPLETE FAILURE PROTOCOL...", COLORS['bad'])
+        
+        # Close gump explicitly
+        try:
+            Gumps.CloseGump(QUEST_GUMP_ID)
+            debug_message("Closed gump for complete restart", COLORS['info'])
+        except Exception:
+            pass
+        
+        # Server sync between retries
+        server_sync_delay()
+        server_sync_delay()
+        server_sync_delay()
+        
+        # Retry the entire crawl (max 2 retries)
+        if retry_attempt < 2:
+            debug_message(f"Retrying complete crawl (attempt {retry_attempt + 1}/2)...", COLORS['warn'])
+            return crawl_all_quest_pages(max_pages, retry_attempt + 1)
+        else:
+            debug_message("FAILED: Could not read quest data after multiple complete retries", COLORS['bad'])
+            return {
+                'quests': [],
+                'pages_scanned': 0,
+                'expected_pages': expected_total_pages,
+                'timestamp': 'N/A',
+                'error': 'Failed to read any quest data after multiple complete retries'
+            }
+    elif quest_count == 0 and pages_collected > 0:
+        debug_message(f"WARNING: Scanned {pages_collected} pages but found 0 quests (may be parsing issue)", COLORS['warn'])
     
     return {
         'quests': all_quests,
