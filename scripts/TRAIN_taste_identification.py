@@ -1,20 +1,20 @@
 """
 TRAIN Taste Identification - a Razor Enhanced Python script for Ultima Online
 
-VERSION::20250922
+use the skill Taste Identification on known food items in player backpack 
+
+STATUS:: untested
+VERSION::20251015
 """
-# Configuration
+
+DEBUG_MODE = False
 TARGET_SKILL_NAME = "Taste Identification"
 TARGET_VALUE = 100.0
-WAIT_BETWEEN_ATTEMPTS_MS = 1000  # 10 seconds to be shard-friendly
-TARGET_TIMEOUT_MS = 1000
+WAIT_BETWEEN_ATTEMPTS_MS = 1000  # 1 second to 
+TARGET_TIMEOUT_MS = 10000
 
-"""
-Food targeting configuration (mirrors ITEM_food_eater.py sets where relevant)
-We will exclude special hued variants like blue fish steak (mana) and berries.
-"""
-
-# Excluded specific hued items: (ItemID, Hue)
+# Excluded specific hued items: (ItemID, Hue) 
+# We will exclude special hued variants like blue fish steak (mana) and berries.
 EXCLUDED_HUED_ITEMS = {
     (0x097B, 0x0825),  # Blue mana fish steak
     (0x09D0, 0x0480),  # Arcane Berries (Apple ID with hue 0x0480)
@@ -49,18 +49,21 @@ FOOD_ITEM_IDS = [
     0x097E,  # Bacon
 ]
 
+def debug_message(msg, color=68):
+    """Send a message to the client if DEBUG_MODE is enabled."""
+    if DEBUG_MODE:
+        Misc.SendMessage("[TRAIN_Taste_Identification] " + str(msg), color)
 
 def get_skill_value(skill_name):
     try:
         return float(Player.GetSkillValue(skill_name))
     except Exception as e:
-        Misc.SendMessage(f"Error reading skill '{skill_name}': {e}", 33)
+        debug_message(f"Error reading skill '{skill_name}': {e}", 33)
         return 0.0
-
 
 def train_taste_id_until(target_value):
     start_val = get_skill_value(TARGET_SKILL_NAME)
-    Misc.SendMessage(
+    debug_message(
         f"Training {TARGET_SKILL_NAME} from {start_val:.1f} to {target_value:.1f}...",
         68,
     )
@@ -69,7 +72,7 @@ def train_taste_id_until(target_value):
     while True:
         current = get_skill_value(TARGET_SKILL_NAME)
         if current >= target_value:
-            Misc.SendMessage(
+            debug_message(
                 f"{TARGET_SKILL_NAME} reached target {current:.1f} >= {target_value:.1f}. Done.",
                 68,
             )
@@ -78,7 +81,7 @@ def train_taste_id_until(target_value):
         # Locate a valid food item in backpack (excluding specific hued variants)
         target_item = find_valid_food_in_backpack()
         if not target_item:
-            Misc.SendMessage("No valid food item found in backpack to Taste ID. Retrying...", 33)
+            debug_message("No valid food item found in backpack to Taste ID. Retrying...", 33)
             Misc.Pause(5000)
             continue
 
@@ -90,19 +93,18 @@ def train_taste_id_until(target_value):
             try:
                 Target.TargetExecute(target_item.Serial)
             except Exception as e:
-                Misc.SendMessage(f"TargetExecute failed: {e}", 33)
+                debug_message(f"TargetExecute failed: {e}", 33)
         else:
-            Misc.SendMessage("No target cursor appeared. Retrying after delay...", 33)
+            debug_message("No target cursor appeared. Retrying after delay...", 33)
 
         attempts += 1
-        Misc.SendMessage(
+        debug_message(
             f"{TARGET_SKILL_NAME} attempt {attempts}, current: {current:.1f}/{target_value:.1f}",
             55,
         )
 
-        # Wait between attempts (server-friendly)
+        # Wait between attempts
         Misc.Pause(WAIT_BETWEEN_ATTEMPTS_MS)
-
 
 def find_valid_food_in_backpack():
     """Return the first valid food item in the player's backpack not in excluded hues."""
@@ -134,9 +136,8 @@ def find_valid_food_in_backpack():
             return it
     return None
 
-
 if __name__ == "__main__":
     try:
         train_taste_id_until(TARGET_VALUE)
     except Exception as e:
-        Misc.SendMessage(f"Unexpected error in TRAIN_taste_identification: {e}", 33)
+        debug_message(f"Unexpected error in TRAIN_taste_identification: {e}", 33)

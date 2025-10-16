@@ -366,12 +366,18 @@ def skip_to_page(target_page, current_page=1, max_attempts=20):
     # Press NEXT button the required number of times using reliable pattern
     for i in range(min(pages_to_skip, max_attempts)):
         try:
+            # Double server sync before button press to avoid command spam
             server_sync_delay()
+            server_sync_delay()
+            
             Gumps.SendAction(QUEST_GUMP_ID, BUTTON_NEXT)
+            
             if not Gumps.WaitForGump(QUEST_GUMP_ID, 10000):
                 debug_message(f"Gump closed during skip ahead at press {i+1}", COLORS['bad'])
                 return False
-            server_sync_delay()  # Sync after gump response
+            
+            # Single sync after gump response
+            server_sync_delay()
         except Exception as e:
             debug_message(f"Error during skip ahead at press {i+1}: {e}", COLORS['bad'])
             return False
@@ -878,10 +884,14 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                 # Normal skip forward
                 try:
                     debug_message(f"Clicking NEXT to skip duplicate page {current_page}...", COLORS['info'])
+                    # Double server sync before NEXT to avoid command spam
+                    server_sync_delay()
+                    server_sync_delay()
                     Gumps.SendAction(QUEST_GUMP_ID, BUTTON_NEXT)
                     if not Gumps.WaitForGump(QUEST_GUMP_ID, 10000):
                         debug_message("Gump closed during duplicate skip", COLORS['bad'])
                         break
+                    server_sync_delay()  # Sync after response
                 except Exception:
                     break
                 continue
@@ -922,7 +932,8 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                 debug_message(f"All remaining pages already collected, stopping", COLORS['info'])
                 break
         
-        # Server sync before clicking NEXT
+        # Double server sync before clicking NEXT to avoid command spam
+        server_sync_delay()
         server_sync_delay()
         
         # Try to go to next page
@@ -1045,8 +1056,12 @@ def crawl_all_quest_pages(max_pages=MAX_PAGES, retry_attempt=0):
                 if not ensure_gump_open(allow_reopen=True):
                     break
                 
+                # Double server sync before NEXT to avoid command spam
+                server_sync_delay()
+                server_sync_delay()
                 Gumps.SendAction(QUEST_GUMP_ID, BUTTON_NEXT)
                 if Gumps.WaitForGump(QUEST_GUMP_ID, 10000):
+                    server_sync_delay()  # Sync after response
                     lines = snap_text_lines()
                     if lines:
                         current_page, _ = extract_page_info(lines)

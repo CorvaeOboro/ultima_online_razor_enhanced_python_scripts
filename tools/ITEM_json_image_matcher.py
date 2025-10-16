@@ -2,6 +2,8 @@
 
 Reads JSON files from the /data directory and searches for matching images
 based on ItemID with flexible hexadecimal filename matching.
+this is used after uding DEV_item_list.py that lets us categorize an item from in game like "food" or "update" to designate we would like to alter the art
+that script outputs the json with info about the item and this tool matches the source art images from exported mul 
 
 Features:
 - Tkinter GUI for folder selection and operation
@@ -12,7 +14,7 @@ Features:
 - Copies matched images to organized subfolders in /data/matching/
 - Prevents duplicate copying
 
-VERSION::20250729
+VERSION::20251016
 """
 
 import json
@@ -354,10 +356,16 @@ class JSONImageMatcher:
                             dest_filename = image_file[5:]  # Remove first 5 characters
                             
                         dest_path = os.path.join(subfolder, dest_filename)
+                        # Also respect a 'completed' subfolder within the target subfolder
+                        completed_subfolder = os.path.join(subfolder, "completed")
+                        completed_path = os.path.join(completed_subfolder, dest_filename)
                         
                         try:
                             if os.path.exists(dest_path):
-                                self.log(f"  SKIP: {dest_filename} (already exists)")
+                                self.log(f"  SKIP: {dest_filename} (already exists in target folder)")
+                                total_skipped += 1
+                            elif os.path.exists(completed_path):
+                                self.log(f"  SKIP: {dest_filename} (already exists in 'completed' subfolder)")
                                 total_skipped += 1
                             else:
                                 shutil.copy2(source_path, dest_path)
