@@ -18,7 +18,7 @@ Requirements:
 - add a hue exclusion ( dont salvage hued items ) , since we dont have access to rarity property this could be useful
 - add a mode that will use the armor data json , to save items that we have not yet analyzed
 
-** WARNING item properties are being clipped to 4, this script may miss important properties if they are listed last **
+** WARNING item properties are clipped to 4, this script may miss important properties if they are listed last **
 
 HOTKEY:: O
 VERSION::20250918
@@ -27,23 +27,23 @@ VERSION::20250918
 DEBUG_MODE = False  # Set to True to enable debug/info messages
 
 SALVAGE_JUNK_ITEMS = True      # Set to False to skip the salvaging , only moving in tot he junk container
-CONSUME_ARCANE_DUST = False # Set to False to skip consuming arcane dust (save for enchanting)
+CONSUME_ARCANE_DUST = True # Set to False to skip consuming arcane dust , this isnt really needed anymore now that you can extract arcane essence from self
 SAVE_ONE_DAGGER = True # Save  one dagger for skinning
 
 # ITEM TYPE-based filtering , SAVE itmes you favor , set to False types unfavored
-SAVE_ITEM_WEAPON_AXE = False
-SAVE_ITEM_WEAPON_SWORD = False
+SAVE_ITEM_WEAPON_AXE = True
+SAVE_ITEM_WEAPON_SWORD = True
 SAVE_ITEM_WEAPON_MACE = True # defaulting only maces
-SAVE_ITEM_WEAPON_FENCING = False
-SAVE_ITEM_WEAPON_ARCHERY = False
-SAVE_ITEM_WEAPON_UNKNOWN = False
+SAVE_ITEM_WEAPON_FENCING = True
+SAVE_ITEM_WEAPON_ARCHERY = True
+SAVE_ITEM_WEAPON_UNKNOWN = True
 
 # Default is only saving leather and plate armor 
-SAVE_ITEM_ARMOR_LEATHER = True # defaulting leather armor for mages
+SAVE_ITEM_ARMOR_LEATHER = False # defaulting leather armor for mages using meditation
 SAVE_ITEM_ARMOR_PLATE = True # defaulting plate armor for warriors
 SAVE_ITEM_ARMOR_CHAINMAIL = False
 SAVE_ITEM_ARMOR_RINGMAIL = False
-SAVE_ITEM_ARMOR_STUDDED = False
+SAVE_ITEM_ARMOR_STUDDED = True # defaulting leather armor for mages , since taste id is better then med
 SAVE_ITEM_ARMOR_BONE = False
 
 SAVE_ITEM_ARMOR_SHIELD = True # defaulting save shields
@@ -89,6 +89,52 @@ TIER4_AFFIXES = [
     "Might",        # +10 damage
     "Substantial"    # +40% armor
 ]
+
+# ACCURACY AFFIXES (used as damage multipliers, not standalone value)
+ACCURACY_AFFIXES = {
+    "Surpassingly Accurate": 1.3,  # +30% damage score boost
+    "Supremely Accurate": 1.25,    # +25% damage score boost  
+    "Exceedingly Accurate": 1.2,   # +20% damage score boost
+    "Eminently Accurate": 1.15,    # +15% damage score boost
+    "Accurate": 1.1                # +10% damage score boost
+}
+
+# DAMAGE AFFIXES (base scores for weapons)
+DAMAGE_AFFIXES = {
+    "Vanquishing": 100,    # +25 damage - highest tier
+    "Power": 75,           # +20 damage
+    "Force": 50,           # +15 damage
+    "Might": 30,           # +10 damage
+    "Ruin": 15             # +5 damage
+}
+
+# SLAYER AFFIXES (equivalent to damage for scoring)
+SLAYER_AFFIXES = {
+    "Greater": 100,        # Slaying +25% - equivalent to Vanquishing
+    "Slayer": 50           # Generic slayer bonus
+}
+
+# ARMOR AFFIXES (base scores for armor)
+ARMOR_AFFIXES = {
+    "Invulnerable": 100,   # +100% armor - highest tier
+    "Fortification": 80,   # +80% armor
+    "Massive": 60,         # +60% armor
+    "Substantial": 40,     # +40% armor
+    "Hardening": 20        # +20% armor
+}
+
+# MINIMUM SCORE THRESHOLD (items below this are junked)
+MIN_SCORE_THRESHOLD = 40  # Adjust this to control what gets saved
+
+# ARMOR TIER ENFORCEMENT - For armor/shields, enforce minimum armor tier regardless of other modifiers
+# This ensures low-tier armor modifiers (Hardening, Substantial, Massive) are junked even with other properties
+ENFORCE_ARMOR_TIER = True  # Set to False to use score-only filtering for armor
+MIN_ARMOR_TIER = 2  # 1=Invulnerable only, 2=Fortification+, 3=Massive+, 4=Substantial+, 5=Hardening+
+
+# WEAPON TIER ENFORCEMENT - For weapons, enforce minimum damage tier regardless of accuracy or other modifiers
+# This ensures low-tier damage modifiers (Ruin, Might, Force) are junked even with accuracy bonuses
+ENFORCE_WEAPON_TIER = True  # Set to False to use score-only filtering for weapons
+MIN_WEAPON_TIER = 2  # 1=Vanquishing/Greater only, 2=Power+, 3=Force+, 4=Might+, 5=Ruin+
 
 
 # Junk Backpack Configuration
@@ -410,6 +456,11 @@ class JunkSalvager:
         self.debug_message(f"Reserve Tier 3 items: {'Yes' if RESERVE_TIERS['TIER3'] else 'No'}", self.colors['config'])
         self.debug_message(f"Reserve Tier 4 items: {'Yes' if RESERVE_TIERS['TIER4'] else 'No'}", self.colors['config'])
         self.debug_message(f"Reserve magical items: {'Yes' if RESERVE_TIERS['MAGICAL'] else 'No'}", self.colors['config'])
+        self.debug_message(f"Enforce armor tier: {'Yes' if ENFORCE_ARMOR_TIER else 'No'}", self.colors['config'])
+        self.debug_message(f"Min armor tier: {MIN_ARMOR_TIER} (1=Invuln, 2=Fort+, 3=Massive+, 4=Subst+, 5=Hard+)", self.colors['config'])
+        self.debug_message(f"Enforce weapon tier: {'Yes' if ENFORCE_WEAPON_TIER else 'No'}", self.colors['config'])
+        self.debug_message(f"Min weapon tier: {MIN_WEAPON_TIER} (1=Vanq/Greater, 2=Power+, 3=Force+, 4=Might+, 5=Ruin+)", self.colors['config'])
+        self.debug_message(f"Min score threshold: {MIN_SCORE_THRESHOLD}", self.colors['config'])
         self.debug_message(f"Save one basic dagger: {'Yes' if SAVE_ONE_DAGGER else 'No'}", self.colors['config'])
         self.debug_message(f"Move delay: {str(MOVE_DELAY)}ms", self.colors['config'])
         self.debug_message(f"Auto-salvage: {'Yes' if SALVAGE_JUNK_ITEMS else 'No'}", self.colors['config'])
@@ -601,12 +652,72 @@ class JunkSalvager:
                 return True
         return False
 
+    def calculate_item_score(self, properties, category):
+        """Calculate item score based on properties.
+        Accuracy modifiers boost damage scores rather than adding independent value.
+        Returns: (score, damage_score, accuracy_multiplier, armor_score, description)
+        """
+        if not properties:
+            return 0, 0, 1.0, 0, "No properties"
+        
+        damage_score = 0
+        armor_score = 0
+        accuracy_multiplier = 1.0
+        found_affixes = []
+        
+        # Check each property
+        for prop in properties:
+            prop_str = str(prop)
+            
+            # Check for damage affixes (weapons)
+            for affix_name, affix_score in DAMAGE_AFFIXES.items():
+                if affix_name.lower() in prop_str.lower():
+                    damage_score = max(damage_score, affix_score)
+                    found_affixes.append(f"{affix_name}({affix_score})")
+                    break
+            
+            # Check for slayer affixes (weapons)
+            for affix_name, affix_score in SLAYER_AFFIXES.items():
+                if affix_name.lower() in prop_str.lower() and "slayer" in prop_str.lower():
+                    damage_score = max(damage_score, affix_score)
+                    found_affixes.append(f"{affix_name}({affix_score})")
+                    break
+            
+            # Check for armor affixes
+            for affix_name, affix_score in ARMOR_AFFIXES.items():
+                if affix_name.lower() in prop_str.lower():
+                    armor_score = max(armor_score, affix_score)
+                    found_affixes.append(f"{affix_name}({affix_score})")
+                    break
+            
+            # Check for accuracy affixes (these multiply damage, not add)
+            for affix_name, multiplier in ACCURACY_AFFIXES.items():
+                if affix_name.lower() in prop_str.lower():
+                    accuracy_multiplier = max(accuracy_multiplier, multiplier)
+                    found_affixes.append(f"{affix_name}(x{multiplier})")
+                    break
+        
+        # Calculate final score
+        # For weapons: damage * accuracy_multiplier
+        # For armor/shields: armor score (accuracy doesn't apply)
+        if category == 'Weapon':
+            base_score = damage_score
+            final_score = base_score * accuracy_multiplier
+        else:
+            base_score = armor_score
+            final_score = base_score
+        
+        description = " + ".join(found_affixes) if found_affixes else "No scored affixes"
+        
+        return final_score, damage_score, accuracy_multiplier, armor_score, description
+
     def is_salvageable_item(self, item):
         """Check if item is a weapon, armor, or shield that can be salvaged"""
         return item.ItemID in WEAPON_INFO or item.ItemID in ARMOR_INFO or item.ItemID in SHIELD_INFO
 
     def should_move_to_junk(self, item):
-        """Determine if an item should be moved to junk backpack, using subtype AND tier/magical filtering"""
+        """Determine if an item should be moved to junk backpack, using score-based filtering.
+        Accuracy modifiers boost damage scores rather than adding independent value."""
         # First check if it's a weapon, armor, or shield
         if not self.is_salvageable_item(item):
             return False
@@ -643,7 +754,11 @@ class JunkSalvager:
                 save_flag = SAVE_ITEM_ARMOR_SHIELD
 
         properties = self.get_item_properties(item)
-        affix_str = ', '.join([str(p) for p in properties]) if properties else 'None'
+        
+        # Calculate item score using new scoring system
+        final_score, damage_score, accuracy_mult, armor_score, score_desc = self.calculate_item_score(properties, category)
+        
+        # Legacy tier classification for stats tracking
         tier = 'None'
         if self.has_affix(properties, TIER1_AFFIXES):
             tier = 'T1'
@@ -670,8 +785,13 @@ class JunkSalvager:
                 self.debug_message(f"Extra basic dagger detected; sending to junk: {name} (ID: {hex(item_id)})", self.colors['important'])
                 return True
 
-        # Debug: show full filtering decision
-        self.debug_message(f"[Filter] {name} (ID: {hex(item_id)}) | Cat: {category} | Subtype: {subtype} | Tier: {tier} | Affixes: {affix_str} | SaveFlag: {save_flag}", self.colors['config'])
+        # Debug: show full filtering decision with score breakdown
+        if category == 'Weapon':
+            score_breakdown = f"Score: {final_score:.1f} (Dmg:{damage_score} x Acc:{accuracy_mult:.2f})"
+        else:
+            score_breakdown = f"Score: {final_score:.1f} (Armor:{armor_score})"
+        
+        self.debug_message(f"[Filter] {name} (ID: {hex(item_id)}) | Cat: {category} | Subtype: {subtype} | Tier: {tier} | {score_breakdown} | {score_desc} | SaveFlag: {save_flag}", self.colors['config'])
 
         # If the subtype is not configured to save, always junk
         if not save_flag:
@@ -681,28 +801,80 @@ class JunkSalvager:
 
         # Passed subtype filter
         self.stats['subtype_saved'] += 1
-        # Check tier 1
+        
+        # Update tier stats for legacy tracking
         if tier == 'T1':
             self.stats['tier1_items'] += 1
-            return not RESERVE_TIERS['TIER1']
-        # Check tier 2
-        if tier == 'T2':
+        elif tier == 'T2':
             self.stats['tier2_items'] += 1
-            return not RESERVE_TIERS['TIER2']
-        # Check tier 3
-        if tier == 'T3':
+        elif tier == 'T3':
             self.stats['tier3_items'] += 1
-            return not RESERVE_TIERS['TIER3']
-        # Check tier 4
-        if tier == 'T4':
+        elif tier == 'T4':
             self.stats['tier4_items'] += 1
-            return not RESERVE_TIERS['TIER4']
-        # Check other magical items
-        if tier == 'Magical':
+        elif tier == 'Magical':
             self.stats['other_items'] += 1
-            return not RESERVE_TIERS['MAGICAL']
-        # Non-magical weapons/armor go to junk
-        return True
+        
+        # WEAPON TIER ENFORCEMENT (overrides score for weapons)
+        if ENFORCE_WEAPON_TIER and category == 'Weapon':
+            # Determine the weapon damage tier from properties
+            weapon_tier = None
+            if self.has_affix(properties, ['Vanquishing']):
+                weapon_tier = 1
+            elif self.has_affix(properties, ['Greater']) and 'slayer' in ' '.join(properties).lower():
+                weapon_tier = 1  # Greater Slayer is equivalent to Vanquishing
+            elif self.has_affix(properties, ['Power']):
+                weapon_tier = 2
+            elif self.has_affix(properties, ['Force']):
+                weapon_tier = 3
+            elif self.has_affix(properties, ['Might']):
+                weapon_tier = 4
+            elif self.has_affix(properties, ['Ruin']):
+                weapon_tier = 5
+            
+            # If weapon has a damage modifier, check if it meets minimum tier
+            if weapon_tier is not None:
+                if weapon_tier > MIN_WEAPON_TIER:
+                    self.debug_message(f"JUNKED by weapon tier enforcement: {name} (Tier {weapon_tier} > required {MIN_WEAPON_TIER})", self.colors['important'])
+                    return True
+                else:
+                    self.debug_message(f"KEEPING: {name} (Weapon Tier {weapon_tier} meets requirement <= {MIN_WEAPON_TIER})", self.colors['success'])
+                    return False
+            # If no damage modifier found, fall through to score-based check
+        
+        # ARMOR TIER ENFORCEMENT (overrides score for armor/shields)
+        if ENFORCE_ARMOR_TIER and category in ['Armor', 'Shield']:
+            # Determine the armor tier from properties
+            armor_tier = None
+            if self.has_affix(properties, ['Invulnerable']):
+                armor_tier = 1
+            elif self.has_affix(properties, ['Fortification']):
+                armor_tier = 2
+            elif self.has_affix(properties, ['Massive']):
+                armor_tier = 3
+            elif self.has_affix(properties, ['Substantial']):
+                armor_tier = 4
+            elif self.has_affix(properties, ['Hardening']):
+                armor_tier = 5
+            
+            # If armor has an armor modifier, check if it meets minimum tier
+            if armor_tier is not None:
+                if armor_tier > MIN_ARMOR_TIER:
+                    self.debug_message(f"JUNKED by armor tier enforcement: {name} (Tier {armor_tier} > required {MIN_ARMOR_TIER})", self.colors['important'])
+                    return True
+                else:
+                    self.debug_message(f"KEEPING: {name} (Armor Tier {armor_tier} meets requirement <= {MIN_ARMOR_TIER})", self.colors['success'])
+                    return False
+            # If no armor modifier found, fall through to score-based check
+        
+        # NEW SCORE-BASED DECISION:
+        # If score is below threshold, junk it
+        if final_score < MIN_SCORE_THRESHOLD:
+            self.debug_message(f"JUNKED by score threshold: {name} (Score: {final_score:.1f} < {MIN_SCORE_THRESHOLD})", self.colors['important'])
+            return True
+        
+        # Score is above threshold, keep it
+        self.debug_message(f"KEEPING: {name} (Score: {final_score:.1f} >= {MIN_SCORE_THRESHOLD})", self.colors['success'])
+        return False
 
 
     def find_salvage_tool(self):

@@ -4,29 +4,51 @@ LOOT Treasure Chest Lockpick - a Razor Enhanced Python script for Ultima Online
 - Uses lockpicks to unlock nearby chests
 - Opens chests (no disarm) and extracts items
 - moving them from container to player backpack
+- Uses server sync method for reliable timing (with fallback to hardcoded delay)
 
 TODO: 
 - add navigation attempts when cant see target ( on a hill ) just randomly move around the chest until message gone
 
-HOTKEY:: K
-VERSION::20250802
+HOTKEY:: L ( Loot )
+VERSION::20251017
 """
 
 from System.Collections.Generic import List
 from System import Int32
 
+# === CONFIGURATION ===
 # If True, drop resource items on ground. If False, move to backpack. drop ground logic issues
 DROP_RESOURCES_GROUND = False
 # If False, suppress all Misc.SendMessage output
 DEBUG_MODE = False
-# Global move delay between item moves (in ms)
-MOVE_DELAY = 600
+# Use server sync method for delays (recommended)
+USE_SERVER_SYNC = True
+# Fallback delay if server sync fails (in milliseconds)
+FALLBACK_DELAY = 600
 # IDs for different treasure chest types 
 CHEST_TYPES = [0x0E40, 0x0E41, 0x0E42, 0x0E43, 0xB061, 0xB05D, 0xB060, 0xB051, 0xC056, 0xC057, 0xB05C]  
 # Lockpick item type 
 LOCKPICK_TYPE = 0x14FC
 
 # Item IDs for resources (leather, ingots, boards, cut cloth leather, etc.) we throw these on the ground if overweight
+def server_sync_delay():
+    """Synchronize with server using backpack label check.
+    This provides a natural server-synced delay that matches server response time.
+    More reliable than arbitrary Misc.Pause() delays.
+    Falls back to FALLBACK_DELAY if GetLabel fails.
+    """
+    try:
+        # GetLabel forces client to wait for server response
+        # This naturally syncs with server tick rate
+        Items.GetLabel(Player.Backpack.Serial)
+        if DEBUG_MODE:
+            Misc.SendMessage("[Treasure] Server sync successful", 68)
+    except Exception as e:
+        # Fallback to configured delay if GetLabel fails
+        if DEBUG_MODE:
+            Misc.SendMessage(f"[Treasure] Server sync failed ({e}), using fallback delay: {FALLBACK_DELAY}ms", 53)
+        Misc.Pause(FALLBACK_DELAY)
+
 RESOURCE_IDS = [
     # Leather & hides
     0x1078,  # Leather
@@ -40,7 +62,7 @@ RESOURCE_IDS = [
     # Ingots
     0x1BF2,  # Iron Ingot
     0x1BEF,  # Dull Copper Ingot
-    0x1BEF,  # Shadow Iron Ingot (same as dull copper in some shards)
+    0x1BEF,  # Shadow Iron Ingot
     0x1BEF,  # Copper Ingot
     0x1BEF,  # Bronze Ingot
     0x1BEF,  # Gold Ingot
@@ -55,7 +77,7 @@ RESOURCE_IDS = [
     0x1BE0,  # Heartwood Board
     0x1BE1,  # Bloodwood Board
     0x1BE2,  # Frostwood Board
-    # Cut resources (new)
+    # Cut resources 
     0x1766,  # Cut Cloth
     0x1081,  # Cut Leather
 ]
@@ -74,7 +96,6 @@ class TreasureManager:
         # Timing configuration (in ms)
         self.lockpick_delay = 1000    # 1 second between lockpick attempts
         self.open_delay = 1500        # 1.5 seconds after opening
-        self.move_delay = MOVE_DELAY  # Use global move delay
         self.retry_delay = 500        # 0.5 seconds before retrying
         
         # Search configuration
@@ -129,7 +150,10 @@ class TreasureManager:
                 drop_amount = min(amount, max_stack)
                 try:
                     Items.MoveOnGround(gold.Serial, drop_amount, x, y, z)
-                    Misc.Pause(self.move_delay)
+                    if USE_SERVER_SYNC:
+                        server_sync_delay()
+                    else:
+                        Misc.Pause(FALLBACK_DELAY)
                     dropped += drop_amount
                     self.debug_message(f"Dropped {drop_amount} gold at ({x},{y},{z}) from stack {gold.Serial:X}", self.success_color)
                 except Exception as e:
@@ -198,7 +222,7 @@ class TreasureManager:
         Target.WaitForTarget(10000, False)
         Target.TargetExecute(chest)
         # Wait for unlock attempt
-        Misc.Pause(self.lockpick_delay)
+        # Misc.Pause(self.lockpick_delay)  # Commented out - server sync should handle timing
         return True
 
     def open_chest(self, chest):
@@ -208,7 +232,11 @@ class TreasureManager:
         """
         self.debug_message("Opening chest...")
         Items.UseItem(chest)
-        Misc.Pause(self.open_delay)
+        # Wait for container to open and contents to load
+        if USE_SERVER_SYNC:
+            server_sync_delay()
+        else:
+            Misc.Pause(FALLBACK_DELAY)
         return True
 
     def is_resource_item(self, item):
@@ -235,16 +263,30 @@ class TreasureManager:
         Returns True if successful, False otherwise.
         """
         x, y, z = Player.Position.X, Player.Position.Y, Player.Position.Z
+        initial_container = item.Container
+        
         try:
             # Drop item on ground
             Items.Move(item, 0xFFFFFFFF, 0, x, y, z)  # 0xFFFFFFFF = ground
-            Misc.Pause(self.move_delay)
-            # Check if item is no longer in chest (moved)
-            if Items.FindBySerial(item.Serial).Container != item.Container:
+            if USE_SERVER_SYNC:
+                server_sync_delay()
+            else:
+                Misc.Pause(FALLBACK_DELAY)
+            
+            # Re-fetch item to get updated state
+            dropped_item = Items.FindBySerial(item.Serial)
+            if not dropped_item:
+                # Item no longer exists (might have been picked up or stacked)
+                return True
+            
+            # Check if item is no longer in original container
+            if dropped_item.Container != initial_container:
                 self.debug_message(f"Dropped resource item {item.Serial:X} at ({x},{y})", self.success_color)
                 return True
-        except:
+        except Exception as e:
+            self.debug_message(f"Exception dropping item {item.Serial:X}: {e}", self.error_color)
             pass
+        
         self.debug_message(f"Failed to drop resource item {item.Serial:X} at player's feet!", self.error_color)
         return False
 
@@ -281,8 +323,12 @@ class TreasureManager:
                 if self.is_overweight():
                     self.debug_message("Overweight detected! Dropping resources at feet...", self.error_color)
                     self.drop_all_resources_at_feet()
-                    Misc.Pause(500)
+                    # Misc.Pause(500)  # Commented out - server sync should handle timing
                 # Re-fetch item object in case container changed or item was moved externally
+                # if USE_SERVER_SYNC:
+                #     server_sync_delay()  # Commented out - redundant, sync happens in attempt_move
+                # else:
+                #     Misc.Pause(100)
                 item_obj = Items.FindBySerial(item.Serial)
                 if not item_obj or not hasattr(item_obj, 'Container') or item_obj.Container != container.Serial:
                     self.debug_message(f"Item {item.Serial:X} not found in chest, skipping.", self.debug_color)
@@ -304,11 +350,15 @@ class TreasureManager:
                         moved_items += 1
                     else:
                         next_failed_serials.add(item_obj.Serial)
-                Misc.Pause(self.move_delay)  # Always pause after move attempt for server sync
+                # Always pause after move attempt for server sync
+                # if USE_SERVER_SYNC:
+                #     server_sync_delay()  # Commented out - redundant, sync happens in attempt_move
+                # else:
+                #     Misc.Pause(FALLBACK_DELAY)
             failed_serials = next_failed_serials
             attempt += 1
             # Extra pause between rounds to avoid flooding
-            Misc.Pause(300)
+            # Misc.Pause(300)  # Commented out - server sync should handle timing
         if failed_serials:
             self.debug_message(f"Failed to move {len(failed_serials)} items after {self.max_retry_count} rounds!", self.error_color)
         self.debug_message(f"Finished moving items! Successfully moved {moved_items} out of {total_items} items.", self.success_color)
@@ -356,9 +406,16 @@ class TreasureManager:
                 self.debug_message(f"Trying to drop resource {item.Serial:X} at ({drop_x},{drop_y},{drop_z})", self.debug_color)
                 try:
                     Items.MoveOnGround(item.Serial, item.Amount if hasattr(item, 'Amount') else 1, drop_x, drop_y, drop_z)
-                    Misc.Pause(self.move_delay)
-                    # Confirm item is no longer in backpack
-                    if not Items.FindBySerial(item.Serial) or Items.FindBySerial(item.Serial).Container != Player.Backpack.Serial:
+                    if USE_SERVER_SYNC:
+                        server_sync_delay()
+                    else:
+                        Misc.Pause(FALLBACK_DELAY)
+                    
+                    # Re-fetch item to get updated state
+                    dropped_item = Items.FindBySerial(item.Serial)
+                    
+                    # Confirm item is no longer in backpack (or doesn't exist)
+                    if not dropped_item or dropped_item.Container != Player.Backpack.Serial:
                         self.debug_message(f"Dropped resource {item.Serial:X} at ({drop_x},{drop_y},{drop_z})", self.success_color)
                         dropped = True
                         break
@@ -369,8 +426,15 @@ class TreasureManager:
                 try:
                     self.debug_message(f"Fallback: dropping {item.Serial:X} at player pos ({player_pos['x']},{player_pos['y']},{player_pos['z']})", self.debug_color)
                     Items.MoveOnGround(item.Serial, item.Amount if hasattr(item, 'Amount') else 1, player_pos['x'], player_pos['y'], player_pos['z'])
-                    Misc.Pause(self.move_delay)
-                    if not Items.FindBySerial(item.Serial) or Items.FindBySerial(item.Serial).Container != Player.Backpack.Serial:
+                    if USE_SERVER_SYNC:
+                        server_sync_delay()
+                    else:
+                        Misc.Pause(FALLBACK_DELAY)
+                    
+                    # Re-fetch item to get updated state
+                    dropped_item = Items.FindBySerial(item.Serial)
+                    
+                    if not dropped_item or dropped_item.Container != Player.Backpack.Serial:
                         self.debug_message(f"Dropped resource {item.Serial:X} at player position ({player_pos['x']},{player_pos['y']},{player_pos['z']})", self.success_color)
                         continue
                 except Exception as e:
@@ -385,17 +449,40 @@ class TreasureManager:
         retry_count = 0
         while retry_count < self.max_retry_count:
             try:
+                # Store initial container before move
+                initial_container = item.Container
+                
                 Items.Move(item, Player.Backpack, 0)
-                Misc.Pause(self.move_delay)
+                if USE_SERVER_SYNC:
+                    server_sync_delay()
+                else:
+                    Misc.Pause(FALLBACK_DELAY)
+                
+                # Re-fetch the item to get updated state
+                moved_item = Items.FindBySerial(item.Serial)
+                if not moved_item:
+                    # Item no longer exists (stacked or deleted) - consider success
+                    return True
+                
                 # Check if item is now in backpack
-                if Items.FindBySerial(item.Serial).Container == Player.Backpack.Serial:
-                    if retry_count % 5 == 0 and retry_count > 0:
+                if moved_item.Container == Player.Backpack.Serial:
+                    if retry_count > 0:
                         self.debug_message(f"Moved item {item.Serial:X} after {retry_count+1} attempts.")
                     return True
-            except:
+                
+                # Check if container changed at all (might have moved somewhere)
+                if moved_item.Container != initial_container:
+                    self.debug_message(f"Item {item.Serial:X} moved but not to backpack (container changed)")
+                    return True
+                    
+            except Exception as e:
+                self.debug_message(f"Error moving item {item.Serial:X}: {e}", self.error_color)
                 pass
             retry_count += 1
-            Misc.Pause(self.retry_delay)
+            # if USE_SERVER_SYNC:
+            #     server_sync_delay()  # Commented out - already synced after Items.Move above
+            # else:
+            #     Misc.Pause(self.retry_delay)
         return False
 
     def attempt_drop_resource_on_ground(self, item):
@@ -408,7 +495,10 @@ class TreasureManager:
             if self.try_drop_item_on_ground(item):
                 return True
             retry_count += 1
-            Misc.Pause(self.retry_delay)
+            # if USE_SERVER_SYNC:
+            #     server_sync_delay()  # Commented out - already synced in try_drop_item_on_ground
+            # else:
+            #     Misc.Pause(self.retry_delay)
         return False
     
     def loot_chest(self):
@@ -418,9 +508,14 @@ class TreasureManager:
         if not chest:
             return False
         
-        # Try to unlock it
-        if not self.unlock_chest(chest):
-            return False
+        # Try to unlock it (skip if no lockpicks - chest might already be unlocked)
+        lockpicks = self.find_lockpicks()
+        if lockpicks:
+            self.debug_message("Lockpicks found, attempting to unlock chest...")
+            if not self.unlock_chest(chest):
+                self.debug_message("Unlock attempt failed, but will try to open anyway...", self.debug_color)
+        else:
+            self.debug_message("No lockpicks found, assuming chest is already unlocked...", self.debug_color)
             
         # Try to open it
         if not self.open_chest(chest):

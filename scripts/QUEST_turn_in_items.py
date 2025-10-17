@@ -10,6 +10,7 @@ TODO:
 
 620 2195 = chaos island blood quest 
 the remains of a blood elemental 
+578 2259
 
 diseased blood 0x0E24 , hue 0x09a7 ,  turn into canute
 gather diseased blood , around chaos island 499 2183 , a bloody corpse , the remains of a blood elemental
@@ -41,7 +42,28 @@ QUESTS_WORLD = {
         ],
         "turn_in_type": "direct_transfer",
         "container_type": "npc"
-    }  
+    },
+    "daily_cyclops_head": {
+        "name": "Daily: Collect Cyclops Head",
+        "description": "Gather Cyclops Head and turn in to Canute the Daily Quest Master.",
+        "category": "daily",
+        "region": "world",
+        "locations": [
+            {
+                "name": "Canute The Daily Quest Master",
+                "x": 1433,
+                "y": 1710,
+                "z": 31,
+                "npc_serial": 0x000000D4,
+                "mobile_id": 0x0190
+            }
+        ],
+        "items": [
+            {"name": "Cyclops Head", "id": 0xA9B2, "hue": -1}
+        ],
+        "turn_in_type": "direct_transfer",
+        "container_type": "npc"
+    }
 }
 
 QUESTS_DUNGEON_SANDSTORM = {
@@ -200,7 +222,9 @@ QUESTS_DUNGEON_WRONG = {
             }
         ],
         "items": [
-            {"name": "Elfic Artifact", "id": 0x241E, "hue": -1}
+            {"name": "Elfic Artifact", "id": 0x241E, "hue": -1},
+            {"name": "Elfic Artifact", "id": 0x241D, "hue": -1},
+            {"name": "Elfic Artifact", "id": 0x241C, "hue": -1}
         ],
         "turn_in_type": "direct_transfer",
         "container_type": "npc"
@@ -304,8 +328,10 @@ for group in ( QUESTS_WORLD, QUESTS_DUNGEON_SANDSTORM, QUESTS_DUNGEON_SHAME, QUE
     QUESTS.update(group)
 
 # Lastly , if not near any item turn in we try to attack specific quest objectives 
-QUEST_STATICS_TO_ATTACK = ["A Coccon", "a bonfire crystal", "Demonic Portal","Poisonous Thorns"]
+# Cocoon (0x9F83), Daemonic Totem (0xB829) - Similar to Poisonous Thorns, attack these quest objects
+QUEST_STATICS_TO_ATTACK = ["A Cocoon", "Daemonic Totem", "a bonfire crystal", "Demonic Portal", "Poisonous Thorns"]
 INTERACT_ONLY_STATICS = True  # When true, only interact with statics items  and do NOT attack mobiles
+USE_ALL_ATTACK = True  # When true, say "All Attack" and target the quest entity to command pets/party
 
 #//======================================================================
 
@@ -555,6 +581,14 @@ def handle_quest_mobiles_fallback():
                         # Use proper attack API rather than just targeting
                         Player.Attack(mobile)
                         Misc.Pause(300)
+                        # If USE_ALL_ATTACK is enabled, command pets/party to attack
+                        if USE_ALL_ATTACK:
+                            Player.ChatSay(0, "All Attack")
+                            Misc.Pause(200)
+                            Target.WaitForTarget(2000, False)
+                            Target.TargetExecute(mobile)
+                            Misc.Pause(300)
+                            debug_message(f"Commanded All Attack on {mname}", 68)
                         found = True
             except Exception as e:
                 debug_message(f"Error while trying to attack quest mobile: {e}", 33)
@@ -581,6 +615,14 @@ def handle_quest_mobiles_fallback():
                     continue
                 if any(t in iname.lower() or iname.lower() in t for t in targets_lc):
                     debug_message(f"Interacting with quest object: {iname} (0x{itm.Serial:X}) within {SEARCH_RANGE_TILES} tiles", 68)
+                    # If USE_ALL_ATTACK is enabled, command pets/party to attack the static object
+                    if USE_ALL_ATTACK:
+                        Player.ChatSay(0, "All Attack")
+                        Misc.Pause(200)
+                        Target.WaitForTarget(2000, False)
+                        Target.TargetExecute(itm)
+                        Misc.Pause(300)
+                        debug_message(f"Commanded All Attack on {iname}", 68)
                     # Try a DoubleClick/use interaction for statics
                     try:
                         Items.DoubleClick(itm)
