@@ -14,7 +14,7 @@
 <center>
 
 | [UI](#UI) | [RITUAL](#RITUAL) | [ITEM](#ITEM) | [VFX](#VFX) | [MISC](#MISC) | [SPELL](#SPELL) | [TRAIN](#TRAIN) | [GATHER](#GATHER) | [DEV](#DEV) |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 
 </center>
 
@@ -36,8 +36,8 @@ user interface custom gumps
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_journal_filtered.png?raw=true"/>
 - [UI_action_buttons.py](scripts/UI_action_buttons.py) – button layout for emotes , say , and scripts
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_UI_action_buttons.png?raw=true"/>
-- [UI_item_drop.py](scripts/UI_item_drop.py) – drop items to ground
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_UI_item_drop.png?raw=true"/>
+- [UI_item_drop.py](scripts/UI_item_drop.py) – select and place items on the ground , creating a trail , or in circles
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_ui_item_drop.png?raw=true"/>
 - [UI_gump_layout_preset.py](scripts/UI_gump_layout_preset.py) – move gumps to specified positions
 - [UI_ascii_display.py](scripts/UI_ascii_display.py) – ASCII art display system
 - [UI_commands_gump.py](scripts/UI_commands_gump.py) – Command shortcuts gump
@@ -77,14 +77,14 @@ ritual magic
 - [ITEM_withdraw_hay_from_packhorse.py](scripts/ITEM_withdraw_hay_from_packhorse.py) – Withdraw hay from packhorse
 
 ## VFX
-- [VFX_mastery_ascension_blood_orb_circle.py](scripts/VFX_mastery_ascension_blood_orb_circle.py) – Blood Orb Circle
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_VFX_mastery_ascension_blood.webp?raw=true"/>
-- [VFX_mastery_ascension_nature_orb_circle.py](scripts/VFX_mastery_ascension_nature_orb_circle.py) – Nature Orb Circle
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_VFX_mastery_ascension_nature.webp?raw=true"/>
-- [VFX_mastery_ascension_shadow_orb_circle.py](scripts/VFX_mastery_ascension_shadow_orb_circle.py) – Shadow Orb Circle
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_VFX_mastery_ascension_shadow.webp?raw=true"/>
-- [VFX_mastery_ascension_fortune_orb_circle.py](scripts/VFX_mastery_ascension_fortune_orb_circle.py) – Fortune Orb Circle
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_VFX_mastery_ascension_fortune.webp?raw=true"/>
+- [VFX_mastery_ascension_blood_orb_circle.py](scripts/VFX_mastery_ascension_blood_orb_circle.py) – Blood Mastery Ascension , a ritual of effects with client side items 
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_vfx_mastery_ascension_blood.webp?raw=true"/>
+- [VFX_mastery_ascension_nature_orb_circle.py](scripts/VFX_mastery_ascension_nature_orb_circle.py) – Nature Mastery , a ritual of effects with client side items 
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_vfx_mastery_ascension_nature.webp?raw=true"/>
+- [VFX_mastery_ascension_shadow_orb_circle.py](scripts/VFX_mastery_ascension_shadow_orb_circle.py) – Shadow Mastery , a ritual of effects with client side items 
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_vfx_mastery_ascension_shadow.webp?raw=true"/>
+- [VFX_mastery_ascension_fortune_orb_circle.py](scripts/VFX_mastery_ascension_fortune_orb_circle.py) – Fortune Mastery , a ritual of effects with client side items 
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_vfx_mastery_ascension_fortune.webp?raw=true"/>
 
 ## COMBAT
 - [COMBAT_cancel_casting.py](scripts/COMBAT_cancel_casting.py) – Cancel spell casting
