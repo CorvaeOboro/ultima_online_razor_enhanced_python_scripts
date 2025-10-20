@@ -9,13 +9,12 @@ the Hay Sheaf item is non stackable and 10 stones each so we attempt to restock 
 searching for pack horses and try to resume gracefully . some issues still with placement 
 
 SEEDS =
-Chosen seed 733978 with score 5431 # this was preety good , long curling tricky paths , its a little harsh as it immeadiately forks you two long choices 
+Chosen seed 733978 for 26x26 with score 5431 # this was preety good , long curling tricky paths , its a little harsh as it immeadiately forks you two long choices 
 
 VERSION = 20250923
 """
 
 import json
-import math
 import os
 import random
 import time
@@ -23,7 +22,7 @@ import time
 DEBUG_MODE = True # debug messages
 SAFE_MODE = False # extra slow
 
-PREVIEW_MODE = False # Preview mode: client-side fake items; no server state change
+PREVIEW_MODE = True # Preview mode: client-side fake items
 PREVIEW_DEFAULT_HUE = 0x0000
 PREVIEW_SOLUTION_HUE = 0x0042  # blue-ish overlay for solution
 
@@ -38,7 +37,7 @@ PREVIEW_PAUSE_DURATION = 25
 PREVIEW_PAUSE_PLACE = 35
 MAX_DISTANCE = 2
 
-# Movement tuning (mirrors RITUAL_spiral_round.py)
+# Movement tuning 
 GOTO_BASE_DELAY = 250
 GOTO_MAX_RETRIES = 1
 WIGGLE_RADII = [0]
@@ -77,14 +76,13 @@ PACK_ROUND_ROBIN_INDEX = 0
 PACK_DEPLETED_SERIALS = set()
 
 # Item configuration
-# Default wall item: Hay (example IDs; adjust as needed for shard)
 HAY_ITEM_IDS = {
-    "Hay": [0x0F36],  # common hay/sheaf item ID; change if shard differs
+    "Hay": [0x0F36],  # common hay/sheaf item ID
 }
 
-# Solution overlay item (cloth bolt or folded cloth). Hue is applied in preview only.
+# Solution overlay item 
 CLOTH_ITEM_IDS = {
-    "Cloth": [0x1766],  # folded cloth stack
+    "Cloth": [0x1766],  # cut cloth 
 }
 
 ITEM_NAME_LOOKUP = {}
@@ -106,7 +104,7 @@ MAZE_CONFIG = {
 
 # Restock behavior for non-stackable hay
 RESTOCK_WAIT_ENABLED = True
-RESTOCK_WAIT_TIMEOUT_SEC = 900  # 15 minutes max wait
+RESTOCK_WAIT_TIMEOUT_SEC = 900  # 
 RESTOCK_POLL_MS = 2000
 
 # Auto restock from pack animals
@@ -116,7 +114,7 @@ PACKHORSE_SERIALS = []              # optional hardcoded list of pack animal ser
 # Name patterns to match when searching nearby (case-insensitive substring)
 PACK_NAME_FILTERS = ["pack horse", "a pack horse", "pack llama", "a pack llama", "packhorse", "packllama"]
 PACK_SEARCH_RANGE = 18              # tiles to search for pack animals
-PACK_BODY_IDS = [0x0123]            # optional known body IDs for pack animals (shard-specific)
+PACK_BODY_IDS = [0x0123]            # optional known body IDs for pack animals 
 PROMPT_FOR_PACK_ON_MISS = True      # if none found, prompt once to select a pack animal and cache serial
 
 # ================================== Utilities and ritual framework ==================================
@@ -634,7 +632,7 @@ def wait_for_restock_if_needed(item_id, required_remaining):
             have = 0
         if have >= required_remaining:
             return True
-        # Attempt auto restock from pack animals
+        # Attempt  restock from pack animals
         if AUTO_RESTOCK_ENABLED:
             pulled = attempt_autorestock_hay_from_packs(item_id, RESTOCK_BATCH_COUNT)
             if pulled > 0:
@@ -651,7 +649,7 @@ def _get_pack_container_from_mobile(mob):
     try:
         pack_container = mob.Backpack if hasattr(mob, 'Backpack') else None
         if pack_container:
-            # Some environments expose .Serial directly; support both
+            
             serial = pack_container.Serial if hasattr(pack_container, 'Serial') else pack_container
             cont_item = Items.FindBySerial(serial)
             if cont_item:

@@ -1,16 +1,16 @@
 """
 DATA Armor Data to Wiki - External Processing Tool
 
-Processes the universal JSON database created by DEV_item_armor_data.py
-Creates wiki tables and analysis reports from armor testing data
+Processes the JSON database created by DEV_item_armor_data.py
+Creates wiki tables and statistics reports from armor testing data
 
 Features:
-- Master table with all item/modifier combinations
+- Omni table with all item/modifier combinations
 - Conflict detection for inconsistent data
 - Sample count verification
-- Statistical analysis of AR modifiers
+- Statistical report of AR modifiers
 
-VERSION:: 20250902
+VERSION:: 20250913
 """
 
 import json
@@ -24,8 +24,32 @@ INPUT_FILE = "../data/armor_universal_database.json"
 OUTPUT_DIR = "../wiki"
 DEBUG_MODE = True
 
+# Modifier ordering (weakest -> strongest) applied to all tables
+# Unknown modifiers will be placed after known ones, sorted alphabetically.
+MODIFIER_ORDER = [
+    'Defense', 'Guarding', 'Hardening', 'Fortification', 'Invulnerability'
+]
+
+def _modifier_sort_key_builder(all_mods):
+    """Return a key function to sort modifiers by predefined global order then alphabetically.
+
+    Unknown modifiers appear after known ordered ones, alphabetically.
+    """
+    order_index = {name: idx for idx, name in enumerate(MODIFIER_ORDER)}
+
+    # Log any unknown modifiers to help refine the ordering list
+    unknown = sorted([m for m in all_mods if m not in order_index])
+    if unknown:
+        debug_msg(f"Unknown modifiers (appended alphabetically): {', '.join(unknown)}")
+
+    def _key(mod):
+        # Known ones get their index; unknowns get large offset plus alpha position
+        return (0, order_index[mod]) if mod in order_index else (1, mod.lower())
+
+    return _key
+
 # Table Generation Toggles
-GENERATE_MASTER_TABLE = True      # Detailed development table with all data
+GENERATE_OMNI_TABLE = True      # Detailed development table with all data
 GENERATE_ARMOR_COMPARE = True     # Wiki table for armor (excludes shields)
 GENERATE_SHIELDS_COMPARE = True   # Wiki table for shields only
 GENERATE_TYPE_SPECIFIC = True     # Individual tables for each armor type
@@ -120,8 +144,8 @@ def analyze_armor_data(armor_entries):
     
     return item_combinations, conflicts
 
-def create_master_table(item_combinations):
-    """Create master wiki table with all item/modifier combinations"""
+def create_omni_table(item_combinations):
+    """Create omni wiki table with all item/modifier combinations"""
     table_lines = []
     
     # Header
@@ -262,8 +286,9 @@ def _create_compare_table(item_combinations, exclude_layers=None, include_layers
     if not item_data:
         return f"No {table_title.lower()} data available."
     
-    # Sort AR modifiers for consistent column order
-    sorted_ar_modifiers = sorted(all_ar_modifiers)
+    # Sort AR modifiers for consistent column order using predefined weakest->strongest ladder
+    sort_key = _modifier_sort_key_builder(all_ar_modifiers)
+    sorted_ar_modifiers = sorted(all_ar_modifiers, key=sort_key)
     
     # Create table
     table_lines = []
@@ -647,8 +672,8 @@ def main():
     # Create outputs based on toggles
     outputs = {}
     
-    if GENERATE_MASTER_TABLE:
-        outputs['master_table'] = create_master_table(item_combinations)
+    if GENERATE_OMNI_TABLE:
+        outputs['omni_table'] = create_omni_table(item_combinations)
     
     if GENERATE_ARMOR_COMPARE:
         outputs['armor_compare_table'] = create_armor_compare_table(item_combinations)
@@ -692,10 +717,10 @@ def main():
             wiki_sections.append(table_content)
             wiki_sections.append("")
     
-    if 'master_table' in outputs:
+    if 'omni_table' in outputs:
         wiki_sections.append("## Full Item Data Table")
         wiki_sections.append("")
-        wiki_sections.append(outputs['master_table'])
+        wiki_sections.append(outputs['omni_table'])
         wiki_sections.append("")
     
     if 'conflict_report' in outputs:
@@ -728,9 +753,8 @@ Generated: {timestamp}
 * Type: Armor material type (Leather, Ring, Studded, Bone, Chain, Plate, Other)
 * Base AR: Armor rating with no AR modifiers
 * ??? indicates no data available for that combination
-* DEX Penalty: Dexterity reduction when wearing the item (space = no penalty)
+* DEX Penalty: Dexterity reduction when wearing the item ( space = no penalty)
 * Items with 0 AR bonus are excluded
-* Shields (LeftHand/RightHand layers) are excluded
 """
         save_wiki_output(armor_compare_content, "ARMOR_COMPARE.txt")
     
@@ -741,16 +765,13 @@ Generated: {timestamp}
 {outputs['shields_compare_table']}
 
 ## Notes
-* Type: Armor material type (Leather, Ring, Studded, Bone, Chain, Plate, Other)
+* Type: Shields
 * Base AR: Armor rating with no AR modifiers
 * ??? indicates no data available for that combination
-* DEX Penalty: Dexterity reduction when wearing the item (space = no penalty)
+* DEX Penalty: Dexterity reduction when wearing the item ( space = no penalty)
 * Items with 0 AR bonus are excluded
-* Only shields (LeftHand/RightHand layers) are included
 """
         save_wiki_output(shields_compare_content, "SHIELDS_COMPARE.txt")
-    
-    # Note: Type-specific tables are now included in main analysis file, not separate files
     
     # Summary
     debug_msg(f"Processing complete!")
@@ -761,7 +782,7 @@ Generated: {timestamp}
     
     # Show toggle status
     toggles = {
-        'Master Table': GENERATE_MASTER_TABLE,
+        'Omni Table': GENERATE_OMNI_TABLE,
         'Armor Compare': GENERATE_ARMOR_COMPARE,
         'Shields Compare': GENERATE_SHIELDS_COMPARE,
         'Type Specific': GENERATE_TYPE_SPECIFIC,

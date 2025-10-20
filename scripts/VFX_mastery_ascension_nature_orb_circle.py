@@ -369,6 +369,29 @@ INWARD_ENERGY_EFFECT = "dots_inward"
 SYMBOL_EFFECT = "dots_inward"  # Changed from firepillar to dots_inward
 FINALE_EFFECT = "shockwave"
 
+# Gump configuration
+GUMP_ID = 4121217123  # Unique gump ID
+GUMP_START_X = 350
+GUMP_START_Y = 350
+GUMP_WIDTH = 160
+GUMP_HEIGHT = 220
+
+# Button IDs
+BUTTON_ASCEND = 1
+BUTTON_LEVEL_BASE = 10  # Buttons 10-21 for levels 1-12
+
+# Button styling
+BUTTON_LARGE_ART = 1  # Large button art (80x40)
+BUTTON_LARGE_WIDTH = 80
+BUTTON_LARGE_HEIGHT = 40
+BUTTON_SMALL_ART = 210  # Small square button art
+BUTTON_SMALL_WIDTH = 30
+BUTTON_SMALL_HEIGHT = 30
+SLIVER_OVERLAY_TILE = 2624  # Dark tile overlay
+
+# Global state
+CURRENT_MASTERY_LEVEL = 8  # Default mastery level
+
 # =============================================================================
 # PACKET HANDLING FUNCTIONS
 # =============================================================================
@@ -1402,29 +1425,6 @@ def perform_nature_circle_ritual():
 # =============================================================================
 # GUMP LAUNCHER UI
 # =============================================================================
-
-# Gump configuration
-GUMP_ID = 4121211123  # Unique gump ID
-GUMP_START_X = 350
-GUMP_START_Y = 350
-GUMP_WIDTH = 160
-GUMP_HEIGHT = 220
-
-# Button IDs
-BUTTON_ASCEND = 1
-BUTTON_LEVEL_BASE = 10  # Buttons 10-21 for levels 1-12
-
-# Button styling
-BUTTON_LARGE_ART = 1  # Large button art (80x40)
-BUTTON_LARGE_WIDTH = 80
-BUTTON_LARGE_HEIGHT = 40
-BUTTON_SMALL_ART = 210  # Small square button art
-BUTTON_SMALL_WIDTH = 30
-BUTTON_SMALL_HEIGHT = 30
-SLIVER_OVERLAY_TILE = 2624  # Dark tile overlay
-
-# Global state
-CURRENT_MASTERY_LEVEL = 8  # Default mastery level
 
 def add_centered_label_with_outline(gd, x, y, w, h, text, hue):
     """Draw a centered label with black outline for readability."""

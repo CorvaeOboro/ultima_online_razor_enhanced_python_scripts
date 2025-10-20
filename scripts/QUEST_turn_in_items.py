@@ -4,9 +4,13 @@ Quest Item Turn In - a Razor Enhanced Python Script for Ultima Online
 Turn in Items to Quest NPC , Searches for quest items in inventory and gives them to specific NPC
 for example : Daemon Bones to Canute , Ancient Vases to Sasha , Strange Eggs to Wellen 
 
+NEW QUESTS:
+- Necronomicon Pages (0x7492, hue 0x0B02) - Turn in to Umbrelle the city witch at Luna (1414, 1704, 12)
+- Deadstall Island (391, 2026) - Cast Resurrection on Lost Souls (0x03CA)
+- Halloween Event - Automatically deposit Halloween Candy (0x7177) into Candy Bag (0x0E76, hue 0x08BB)
+
 TODO:
 - restore the orb , treasure map , and paragon turn in to griphook when returns
-
 
 620 2195 = chaos island blood quest 
 the remains of a blood elemental 
@@ -16,8 +20,11 @@ diseased blood 0x0E24 , hue 0x09a7 ,  turn into canute
 gather diseased blood , around chaos island 499 2183 , a bloody corpse , the remains of a blood elemental
 
 HOTKEY:: K ( Kwuest )
-VERSION:: 20250926
+VERSION:: 20251018
 """
+import System
+import System.Collections.Generic
+
 DEBUG_MODE = False
 
 # Quest Configurations
@@ -60,6 +67,50 @@ QUESTS_WORLD = {
         ],
         "items": [
             {"name": "Cyclops Head", "id": 0xA9B2, "hue": -1}
+        ],
+        "turn_in_type": "direct_transfer",
+        "container_type": "npc"
+    },
+    "daily_robust_harpy_feathers": {
+        "name": "Daily: Collect Robust Harpy Feathers",
+        "description": "Gather Robust Harpy Feathers and turn in to Canute the Daily Quest Master.",
+        "category": "daily",
+        "region": "world",
+        "locations": [
+            {
+                "name": "Canute The Daily Quest Master",
+                "x": 1433,
+                "y": 1710,
+                "z": 31,
+                "npc_serial": 0x000000D4,
+                "mobile_id": 0x0190
+            }
+        ],
+        "items": [
+            {"name": "Robust Harpy Feather", "id": 0x5737, "hue": 0x0B42}
+        ],
+        "turn_in_type": "direct_transfer",
+        "container_type": "npc"
+    }
+}
+
+QUESTS_NECRONOMICON = {
+    "necronomicon_pages": {
+        "name": "Necronomicon Pages Collection",
+        "description": "Turn in Page of the Necronomicon Tome to Umbrelle the city witch.",
+        "category": "event",
+        "region": "luna",
+        "locations": [
+            {
+                "name": "Umbrelle the city witch",
+                "x": 1414,
+                "y": 1704,
+                "z": 12,
+                "npc_serial": 0x00000119
+            }
+        ],
+        "items": [
+            {"name": "Page of the Necronomicon Tome", "id": 0x7492, "hue": 0x0B02}
         ],
         "turn_in_type": "direct_transfer",
         "container_type": "npc"
@@ -231,6 +282,49 @@ QUESTS_DUNGEON_WRONG = {
     }
 }
 
+QUESTS_DEADSTALL_ISLAND = {
+    "deadstall_resurrect_lost_souls": {
+        "name": "Deadstall Island: Resurrect Lost Souls",
+        "description": "Cast Resurrection spell on Lost Souls near Deadstall Island.",
+        "category": "spell_quest",
+        "region": "deadstall",
+        "quest_range": 500,  # How far from Deadstall Island to activate quest
+        "locations": [
+            {
+                "name": "Deadstall Island",
+                "x": 391,
+                "y": 2026,
+                "z": 0
+            }
+        ],
+        "turn_in_type": "spell_cast",
+        "spell_name": "Resurrection",
+        "target_mobile": {
+            "name": "Lost Soul",
+            "id": 0x03CA,
+            "max_range": 3  # How far Lost Soul can be to cast spell on it
+        }
+    }
+}
+
+QUESTS_HALLOWEEN = {
+    "halloween_candy_collection": {
+        "name": "Halloween: Candy Collection",
+        "description": "Collect Halloween Candy and deposit into Candy Bag.",
+        "category": "event",
+        "region": "world",
+        "items": [
+            {"name": "Halloween Candy", "id": 0x7177, "hue": -1}
+        ],
+        "turn_in_type": "container_deposit",
+        "target_container": {
+            "name": "Candy Bag",
+            "id": 0x0E76,
+            "hue": 0x08BB
+        }
+    }
+}
+
 # currently disabled
 QUESTS_GRIPHOOK_GENERAL_DISABLED = {
     "treasure_maps": {
@@ -324,12 +418,13 @@ QUESTS_GRIPHOOK_GENERAL_DISABLED = {
 # Combine all groups into a single QUESTS dictionary 
 # currently excluding the QUESTS_GRIPHOOK_GENERAL_DISABLED , until NPC return
 QUESTS = {}
-for group in ( QUESTS_WORLD, QUESTS_DUNGEON_SANDSTORM, QUESTS_DUNGEON_SHAME, QUESTS_DUNGEON_DECEIT, QUESTS_DUNGEON_DESTARD, QUESTS_DUNGEON_WRONG):
+for group in ( QUESTS_WORLD, QUESTS_NECRONOMICON, QUESTS_DUNGEON_SANDSTORM, QUESTS_DUNGEON_SHAME, QUESTS_DUNGEON_DECEIT, QUESTS_DUNGEON_DESTARD, QUESTS_DUNGEON_WRONG, QUESTS_DEADSTALL_ISLAND, QUESTS_HALLOWEEN):
     QUESTS.update(group)
 
 # Lastly , if not near any item turn in we try to attack specific quest objectives 
 # Cocoon (0x9F83), Daemonic Totem (0xB829) - Similar to Poisonous Thorns, attack these quest objects
-QUEST_STATICS_TO_ATTACK = ["A Cocoon", "Daemonic Totem", "a bonfire crystal", "Demonic Portal", "Poisonous Thorns"]
+# imprisoned eclipse (0x6E19) - LUNA quest
+QUEST_STATICS_TO_ATTACK = ["A Cocoon", "Daemonic Totem", "a bonfire crystal", "Demonic Portal", "Poisonous Thorns", "imprisoned eclipse"]
 INTERACT_ONLY_STATICS = True  # When true, only interact with statics items  and do NOT attack mobiles
 USE_ALL_ATTACK = True  # When true, say "All Attack" and target the quest entity to command pets/party
 
@@ -547,6 +642,51 @@ def handle_npc_turn_in(items, quest_config, location):
     
     return True
 
+def handle_container_deposit(items, quest_config):
+    """Handle depositing items into a specific container in backpack."""
+    target_container_info = quest_config["target_container"]
+    
+    # Search for the target container in backpack
+    target_container = Items.FindByID(
+        target_container_info["id"], 
+        target_container_info["hue"], 
+        Player.Backpack.Serial
+    )
+    
+    if not target_container:
+        debug_message(f"Cannot find {target_container_info['name']} (0x{target_container_info['id']:04X}, hue 0x{target_container_info['hue']:04X}) in backpack!", 33)
+        return False
+    
+    debug_message(f"Found {target_container_info['name']} in backpack", 68)
+    
+    # Move items into the container
+    moved_any = False
+    attempt_round = 0
+    MAX_ROUNDS = 15
+    
+    while attempt_round < MAX_ROUNDS:
+        attempt_round += 1
+        remaining = find_quest_items(quest_config)
+        if not remaining:
+            break
+        
+        # Move each found item individually
+        for item_list in remaining.values():
+            for item in item_list:
+                try:
+                    Items.Move(item, target_container.Serial, 0)  # 0 = move entire stack
+                    Misc.Pause(650)
+                    moved_any = True
+                    debug_message(f"Moved {item.Name if hasattr(item, 'Name') else 'item'} to {target_container_info['name']}", 68)
+                except Exception as e:
+                    debug_message(f"Move failed for item 0x{getattr(item, 'Serial', 0):X}: {e}", 33)
+                    Misc.Pause(300)
+        
+        # Small backoff between rounds
+        Misc.Pause(600)
+    
+    return moved_any
+
 def validate_empty_container(item, quest_config):
     """Validate if a container is empty."""
     debug_message(quest_config["validation"]["message"], 67)
@@ -554,6 +694,73 @@ def validate_empty_container(item, quest_config):
         debug_message("Container is not empty!", 33)
         return False
     return True
+
+def handle_spell_cast(quest_config, location):
+    """Handle spell casting quest (e.g., Resurrection on Lost Souls)."""
+    target_info = quest_config["target_mobile"]
+    max_range = target_info.get("max_range", 8)
+    
+    Misc.SendMessage(f"[QUEST] Searching for {target_info['name']} (0x{target_info['id']:04X}) within {max_range} tiles...", 68)
+    
+    # Search for target mobile
+    mobile_filter = Mobiles.Filter()
+    mobile_filter.Enabled = True
+    mobile_filter.RangeMax = max_range
+    
+    # Create .NET List for Bodies filter
+    body_list = System.Collections.Generic.List[System.Int32]()
+    body_list.Add(target_info["id"])
+    mobile_filter.Bodies = body_list
+    
+    # Create .NET List for Notorieties (all types)
+    notoriety_list = System.Collections.Generic.List[System.Byte]()
+    for i in range(8):
+        notoriety_list.Add(i)
+    mobile_filter.Notorieties = notoriety_list
+    
+    mobiles = Mobiles.ApplyFilter(mobile_filter)
+    
+    Misc.SendMessage(f"[QUEST] Found {len(mobiles) if mobiles else 0} matching mobiles", 68)
+    
+    if not mobiles or len(mobiles) == 0:
+        Misc.SendMessage(f"[QUEST] No {target_info['name']} found within {max_range} tiles!", 33)
+        return False
+    
+    # Find nearest target
+    nearest_mobile = None
+    min_distance = float('inf')
+    
+    for mobile in mobiles:
+        if mobile and hasattr(mobile, 'Position'):
+            dist = calculate_distance(Player.Position.X, Player.Position.Y, 
+                                     mobile.Position.X, mobile.Position.Y)
+            if dist < min_distance:
+                min_distance = dist
+                nearest_mobile = mobile
+    
+    if not nearest_mobile:
+        debug_message(f"No valid {target_info['name']} found!", 33)
+        return False
+    
+    debug_message(f"Found {target_info['name']} at {min_distance:.1f} tiles away", 68)
+    
+    # Cast Resurrection spell
+    spell_name = quest_config["spell_name"]
+    debug_message(f"Casting {spell_name} on {target_info['name']}...", 68)
+    
+    # Cast the spell
+    Spells.CastMagery(spell_name)
+    Misc.Pause(1500)  # Wait for spell to be ready
+    
+    # Wait for target cursor
+    if Target.WaitForTarget(3000):
+        Target.TargetExecute(nearest_mobile)
+        Misc.Pause(1000)
+        debug_message(f"Cast {spell_name} on {target_info['name']}!", 68)
+        return True
+    else:
+        debug_message("Target cursor not received after casting spell!", 33)
+        return False
 
 def handle_quest_mobiles_fallback():
     """If not near turn-in, engage quest targets.
@@ -640,16 +847,37 @@ def handle_quest_mobiles_fallback():
 
 def process_quest(quest_name, quest_config):
     """Process a specific quest turn-in."""
-    # Find quest items
-    items = find_quest_items(quest_config)
-    if not items:
-        debug_message(f"No items found for {quest_config['name']}!", 33)
-        return False
+    
+    # Handle container deposit quests (no location needed)
+    if quest_config["turn_in_type"] == "container_deposit":
+        items = find_quest_items(quest_config)
+        if not items:
+            debug_message(f"No items found for {quest_config['name']}!", 33)
+            return False
+        return handle_container_deposit(items, quest_config)
     
     # Find nearest turn-in location
     location, distance = find_nearest_location(quest_config["locations"])
     if not location:
         debug_message("No valid turn-in location found!", 33)
+        return False
+    
+    # Handle spell casting quests differently
+    if quest_config["turn_in_type"] == "spell_cast":
+        # Check if we're in range of quest location (use quest_range if specified, otherwise default to 15)
+        quest_range = quest_config.get("quest_range", 15)
+        if not is_within_range(Player.Position.X, Player.Position.Y, 
+                              location["x"], location["y"], range_tiles=quest_range):
+            debug_message(f"Move closer to {location['name']} (within {quest_range} tiles) to perform quest!", 33)
+            return False
+        
+        debug_message(f"Within {quest_range} tiles of {location['name']}, searching for targets...", 68)
+        return handle_spell_cast(quest_config, location)
+    
+    # For item-based quests, find quest items
+    items = find_quest_items(quest_config)
+    if not items:
+        debug_message(f"No items found for {quest_config['name']}!", 33)
         return False
     
     # Check if we're in range
@@ -684,14 +912,25 @@ def main():
     quests_available = False
     
     for quest_name, quest_config in QUESTS.items():
-        debug_message(f"Checking for {quest_config['name']} items...", 67)
-        if find_quest_items(quest_config):
+        # Spell-cast quests don't require items in backpack
+        if quest_config.get("turn_in_type") == "spell_cast":
+            debug_message(f"Checking for {quest_config['name']} quest...", 67)
             quests_available = True
             debug_message(f"Processing {quest_config['name']}...", 67)
             if process_quest(quest_name, quest_config):
                 debug_message(f"Completed {quest_config['name']}!", 67)
             else:
                 debug_message(f"Failed to complete {quest_config['name']}!", 33)
+        else:
+            # Item-based quests
+            debug_message(f"Checking for {quest_config['name']} items...", 67)
+            if find_quest_items(quest_config):
+                quests_available = True
+                debug_message(f"Processing {quest_config['name']}...", 67)
+                if process_quest(quest_name, quest_config):
+                    debug_message(f"Completed {quest_config['name']}!", 67)
+                else:
+                    debug_message(f"Failed to complete {quest_config['name']}!", 33)
     
     if not quests_available:
         debug_message("No quest items found in backpack! Searching for quest mobiles to attack...", 33)

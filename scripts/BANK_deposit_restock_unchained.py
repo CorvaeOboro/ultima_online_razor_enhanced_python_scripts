@@ -167,6 +167,18 @@ special_items_dict = {
     }
 }
 
+# Champion Crystals - Exclude from all deposits (different hues)
+CHAMPION_CRYSTAL_ID = 0x1F19
+
+# Mastery Orbs - Exclude from resources container (different hues)
+MASTERY_ORBS = {
+    0x573E: {  # Mastery Orb ItemID
+        # Add known hues here as they are discovered
+        # Format: hue_value: "Mastery Type Name"
+        # These should NOT go into resources container
+    }
+}
+
 #//=============================================================================
 
 # dictionaries to map ItemID to Name for easy lookup
@@ -209,7 +221,7 @@ def get_player_max_mana():
         if im and im > 0:
             debug_message(f"[Mana Debug] Using ManaMax={mm} -> int={im} for profile selection", 68)
             return im
-        # Fallback: derive max mana from components if ManaMax is unavailable on this shard/client
+        # Fallback: derive max mana from components if ManaMax is unavailable on this shard or client
         try:
             base_int = int(Player.Int or 0)
         except Exception:
@@ -330,9 +342,33 @@ def manage_potions(bankBox):
             if potions_needed > 0:
                 debug_message(f"Warning: Still need {potions_needed} {potion_name} but none available in bank", 33)
 
+def is_excluded_item(item, item_id):
+    """
+    Check if an item should be excluded from resource container deposits.
+    Returns True if item should be excluded (champion crystals or mastery orbs).
+    """
+    # Exclude champion crystals (all hues)
+    if item_id == CHAMPION_CRYSTAL_ID:
+        debug_message(f"Excluding Champion Crystal (0x{item_id:04X}, hue: {item.Hue}) from resources", 68)
+        return True
+    
+    # Exclude mastery orbs (ItemID 0x573E, all hues)
+    if item_id == 0x573E:
+        hue = item.Hue if hasattr(item, 'Hue') else 0
+        if item_id in MASTERY_ORBS:
+            # Known mastery orb
+            orb_name = MASTERY_ORBS[item_id].get(hue, f"Unknown Mastery Orb (hue: {hue})")
+            debug_message(f"Excluding {orb_name} (0x{item_id:04X}) from resources", 68)
+        else:
+            debug_message(f"Excluding Mastery Orb (0x{item_id:04X}, hue: {hue}) from resources", 68)
+        return True
+    
+    return False
+
 def move_resources_to_subcontainer(bankBox, resourceContainer):
     """
     Move all resource items (from RESOURCES_TO_DEPOSIT) from backpack to a specific sub-container in the bank box.
+    Excludes champion crystals (0x1F19) and mastery orbs (0x573E) regardless of hue.
     Args:
         bankBox: Serial of the main bank box container
         resourceContainer: Serial of the sub-container inside the bank box
@@ -346,6 +382,10 @@ def move_resources_to_subcontainer(bankBox, resourceContainer):
         if not isinstance(items, list):
             items = [items]
         for item in items:
+            # Check if item should be excluded
+            if is_excluded_item(item, resource_id):
+                continue
+            
             amount = item.Amount if hasattr(item, 'Amount') else 1
             debug_message(f"Moving {amount} {resource_name} (0x{resource_id:04X}) to resource container", 65)
             Items.Move(item, resourceContainer, amount)

@@ -406,7 +406,7 @@ FINALE_EFFECT = "shockwave"
 # =============================================================================
 
 # Gump configuration
-GUMP_ID = 4121211124  # Unique gump ID (different from nature)
+GUMP_ID = 4121261121  # Unique gump ID 
 GUMP_START_X = 350
 GUMP_START_Y = 350
 GUMP_WIDTH = 160

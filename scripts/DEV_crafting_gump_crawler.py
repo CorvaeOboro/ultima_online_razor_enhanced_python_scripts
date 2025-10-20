@@ -1,83 +1,56 @@
 """
 Development Crafting Gump Crawler - a Razor Enhanced Python Script for Ultima Online
 
-Goal: Open a crafting tool gump and extract organized data to JSON.
-this may be used to populate the wiki , or useful info for other scripts
+explore a crafting gump to learn recipes , ingredients and skill requirements 
+Open a crafting tool gump and extract organized data to JSON.
+useful to populate the wiki information , or info for other scripts
 
-Flow per run:
-1) Ensure a clean gump state.
-2) Use a crafting tool from backpack to open the crafting gump.
-3) Snapshot base gump content
-4) Probes button actions in an offset range to discover 
+Use a crafting tool from backpack to open the crafting gump.
+read gump content
+try button actions in an offset range to discover 
    - a category change, then an item's info panel; or
    - directly an item's info panel.
-5) When an info/detail-like gump is detected, record it, then stop .
+When an info/detail-like gump is detected, record it, 
+explore all permutations  
 
 Notes:
-- Button IDs and layout vary by tool/shard. We implement a small discovery scan with safety caps.
-- You can configure TOOL_ITEM_IDS 
-- later provide explicit CATEGORY_BUTTONS and ITEM_INFO_BUTTONS.
-
-#//===============================================
-Gump text lines vary so we map a few known example to categories
+- Button IDs and layout vary by tool/shard. 
+- later provide exact CATEGORY_BUTTONS and ITEM_INFO_BUTTONS , from recording or gump inspection
+- Gump text lines numbers vary in this cooking example so we map a few known example to categories
 then handle each troublesome item mapping 
 
-#//===============================================
- Crafting gump menu , 
-the player will activate a crafting tool that will bring up a gump menu with buttons 
-and labels in rows , categories on the right and items to be crafted on the left . 
-extract all the information into nicely organized json file ,
- next to each item is a gump button that will show more info about an item ,
-  for every item of every category we want to go through and extract the info about it .
-   in order to do this we want to create a nice clean loop that closes the gump if its own ,
-    uses the tool , selects the category button , then selects the item's info button ,
-     then extracts the infro from the gump . then repeats for ever permutation .
-      for now we will limit it to 1 total item extracted to test , 
-
-STATUS:: in progress , only tuned for cooking , needs verification 
-VERSION = 20250818
+STATUS:: in progress , only tuned for cooking , needs verification ( DEV_crafting_tester.py )
+VERSION = 20251016
 """
 import time
 import os
 import random
 from collections import OrderedDict
 
-# ===== Settings =====
+
 DEBUG_TO_INGAME_MESSAGE = True
 DEBUG_TO_JSON = True
-# Extraction cap (test mode)
-MAX_ITEMS_TO_EXTRACT = 999
 
-# Global toggle: choose which discipline's settings to use
-# Set to True for Alchemy (Mortar and Pestle), False for Cooking (Skillet)
-USE_ALCHEMY_SETTINGS = True
-
-# Discipline-specific tool IDs
-# 0x0E9B = Mortar and Pestle (Alchemy)
-# 0x097F = Skillet / Frying Pan (Cooking)
-ALCHEMY_TOOL_ITEM_IDS = [0x0E9B]
-COOKING_TOOL_ITEM_IDS = [0x097F]
-
-# Provide a list of crafting tool item IDs to use (backpack). Derived from toggle above.
+MAX_ITEMS_TO_EXTRACT = 999 # Extraction cap
+USE_ALCHEMY_SETTINGS = True # Set to True for Alchemy (Mortar and Pestle), False for Cooking (Skillet)
+ALCHEMY_TOOL_ITEM_IDS = [0x0E9B] # 0x0E9B = Mortar and Pestle (Alchemy)
+COOKING_TOOL_ITEM_IDS = [0x097F] # 0x097F = Skillet / Frying Pan (Cooking)
 TOOL_ITEM_IDS = ALCHEMY_TOOL_ITEM_IDS if USE_ALCHEMY_SETTINGS else COOKING_TOOL_ITEM_IDS
 
-# Output shaping toggles
-# - OUTPUT_BASE: include session/base gump and category scaffolding
-# - OUTPUT_ITEM: include items parsed
+# initially may want to output the base to to get the category names , after we just want to output items
 # If only OUTPUT_ITEM is True, saved JSON will be a flat list of parsed items
-OUTPUT_BASE = False
-OUTPUT_ITEM = True
+OUTPUT_BASE = False # - OUTPUT_BASE: include session/base gump and category scaffolding
+OUTPUT_ITEM = True # - OUTPUT_ITEM: include items parsed
 INCLUDE_PERCENTS = False  # success/exceptional percents are included in item JSON
 
-# Debug visualization of token streams (alternating colors) for tricky categories
 DEBUG_TOKEN_STRIPE = True
 DEBUG_TOKEN_STRIPE_CATEGORIES = { 'ingredients', 'preparations', 'baking' }
 DEBUG_TOKEN_COLOR_A = 68
 DEBUG_TOKEN_COLOR_B = 38
 
-# Known category buttons for Skillet crafting gump (right side columns)
+
 # Pattern continues by +7 up to 43: 1,8,15,22,29,36,43
-CATEGORY_BUTTONS = list(range(1, 44, 7))
+CATEGORY_BUTTONS = list(range(1, 44, 7)) # Known category buttons for Skillet crafting gump (right side columns)
 
 # Cooking (Skillet) category names mapped to their button IDs (right column)
 # this was extracted by using the OUTPUT_BASE to scan the gump 
