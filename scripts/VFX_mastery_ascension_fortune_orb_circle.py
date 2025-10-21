@@ -298,15 +298,15 @@ RITUAL_CONFIG = {
     
     # Phase 7: Fade out
     "phase_fade": {
-        "delay_after_finale_ms": 500,  # When fade starts after finale
+        "delay_after_finale_ms": 0,  # When fade starts after finale
         "fade_steps": 3,               # Number of darkening steps
-        "fade_step_delay_ms": 120,     # Delay per fade step
+        "fade_step_delay_ms": 100,     # Delay per fade step
         "use_brightness_levels": True, # Use hue family brightness for fade
     },
     
     # Timeline system
     "timeline": {
-        "minimum_tick_rate_ms": 50,  # ~6-7 FPS to prevent client overload
+        "minimum_tick_rate_ms": 30,  # ~6-7 FPS to prevent client overload
         "max_updates_per_frame": 18,   # Limit simultaneous updates per frame
     },
 }
@@ -356,43 +356,67 @@ TREASURE_ITEMS = [
 # =============================================================================
 # VFX EFFECT DEFINITIONS 
 # =============================================================================
+# NOTE: Many VFX items auto-animate in the UO client when spawning just the first frame!
+# This drastically reduces packet overhead. Use single-frame [0xXXXX] for auto-animation,
+# or full range list(range(...)) if you need manual control over frame rate or reverse playback.
 
 VFX_EFFECTS = {
+    # Multi-frame animated VFX
     "dots_inward": {
-        "frames": list(range(0xAA80, 0xAA8A)),  # Dots converging inward
+        "frames": [0xAA80],  # Single static frame (use list literal)
+        #"frames": list(range(0xAA80, 0xAA8A)),  # Dots converging inward (10 frames)
         "frame_duration": 150,  # Slower for better visibility 
     },
     "firepillar": {
-        "frames": list(range(0xA437, 0xA44A)),  # Rising pillar
+        "frames": list(range(0xA437, 0xA44A)),  # Rising pillar (19 frames)
         "frame_duration": 85,
     },
     "shockwave": {
-        "frames": list(range(0xAAE5, 0xAAF1)),  # Expanding shockwave
+        "frames": [0xAAE5],  # Single static frame (use list literal)
+        #"frames": list(range(0xAAE5, 0xAAF1)),  # Expanding shockwave (12 frames)
         "frame_duration": 100,
     },
     "wind_whirl": {
-        "frames": list(range(0x6D60, 0x6D66)),  # 0x6D60 to 0x6D65
+        "frames": list(range(0x6D60, 0x6D66)),  # 0x6D60 to 0x6D65 (6 frames)
         "frame_duration": 100,
     },
     "orrey_energy_sphere_rings": {
-        "frames": list(range(0x6E10, 0x6E15)),  # 0x6E10 to 0x6E15
+        "frames": list(range(0x6E10, 0x6E15)),  # 0x6E10 to 0x6E15 (5 frames)
         "frame_duration": 100,
     },
     "wispy_lines_energy_around": {
-        "frames": list(range(0x5480, 0x5486)),  # 0x5480 to 0x5486
+        "frames": [0x5480],  # Single static frame (use list literal)
+        #"frames": list(range(0x5480, 0x5486)),  # 0x5480 to 0x5486 (6 frames)
         "frame_duration": 100,
     },
     "downward_drops": {
-        "frames": list(range(0x549B, 0x549F)),  # 0x549B to 0x549F
+        "frames": list(range(0x549B, 0x549F)),  # 0x549B to 0x549F (4 frames)
         "frame_duration": 150,
     },
     "nature_tenrils": {
-        "frames": list(range(0x6D01, 0x6D0C)),  # 0x6D01 to 0x6D0C
+        "frames": list(range(0x6D01, 0x6D0C)),  # 0x6D01 to 0x6D0C (11 frames)
         "frame_duration": 150,
     },
     "sparkles": {
-        "frames": list(range(0xAB42, 0xAB55)),  # 0xAB4A to 0xAB50
+        "frames": [0xAB42],  # Single static frame (use list literal)
+        #"frames": list(range(0xAB42, 0xAB55)),  # 0xAB4A to 0xAB50 (19 frames)
         "frame_duration": 150,
+    },
+    
+    # Single-frame static VFX examples (use list for single frame)
+    # These will auto-animate in client if the VFX supports it
+    "static_cloud": {
+        "frames": [0xA9D6],  # Single static frame (use list literal)
+        # For manual animation: list(range(0xA9D6, 0xA9DF)) - multiple frames
+        "frame_duration": 300,  # Time per frame (ignored for single frame)
+    },
+    "static_energy_sphere": {
+        "frames": [0x6E10],  # Single static energy sphere (auto-animates in client)
+        "frame_duration": 100,  # Ignored for single frame
+    },
+    "static_wispy": {
+        "frames": [0x5480],  # Single static wispy energy (auto-animates in client)
+        "frame_duration": 100,  # Ignored for single frame
     },
 }
 
@@ -886,11 +910,11 @@ class OscillatingItemTrack(AnimationTrack):
     """
     Animates an item oscillating up and down in Z-axis with trail effect.
     Creates a "wave" effect when multiple items are staggered.
-    Leaves a trail of items at previous positions for smoother visual effect.
+    Uses frame overlap system for smooth transitions without flicker.
     """
     
     def __init__(self, start_time_ms, end_time_ms, item_id, position, hue=0x0000, 
-                 z_amplitude=10, update_interval_ms=100, z_direction=1, trail_length=1):
+                 z_amplitude=10, update_interval_ms=100, z_direction=1, trail_length=2):
         """
         Args:
             start_time_ms: When to spawn and start oscillating
@@ -901,7 +925,7 @@ class OscillatingItemTrack(AnimationTrack):
             z_amplitude: How far to oscillate up/down
             update_interval_ms: Time between position updates
             z_direction: Initial direction (1=up, -1=down)
-            trail_length: Number of trail items to keep visible (default 3)
+            trail_length: Number of trail items to keep visible (default 2 for smooth overlap)
         """
         total_duration = end_time_ms - start_time_ms
         super().__init__(start_time_ms=start_time_ms, duration_ms=total_duration)
@@ -912,110 +936,165 @@ class OscillatingItemTrack(AnimationTrack):
         self.update_interval_ms = update_interval_ms
         self.z_direction = z_direction
         self.current_z_offset = 0
-        self.trail_serials = []  # List of serials for trail items
-        self.trail_length = trail_length  # Number of trail items to keep
+        
+        # Frame overlap system - keep multiple frames visible for smooth transitions
+        self.frame_trail = []  # List of (serial, spawn_time_ms) tuples
+        self.trail_length = trail_length  # Number of frames to keep visible
+        self.frame_overlap_ms = 100  # How long to keep old frames visible (overlap duration)
+        
         self.last_update_time = 0
+        self.last_overlap_cleanup_time = 0  # Track when we last cleaned up old frames
     
     def on_start(self):
         """Spawn the item at base position."""
         x, y, z = self.base_position
         serial = _send_fake_item(x, y, z, self.item_id, self.hue)
         if serial:
-            self.trail_serials.append(serial)
+            self.frame_trail.append((serial, 0))  # Store with spawn time
         self.last_update_time = 0
+        self.last_overlap_cleanup_time = 0
     
     def on_update(self, local_time_ms):
         """Update Z position to create oscillation with trail effect."""
-        # Check if it's time to update
-        if local_time_ms - self.last_update_time < self.update_interval_ms:
-            return
+        needs_update = False
         
-        # Update Z offset
-        self.current_z_offset += self.z_direction
+        # Check if it's time to update position (skip if amplitude is 0 - static item)
+        if self.z_amplitude > 0 and local_time_ms - self.last_update_time >= self.update_interval_ms:
+            # Update Z offset
+            self.current_z_offset += self.z_direction
+            
+            # Reverse direction at amplitude limits
+            if self.current_z_offset >= self.z_amplitude:
+                self.z_direction = -1
+                self.current_z_offset = self.z_amplitude
+            elif self.current_z_offset <= -self.z_amplitude:
+                self.z_direction = 1
+                self.current_z_offset = -self.z_amplitude
+            
+            needs_update = True
+            self.last_update_time = local_time_ms
         
-        # Reverse direction at amplitude limits
-        if self.current_z_offset >= self.z_amplitude:
-            self.z_direction = -1
-            self.current_z_offset = self.z_amplitude
-        elif self.current_z_offset <= -self.z_amplitude:
-            self.z_direction = 1
-            self.current_z_offset = -self.z_amplitude
-        
-        # Spawn new item at new position (don't delete old ones yet)
-        x, y, base_z = self.base_position
-        new_z = base_z + self.current_z_offset
-        serial = _send_fake_item(x, y, new_z, self.item_id, self.hue)
-        
-        if serial:
-            self.trail_serials.append(serial)
-        
-        # Remove oldest trail item if we exceed trail length
-        if len(self.trail_serials) > self.trail_length:
-            oldest_serial = self.trail_serials.pop(0)
-            _remove_fake_item(oldest_serial)
-        
-        self.last_update_time = local_time_ms
+        # Spawn new frame if position changed
+        if needs_update:
+            x, y, base_z = self.base_position
+            new_z = base_z + self.current_z_offset
+            serial = _send_fake_item(x, y, new_z, self.item_id, self.hue)
+            
+            if serial:
+                # Add new frame to trail with current time
+                self.frame_trail.append((serial, local_time_ms))
+                
+                # Maintain fixed trail length - remove oldest frames when exceeding trail_length
+                while len(self.frame_trail) > self.trail_length:
+                    old_serial, old_time = self.frame_trail.pop(0)  # Remove oldest
+                    _remove_fake_item(old_serial)
     
     def on_complete(self):
-        """Remove all trail items."""
-        for serial in self.trail_serials:
+        """Remove all trail frames."""
+        for serial, spawn_time in self.frame_trail:
             _remove_fake_item(serial)
-        self.trail_serials.clear()
+        self.frame_trail.clear()
 
 class VFXPlaybackTrack(AnimationTrack):
-    """Plays through VFX frames in sequence - ALWAYS steps through ALL frames."""
+    """Plays through VFX frames in sequence with overlap for smooth transitions."""
     
     def __init__(self, start_time_ms, vfx_frames, frame_duration_ms, position, hue=0x0000, loop=False, loop_count=None):
-        total_duration = len(vfx_frames) * frame_duration_ms
+        # Validate frames list is not empty
+        if not vfx_frames or len(vfx_frames) == 0:
+            raise ValueError("vfx_frames cannot be empty - must have at least one frame")
+        
+        # Calculate duration based on frames and loops
+        single_loop_duration = len(vfx_frames) * frame_duration_ms
+        if loop and loop_count is not None:
+            # For looping VFX, multiply by loop count
+            total_duration = single_loop_duration * loop_count
+        else:
+            total_duration = single_loop_duration
+        
         super().__init__(start_time_ms=start_time_ms, duration_ms=total_duration, loop=loop, loop_count=loop_count)
         self.vfx_frames = vfx_frames
         self.frame_duration_ms = frame_duration_ms
         self.position = position
         self.hue = hue
-        self.current_serial = None
+        self.single_loop_duration = single_loop_duration
+        self.is_single_frame = (len(vfx_frames) == 1)
+        
+        # Frame overlap system
+        self.frame_trail = []  # List of (serial, spawn_time_ms) tuples
+        self.frame_overlap_ms = 100  # Overlap duration
         self.current_frame_index = 0
         self.last_frame_time = 0
+        self.last_overlap_cleanup_time = 0
         self.frames_shown = 0
     
     def on_start(self):
-        """Show first frame on start."""
-        if self.vfx_frames:
-            x, y, z = self.position
-            frame_item_id = self.vfx_frames[0]
-            self.current_serial = _send_fake_item(x, y, z, frame_item_id, self.hue)
+        """Spawn initial frame (works for both single and multi-frame VFX)."""
+        if not self.vfx_frames:
+            return
+        
+        x, y, z = self.position
+        frame_item_id = self.vfx_frames[0]  # Always start with first frame
+        initial_serial = _send_fake_item(x, y, z, frame_item_id, self.hue)
+        
+        if initial_serial:
+            self.frame_trail.append((initial_serial, 0))
             self.current_frame_index = 0
             self.last_frame_time = 0
             self.frames_shown = 1
     
     def on_update(self, local_time_ms):
-        """Step through frames sequentially - never skip frames."""
+        """Step through frames sequentially with overlap."""
         if not self.vfx_frames:
             return
         
-        # Check if enough time has passed for next frame
-        if local_time_ms - self.last_frame_time >= self.frame_duration_ms:
-            # Advance to next frame
-            self.current_frame_index += 1
+        # For single-frame VFX with looping, keep the frame visible throughout all loops
+        # No need to respawn or update - just let it persist until on_complete()
+        if self.is_single_frame:
+            # Single frame stays visible, no updates needed
+            return
+        
+        # Multi-frame VFX: cycle through frames
+        if len(self.vfx_frames) > 1:
+            # Check if enough time has passed for next frame
+            if local_time_ms - self.last_frame_time >= self.frame_duration_ms:
+                # Advance to next frame
+                next_frame_index = self.current_frame_index + 1
+                
+                # Check if we've shown all frames
+                if next_frame_index < len(self.vfx_frames):
+                    # Show next frame
+                    x, y, z = self.position
+                    frame_item_id = self.vfx_frames[next_frame_index]
+                    new_serial = _send_fake_item(x, y, z, frame_item_id, self.hue)
+                    
+                    if new_serial:
+                        self.frame_trail.append((new_serial, local_time_ms))
+                    
+                    self.current_frame_index = next_frame_index
+                    self.last_frame_time = local_time_ms
+                    self.frames_shown += 1
+        
+        # ALWAYS check for overlap cleanup (independent of frame changes)
+        if len(self.frame_trail) > 1 and local_time_ms - self.last_overlap_cleanup_time >= 10:
+            self.last_overlap_cleanup_time = local_time_ms
             
-            # Check if we've shown all frames
-            if self.current_frame_index >= len(self.vfx_frames):
-                # Animation complete - don't advance further
-                return
+            # Remove old frames that have exceeded overlap time
+            frames_to_remove = []
+            for i, (serial, spawn_time) in enumerate(self.frame_trail[:-1]):  # Don't check newest frame
+                age_ms = local_time_ms - spawn_time
+                if age_ms > self.frame_overlap_ms:
+                    frames_to_remove.append(i)
+                    _remove_fake_item(serial)
             
-            # Remove previous frame
-            if self.current_serial:
-                _remove_fake_item(self.current_serial)
-            
-            # Show next frame
-            x, y, z = self.position
-            frame_item_id = self.vfx_frames[self.current_frame_index]
-            self.current_serial = _send_fake_item(x, y, z, frame_item_id, self.hue)
-            self.last_frame_time = local_time_ms
-            self.frames_shown += 1
+            # Remove from trail list (in reverse to maintain indices)
+            for i in reversed(frames_to_remove):
+                self.frame_trail.pop(i)
     
     def on_complete(self):
-        if self.current_serial:
-            _remove_fake_item(self.current_serial)
+        """Remove all trail frames."""
+        for serial, spawn_time in self.frame_trail:
+            _remove_fake_item(serial)
+        self.frame_trail.clear()
 
 class DriftingCloudTrack(AnimationTrack):
     """
