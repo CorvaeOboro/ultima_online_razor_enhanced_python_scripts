@@ -2,8 +2,10 @@
 VFX Mastery Ascension of Fortune Ritual - a Razor Enhanced Python Script for Ultima Online
 
 Celebrate in the Ascension of your Fortune Mastery   
-Timeline-based animation ritual for Fortune Mastery level advancement.
-Client-side preview using packet injection - no actual item placement.
+as you level up your Mastery activate this python script to visualize that event , 
+setting the Number in the gump to represent your level or the amount of orbs being consumed .
+'Ascend' to witness your advancement via visual effects as the orbs power is drawn forth during the ritual . 
+a timeline-based animation ritual displaying client-side visuals thru packets 
 
 FORTUNE RITUAL THEME:
 - 8-12 golden orb positions arranged in circle (radius 5, based on mastery level)
@@ -76,8 +78,8 @@ Symbols Fade Start      |   4645     |  5005     |  360ms   |   -   | 3-step bri
 VISUAL TIMELINE (Time in seconds, each "=" represents ~100ms)
 ================================================================================
 
-0.0s    1.0s    2.0s    3.0s    4.0s    5.0s
-|-------|-------|-------|-------|-------|-------|
+0.0s    1.0s    2.0s    3.0s    4.0s    5.0s    6.0s
+|-------|-------|-------|-------|-------|-------|-------|
 
 Symbol 1:   ████████████████████████████████████████████☀  [0-5005ms brighten]
 Symbol 2:    ███████████████████████████████████████████☀  [100-5005ms]
@@ -100,7 +102,7 @@ Orb 8:              ~~~~~~~~~~~~~~~~~~~~~~~~~~~          [900-4145ms oscillating
 Deco 1-8:       ████████████████████████████████          [400-3645ms]
                 [Inner: 4 coins, Middle: 4 piles, Outer: 6 gems]
 
-Center VFX:         =========|=========|=========          [800-3510ms]
+Center VFX:         =========|=========|=========            [800-3510ms]
                     [loop 1] [loop 2] [loop 3]
 
 Sparkles 1:              ████████████████                  [1200-2850ms x1]
@@ -137,7 +139,7 @@ CONFIGURATION:
 - OSCILLATION: Fortune orbs float with Z-axis trail effect
 - FADE: Symbols brighten to fortune color (0x0B73) in 3 steps over 360ms
 
-VERSION::20251019
+VERSION::20251022
 """
 
 import random
@@ -152,7 +154,13 @@ RITUAL_CONFIG = {
     "circle": {
         "radius": 5,              # Distance from center for symbol placement
         "element_count": 8,       # Number of elements in the circle ( mastery level )
-        "rotation_degrees": 45,   # Base rotation offset
+        "rotation_degrees": 45,   # Base rotation offset 
+        "phase_rotation": {
+            "enabled": True,                   # Enable phase-based rotation system
+            "use_mastery_presets": True,       # Use MASTERY_PHASE_PRESETS for automatic phase_offset based on element_count
+            "phase_offset": 0,                # Manual phase offset (used only if use_mastery_presets is False)
+            "apply_to_decorations": True,      # Apply phase rotation to decoration rings
+        },
     },
     
     # Color scheme settings
@@ -167,15 +175,27 @@ RITUAL_CONFIG = {
         "shockwave_hue": 0x0B73,             # Shockwave finale hue (golden)
     },
     
+    # Symbol hue palette system (enabled for gold cycling)
+    "symbol_hue_palette": {
+        "enabled": True,                     # Enable hue palette cycling
+        "idle_palette": [0x08A5, 0x08A6],   # Gold hues for idle cycling (darker to brighter gold)
+        "idle_cycle_speed_ms": 500,
+        "phase_out_palette": [0x08A5, 0x08A6, 0x0B73],  # Fade from gold to bright white
+        "use_phase_out_palette": True,
+    },
+    
     # Phase 1: Alchemical symbols (base of each orb position)
     "phase_symbols": {
+        "enabled": True,          # Enable/disable symbols rendering
         "spawn_delay_ms": 100,     # Delay between placing each symbol
         "z_offset": 2,            # Ground level
         "use_gold_hue": True,     # Use golden hue for symbols
+        "use_hue_palette": True,   # Enable hue palette cycling
     },
     
     # Phase 2: Fortune Orbs (floating above symbols)
     "phase_orbs": {
+        "enabled": True,          # Enable/disable orbs rendering
         "spawn_delay_ms": 100,     # Delay between placing orbs
         "start_offset_ms": 200,   # Delay after symbols start
         "z_offset": 10,            # Base Z height for orbs
@@ -189,26 +209,31 @@ RITUAL_CONFIG = {
     
     # Phase 3: Small decoration circles around each orb
     "phase_decorations": {
+        "enabled": True,          # Enable/disable all decorations rendering
         "start_offset_ms": 400,   # Delay after orbs start
         "spawn_delay_per_orb_ms": 100,  # Delay between each orb's decorations
         "spawn_delay_per_item_ms": 130,  # Delay between items in same circle
         
         # Inner decoration ring (around each orb)
         "inner_ring": {
+            "enabled": True,          # Enable/disable inner ring
             "item_id": "gold_coins",        # Gold coins
             "radius": 1,              # 1 tile from orb center
             "points": 4,              # 4 items in circle
             "z_offset": 2,            # Ground level
+            "rotation_degrees": 0,    # Independent rotation (0-360)
             "hue": 0x0000,            # Golden hue
             "use_scheme_hue": False,   # Use golden scheme
         },
         
         # Middle decoration ring (around each orb)
         "middle_ring": {
+            "enabled": True,          # Enable/disable middle ring
             "item_ids": "gold_piles",
             "radius": 2,              # 2 tiles from orb center
             "points": 4,              # 3 items in circle
             "z_offset": 2,            # Slightly elevated
+            "rotation_degrees": 0,    # Independent rotation (0-360)
             "random_selection": True, # Randomly pick from item_ids
             "hue": 0x0000,            # Golden hue
             "use_scheme_hue": False,  # Use golden scheme
@@ -216,10 +241,12 @@ RITUAL_CONFIG = {
         
         # Outer decoration ring (around each orb) - treasure items
         "outer_ring": {
+            "enabled": True,          # Enable/disable outer ring
             "item_ids": "treasures",  # Treasure items
             "radius": 3,              # 3 tiles from orb center
             "points": 6,              # 5 items in circle
             "z_offset": 2,            # Ground level
+            "rotation_degrees": 0,    # Independent rotation (0-360)
             "random_selection": True, # Randomly pick from treasures
             "hue": 0x0000,            # Golden hue
             "use_scheme_hue": False,  # Use golden scheme
@@ -227,33 +254,15 @@ RITUAL_CONFIG = {
         
     },
     
-    # Phase 3: Drifting Shadow Clouds
-    "phase_drifting_clouds": {
-        "enabled": False,          # Enable drifting shadow clouds
-        "cloud_count": 5,         # Number of clouds to spawn
-        "start_delay_ms": 500,    # Spawn after symbols
-        "spawn_area_radius": 3,   # Radius around center to spawn clouds
-        "min_distance": 1,        # Minimum distance between clouds (no overlap)
-        "z_offset": 10,           # Base height of clouds (above orbs)
-        "z_amplitude": 1,         # Random Z movement range (+/- 3)
-        "drift_speed_ms": 300,    # Update Z position every 300ms
-        "hue": 1,                 # Dark blue/black hue for clouds
-        "vfx_frames": [0x5440, 0x5444],  # Cloud VFX frames (will cycle through)
-        "frame_duration_ms": 110, # Time per frame for animation
-        "camera_offset": True,    # Offset position to appear "in front" of player
-        "offset_x": 3,            # X offset (east) - moves toward camera in isometric
-        "offset_y": 3,            # Y offset (south) - moves toward camera in isometric
-        # Note: In UO's isometric view, +X is east, +Y is south
-        # Moving southeast (+X, +Y) brings objects toward the camera/front
-    },
     
     # Phase 4: Center inward energy
     "phase_center_energy": {
+        "enabled": True,          # Enable/disable center inward energy VFX
         "vfx_effect": "dots_inward",
         "start_delay_ms": 800,    # When center energy starts
-        "loop_count": 3,          # Number of times to loop
+        "loop_count": 1,          # Number of times to loop
         "z_offset": 1,           # Height of center energy
-        "hue": 48,            # Color (0x0000 = use scheme)
+        "hue": 0x0B73,            # Color (0x0000 = use scheme)
         "camera_offset": True,    # Offset position to appear "in front" of player
         "offset_x": 2,            # X offset (east) - moves toward camera in isometric
         "offset_y": 2,            # Y offset (south) - moves toward camera in isometric
@@ -263,6 +272,7 @@ RITUAL_CONFIG = {
     
     # Phase 5: Symbol VFX (downward drops at each symbol)
     "phase_symbol_vfx": {
+        "enabled": True,          # Enable/disable symbol VFX
         "vfx_effect": "sparkles",
         "start_offset_ms": 400,   # Delay after center energy starts
         "stagger_delay_ms": 120,  # Delay between each symbol VFX (overlapping)
@@ -274,6 +284,7 @@ RITUAL_CONFIG = {
     
     # Phase 5b: Late-stage wispy energy at center
     "phase_center_energy_late": {
+        "enabled": True,          # Enable/disable late-stage wispy energy VFX
         "vfx_effect": "sparkles",
         "delay_after_symbol_vfx_ms": 100,  # Start shortly before finale
         "loop_count": 1,          # Number of times to loop
@@ -286,6 +297,7 @@ RITUAL_CONFIG = {
     
     # Phase 6: Finale shockwave
     "phase_finale": {
+        "enabled": True,          # Enable/disable finale shockwave VFX
         "vfx_effect": "shockwave",
         "delay_after_symbol_vfx_ms": 300,  # Delay after symbol VFX complete
         "loop_count": 1,          # Number of shockwave pulses
@@ -293,7 +305,7 @@ RITUAL_CONFIG = {
         "use_shockwave_hue": True,  # Use shockwave hue 
         "camera_offset": True,    # Offset position to appear "in front" of player
         "offset_x": 2,            # X offset (east) - moves toward camera in isometric
-        "offset_y": 2,    
+        "offset_y": 2,            # Y offset (south) - moves toward camera in isometric
     },
     
     # Phase 7: Fade out
@@ -306,9 +318,33 @@ RITUAL_CONFIG = {
     
     # Timeline system
     "timeline": {
-        "minimum_tick_rate_ms": 30,  # ~6-7 FPS to prevent client overload
+        "minimum_tick_rate_ms": 30,  # ~33 FPS for smooth animation
         "max_updates_per_frame": 18,   # Limit simultaneous updates per frame
     },
+}
+
+# =============================================================================
+# CIRCLE ROTATION per MASTERY LEVEL settings
+# =============================================================================
+# specify the rotation for each level , for example in holy we want 4 to make a cross , and 3 and 5 to be upright 
+# Maps element_count (mastery level) to phase_offset (fraction of angle between points)
+# phase_offset is multiplied by (360/N) to get rotation in degrees
+#   - phase_offset = 0.5 rotates by half the angle between points (out of phase)
+# For N=3 (120° between points): phase_offset=0.5 → 60° rotation (midway)
+# For N=8 (45° between points): phase_offset=0.5 → 22.5° rotation (midway)
+CIRCLE_ROTATION_PER_LEVEL = {
+    1: 0,      # 1 below the player
+    2: 0.5,      # 2 to the left and right
+    3: 0.5,     # 3 triangle is standing pointed up
+    4: 0,      # 4 cardinal cross
+    5: 0.5,      # 5 pentagon is standing pointed up
+    6: 0,     # 6 cardinal hexagon
+    7: 0,      # 7 , the 7th "top" element is below player , creating a U like shape
+    8: 0,     # 8 
+    9: 0,     # 9 
+    10: 0,     # 10 
+    11: 0,     # 11 
+    12: 0,    # 12 
 }
 
 # UO HUE SYSTEM KNOWLEDGE:
@@ -321,6 +357,10 @@ HUE_FAMILIES = {
     "gold": {
         "base_hues": [0x08A5, 0x08A5, 0x08A5, 0x08A5, 0x08A5],  # Golden (consistent)
         "description": "Fortune golden, bright wealth"
+    },
+    "white": {
+        "base_hues": [0x0481, 0x0481, 0x0481, 0x0481, 0x0481],  # Bright white (fallback)
+        "description": "Bright white for fading"
     },
 }
 
@@ -352,20 +392,20 @@ FORTUNE_ITEMS = {
 TREASURE_ITEMS = [ 
      0x0F15, 0x0F25  # gems citrine and amber
 ]
-# 0x0F26, 0x0F27, 0x0F28, 0x0F29, 0x0F2A, 0x0F2B,
+
 # =============================================================================
-# VFX EFFECT DEFINITIONS 
-# =============================================================================
-# NOTE: Many VFX items auto-animate in the UO client when spawning just the first frame!
-# This drastically reduces packet overhead. Use single-frame [0xXXXX] for auto-animation,
-# or full range list(range(...)) if you need manual control over frame rate or reverse playback.
+# VFX EFFECT ANIMATION FRAMES DEFINITIONS 
+# initially we were listing the frames here to spawn them individually to control their framerate , 
+# however that ends up being too many packet updates and flickers , and if we only spawn the FIRST frame it will play the animation 
+# automatically in game , a big improvement! much less updates and smoother playback in game .
+#  this setup remains incase we may want to play a vfx in reverse.
 
 VFX_EFFECTS = {
     # Multi-frame animated VFX
     "dots_inward": {
         "frames": [0xAA80],  # Single static frame (use list literal)
         #"frames": list(range(0xAA80, 0xAA8A)),  # Dots converging inward (10 frames)
-        "frame_duration": 150,  # Slower for better visibility 
+        "frame_duration": 2000,  # Slower for better visibility 
     },
     "firepillar": {
         "frames": list(range(0xA437, 0xA44A)),  # Rising pillar (19 frames)
@@ -374,7 +414,7 @@ VFX_EFFECTS = {
     "shockwave": {
         "frames": [0xAAE5],  # Single static frame (use list literal)
         #"frames": list(range(0xAAE5, 0xAAF1)),  # Expanding shockwave (12 frames)
-        "frame_duration": 100,
+        "frame_duration": 1200,
     },
     "wind_whirl": {
         "frames": list(range(0x6D60, 0x6D66)),  # 0x6D60 to 0x6D65 (6 frames)
@@ -385,52 +425,50 @@ VFX_EFFECTS = {
         "frame_duration": 100,
     },
     "wispy_lines_energy_around": {
-        "frames": [0x5480],  # Single static frame (use list literal)
+        "frames": [0x547F],  # Single static frame (use list literal)
         #"frames": list(range(0x5480, 0x5486)),  # 0x5480 to 0x5486 (6 frames)
-        "frame_duration": 100,
+        "frame_duration": 400,
     },
     "downward_drops": {
         "frames": list(range(0x549B, 0x549F)),  # 0x549B to 0x549F (4 frames)
         "frame_duration": 150,
     },
-    "nature_tenrils": {
-        "frames": list(range(0x6D01, 0x6D0C)),  # 0x6D01 to 0x6D0C (11 frames)
-        "frame_duration": 150,
-    },
     "sparkles": {
         "frames": [0xAB42],  # Single static frame (use list literal)
         #"frames": list(range(0xAB42, 0xAB55)),  # 0xAB4A to 0xAB50 (19 frames)
-        "frame_duration": 150,
+        "frame_duration": 600,
     },
     
     # Single-frame static VFX examples (use list for single frame)
-    # These will auto-animate in client if the VFX supports it
     "static_cloud": {
         "frames": [0xA9D6],  # Single static frame (use list literal)
-        # For manual animation: list(range(0xA9D6, 0xA9DF)) - multiple frames
+        # For animation: list(range(0xA9D6, 0xA9DF)) - multiple frames
         "frame_duration": 300,  # Time per frame (ignored for single frame)
     },
     "static_energy_sphere": {
-        "frames": [0x6E10],  # Single static energy sphere (auto-animates in client)
+        "frames": [0x6E10],  # Single static energy sphere
         "frame_duration": 100,  # Ignored for single frame
     },
     "static_wispy": {
-        "frames": [0x5480],  # Single static wispy energy (auto-animates in client)
+        "frames": [0x5480],  # Single static wispy energy
         "frame_duration": 100,  # Ignored for single frame
     },
+    "beam_down": {
+        "frames": [0xAAD2],  # Single static wispy energy
+        "frame_duration": 100,  # Ignored for single frame
+    },
+    "inward_sparks_blue": {
+        "frames": [0xABB4],  # Single static wispy energy
+        "frame_duration": 1000,  # Ignored for single frame
+    },
 }
-
-# Active effects for different phases
-INWARD_ENERGY_EFFECT = "dots_inward"
-SYMBOL_EFFECT = "nature_tenrils"  # Changed from firepillar to dots_inward
-FINALE_EFFECT = "shockwave"
 
 # =============================================================================
 # GUMP CONFIGURATION 
 # =============================================================================
 
 # Gump configuration
-GUMP_ID = 4121261121  # Unique gump ID 
+GUMP_ID = 4121213999  # Unique gump ID for Holy ritual 
 GUMP_START_X = 350
 GUMP_START_Y = 350
 GUMP_WIDTH = 160
@@ -451,7 +489,6 @@ SLIVER_OVERLAY_TILE = 2624  # Dark tile overlay
 
 # Global state
 CURRENT_MASTERY_LEVEL = 8  # Default mastery level
-
 
 # =============================================================================
 # PACKET HANDLING FUNCTIONS
@@ -546,12 +583,7 @@ def _send_fake_item(item_x, item_y, item_z, item_id, hue=0x0000):
         return None
 
 def _remove_fake_item(serial):
-    """
-    Send packet to remove a client-side item by serial.
-    
-    Args:
-        serial: Serial number of the item to remove
-    """
+    """Send packet to remove a client-side item by serial."""
     try:
         # Remove item packet (0x1D)
         serial_hex = f"{int(serial):08X}"
@@ -599,27 +631,89 @@ def generate_circle_points(center_x, center_y, radius, count, rotation=0):
     
     return points
 
-def generate_line_points(start_x, start_y, end_x, end_y, steps):
+def calculate_phase_rotation(element_count, phase_offset=0):
     """
-    Generate points along a line from start to end.
+    Calculate rotation offset based on phase alignment.
+    
+    This allows precise control over circle point rotation to create in-phase
+    or out-of-phase patterns. The phase_offset is multiplied by the angle
+    between points (360/N) to determine the rotation.
     
     Args:
-        start_x, start_y: Starting coordinates
-        end_x, end_y: Ending coordinates
-        steps: Number of points along the line
+        element_count: Number of elements in the circle
+        phase_offset: Phase offset multiplier (fraction of angle between points)
+                     0.0 = no rotation (in-phase, aligned)
+                     0.5 = half out-of-phase (rotated by half the angle between points)
+                     1.0 = full rotation (same as no rotation)
+                     Fractional values create intermediate phases
+    
+    Returns:
+        float: Rotation offset in degrees
+    
+    Examples:
+        3 elements (120° between points), phase_offset=0.5:
+            Returns 60° (midway between points - out of phase)
+        
+        8 elements (45° between points), phase_offset=0.5:
+            Returns 22.5° (midway between points - out of phase)
+        
+        4 elements (90° between points), phase_offset=0.25:
+            Returns 22.5° (quarter rotation)
+    """
+    # Calculate degrees between each element
+    degrees_per_element = 360.0 / element_count
+    
+    # Calculate rotation based on phase offset (fraction of angle between points)
+    rotation_degrees = (phase_offset * degrees_per_element) % 360
+    
+    return rotation_degrees
+
+def get_phase_offset_for_mastery_level(element_count, use_presets=True, manual_offset=0):
+    """
+    Get the appropriate phase offset for a given mastery level (element count).
+    
+    Args:
+        element_count: Number of elements in the circle (mastery level)
+        use_presets: If True, use MASTERY_PHASE_PRESETS; if False, use manual_offset
+        manual_offset: Manual phase offset value (used when use_presets is False)
+    
+    Returns:
+        int/float: Phase offset value
+    """
+    if use_presets:
+        # Use preset from MASTERY_PHASE_PRESETS dictionary
+        # If element_count not in presets, default to 0 (in-phase)
+        return CIRCLE_ROTATION_PER_LEVEL.get(element_count, 0)
+    else:
+        # Use manual offset
+        return manual_offset
+
+def generate_circle_points_with_phase(center_x, center_y, radius, count, 
+                                      base_rotation=0, use_phase_rotation=False,
+                                      phase_offset=0):
+    """
+    Generate circle points with optional phase-based rotation control.
+    
+    Wrapper around generate_circle_points() that adds phase rotation system.
+    
+    Args:
+        center_x, center_y: Center coordinates
+        radius: Circle radius
+        count: Number of points
+        base_rotation: Base rotation offset in degrees
+        use_phase_rotation: Enable phase rotation system
+        phase_offset: Phase offset multiplier (fraction of angle between points)
     
     Returns:
         List of (x, y) tuples
     """
-    points = []
+    total_rotation = base_rotation
     
-    for i in range(steps + 1):
-        t = i / float(steps) if steps > 0 else 0
-        x = int(start_x + (end_x - start_x) * t)
-        y = int(start_y + (end_y - start_y) * t)
-        points.append((x, y))
+    if use_phase_rotation:
+        phase_rotation = calculate_phase_rotation(count, phase_offset)
+        total_rotation += phase_rotation
     
-    return points
+    return generate_circle_points(center_x, center_y, radius, count, total_rotation)
 
 # =============================================================================
 # COLOR MANAGEMENT
@@ -636,7 +730,7 @@ def get_scheme_hue(brightness="brightest"):
         Hue value (integer)
     """
     scheme = RITUAL_CONFIG["color"]["scheme"]
-    hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["gold"])
+    hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["white"])
     base_hues = hue_family["base_hues"]
     
     if not base_hues:
@@ -663,7 +757,7 @@ def get_hue_for_element(element_index, total_elements):
     """
     # Get the active hue family
     scheme = RITUAL_CONFIG["color"]["scheme"]
-    hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["gold"])
+    hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["white"])
     base_hues = hue_family["base_hues"]
     
     if not base_hues:
@@ -718,26 +812,26 @@ def get_hue_for_element(element_index, total_elements):
 def darken_hue(hue, steps):
     """
     Darken a hue using UO hue family system.
-    Special handling for gold hue to keep it golden while fading.
+    Special handling for holy white hue to fade gracefully.
     
     Args:
         hue: Original hue value
         steps: Number of darkening steps
     Returns:Darkened hue value
     """
-    # Special handling for gold hue - keep it golden while darkening
-    gold_hue = RITUAL_CONFIG["color"].get("gold_hue", 0x08A5)
-    if hue == gold_hue:
-        # Gold hue darkens gradually
-        # Only fade to darker gold on final steps
-        if steps >= 4:
-            return 0x0001  # Nearly black
-        else:
-            return gold_hue  # Keep gold hue
+    # Special handling for holy hue - fade from bright to dark
+    holy_hue = RITUAL_CONFIG["color"].get("holy_orb_hue", 0x0481)
+    if hue == holy_hue or hue == 0x0481:
+        # Holy hue fades from bright white to darker
+        # Use white family brightness levels
+        white_family = HUE_FAMILIES["white"]["base_hues"]
+        # Start from brightest, move toward darkest
+        fade_index = len(white_family) - 1 - min(steps, len(white_family) - 1)
+        return white_family[max(0, fade_index)]
     
     if RITUAL_CONFIG["phase_fade"]["use_brightness_levels"]:
         # Find which family this hue belongs to
-        hue_family = HUE_FAMILIES.get(RITUAL_CONFIG["color"]["scheme"], HUE_FAMILIES["gold"])
+        hue_family = HUE_FAMILIES.get(RITUAL_CONFIG["color"]["scheme"], HUE_FAMILIES["white"])
         base_hues = hue_family["base_hues"]
         
         # Find current brightness level in family
@@ -887,19 +981,138 @@ class StaticItemTrack(AnimationTrack):
                 if self.spawned_serial:
                     _remove_fake_item(self.spawned_serial)
                 
-                # For symbols: brighten to fortune color instead of darkening
-                # Check if this is a symbol by checking if initial hue is gold_hue
-                fortune_hue = RITUAL_CONFIG["color"]["fortune_orb_hue"]
-                if self.initial_hue == RITUAL_CONFIG["color"]["gold_hue"]:
-                    # Transition from gold_hue to bright fortune_hue
-                    new_hue = fortune_hue
-                else:
-                    # Other items darken normally
-                    new_hue = darken_hue(self.initial_hue, target_fade_step + 1)
-                
+                darkened_hue = darken_hue(self.initial_hue, target_fade_step + 1)
                 x, y, z = self.position
-                self.spawned_serial = _send_fake_item(x, y, z, self.item_id, new_hue)
+                self.spawned_serial = _send_fake_item(x, y, z, self.item_id, darkened_hue)
                 self.current_fade_step = target_fade_step
+    
+    def on_complete(self):
+        """Remove the item."""
+        if self.spawned_serial:
+            _remove_fake_item(self.spawned_serial)
+
+class PaletteShiftingItemTrack(AnimationTrack):
+    """
+    Spawns a static item that cycles through hue palettes during idle phase,
+    then uses a custom phase-out palette (instead of darkening) before removal.
+    """
+    
+    def __init__(self, start_time_ms, end_time_ms, item_id, position, 
+                 idle_palette=None, idle_cycle_speed_ms=500,
+                 phase_out_palette=None, fade_duration_ms=0,
+                 use_phase_out_palette=True):
+        """
+        Args:
+            start_time_ms: When to spawn
+            end_time_ms: When to start phase-out sequence
+            item_id: Item to display
+            position: (x, y, z) tuple
+            idle_palette: List of hues to cycle through during idle phase
+            idle_cycle_speed_ms: Time per hue in idle cycle
+            phase_out_palette: List of hues for phase-out sequence
+            fade_duration_ms: Total phase-out duration
+            use_phase_out_palette: If True, use phase_out_palette; if False, use darkening
+        """
+        total_duration = (end_time_ms - start_time_ms) + fade_duration_ms
+        super().__init__(start_time_ms=start_time_ms, duration_ms=total_duration)
+        self.end_time_ms = end_time_ms
+        self.item_id = item_id
+        self.position = position
+        
+        # Idle palette cycling
+        self.idle_palette = idle_palette if idle_palette else [0x0000]
+        self.idle_cycle_speed_ms = idle_cycle_speed_ms
+        
+        # Phase-out palette
+        self.phase_out_palette = phase_out_palette if phase_out_palette else [0x0000]
+        self.fade_duration_ms = fade_duration_ms
+        self.use_phase_out_palette = use_phase_out_palette
+        
+        # State tracking
+        self.spawned_serial = None
+        self.current_hue = self.idle_palette[0]
+        self.current_palette_index = 0
+        self.last_update_time = 0
+        self.fade_start_local_ms = end_time_ms - start_time_ms
+        self.in_phase_out = False
+        
+        # Calculate time per phase-out step
+        self.phase_out_steps = len(self.phase_out_palette)
+        self.time_per_phase_step = fade_duration_ms / self.phase_out_steps if self.phase_out_steps > 0 else 0
+    
+    def on_start(self):
+        """Spawn the item with first idle palette hue."""
+        x, y, z = self.position
+        self.current_hue = self.idle_palette[0]
+        self.spawned_serial = _send_fake_item(x, y, z, self.item_id, self.current_hue)
+        self.last_update_time = 0
+    
+    def on_update(self, local_time_ms):
+        """Cycle through idle palette, then phase-out palette."""
+        
+        # Check if we're in phase-out period
+        if local_time_ms >= self.fade_start_local_ms:
+            if not self.in_phase_out:
+                self.in_phase_out = True
+                self.current_palette_index = 0
+            
+            # Phase-out sequence
+            if self.use_phase_out_palette and self.phase_out_steps > 0:
+                fade_elapsed = local_time_ms - self.fade_start_local_ms
+                target_step = int(fade_elapsed / self.time_per_phase_step)
+                
+                if target_step >= self.phase_out_steps:
+                    target_step = self.phase_out_steps - 1
+                
+                # Update hue if step changed
+                if target_step != self.current_palette_index:
+                    new_hue = self.phase_out_palette[target_step]
+                    if new_hue != self.current_hue:
+                        if self.spawned_serial:
+                            _remove_fake_item(self.spawned_serial)
+                        
+                        x, y, z = self.position
+                        self.spawned_serial = _send_fake_item(x, y, z, self.item_id, new_hue)
+                        self.current_hue = new_hue
+                        self.current_palette_index = target_step
+            else:
+                # Use traditional darkening (fallback)
+                fade_elapsed = local_time_ms - self.fade_start_local_ms
+                fade_steps = 4  # Default fade steps
+                time_per_step = self.fade_duration_ms / fade_steps if fade_steps > 0 else 0
+                target_step = int(fade_elapsed / time_per_step) if time_per_step > 0 else 0
+                
+                if target_step >= fade_steps:
+                    target_step = fade_steps - 1
+                
+                if target_step != self.current_palette_index:
+                    darkened_hue = darken_hue(self.idle_palette[0], target_step + 1)
+                    if self.spawned_serial:
+                        _remove_fake_item(self.spawned_serial)
+                    
+                    x, y, z = self.position
+                    self.spawned_serial = _send_fake_item(x, y, z, self.item_id, darkened_hue)
+                    self.current_hue = darkened_hue
+                    self.current_palette_index = target_step
+        else:
+            # Idle phase - cycle through idle palette
+            if len(self.idle_palette) > 1 and self.idle_cycle_speed_ms > 0:
+                time_since_last_update = local_time_ms - self.last_update_time
+                
+                if time_since_last_update >= self.idle_cycle_speed_ms:
+                    # Move to next hue in idle palette
+                    self.current_palette_index = (self.current_palette_index + 1) % len(self.idle_palette)
+                    new_hue = self.idle_palette[self.current_palette_index]
+                    
+                    if new_hue != self.current_hue:
+                        if self.spawned_serial:
+                            _remove_fake_item(self.spawned_serial)
+                        
+                        x, y, z = self.position
+                        self.spawned_serial = _send_fake_item(x, y, z, self.item_id, new_hue)
+                        self.current_hue = new_hue
+                    
+                    self.last_update_time = local_time_ms
     
     def on_complete(self):
         """Remove the item."""
@@ -1022,10 +1235,8 @@ class VFXPlaybackTrack(AnimationTrack):
         # Frame overlap system
         self.frame_trail = []  # List of (serial, spawn_time_ms) tuples
         self.frame_overlap_ms = 100  # Overlap duration
-        self.current_frame_index = 0
-        self.last_frame_time = 0
+        self.current_frame_index = -1
         self.last_overlap_cleanup_time = 0
-        self.frames_shown = 0
     
     def on_start(self):
         """Spawn initial frame (works for both single and multi-frame VFX)."""
@@ -1039,11 +1250,8 @@ class VFXPlaybackTrack(AnimationTrack):
         if initial_serial:
             self.frame_trail.append((initial_serial, 0))
             self.current_frame_index = 0
-            self.last_frame_time = 0
-            self.frames_shown = 1
     
     def on_update(self, local_time_ms):
-        """Step through frames sequentially with overlap."""
         if not self.vfx_frames:
             return
         
@@ -1055,24 +1263,19 @@ class VFXPlaybackTrack(AnimationTrack):
         
         # Multi-frame VFX: cycle through frames
         if len(self.vfx_frames) > 1:
-            # Check if enough time has passed for next frame
-            if local_time_ms - self.last_frame_time >= self.frame_duration_ms:
-                # Advance to next frame
-                next_frame_index = self.current_frame_index + 1
+            target_frame_index = int(local_time_ms / self.frame_duration_ms)
+            if target_frame_index >= len(self.vfx_frames):
+                target_frame_index = len(self.vfx_frames) - 1
+            
+            if target_frame_index != self.current_frame_index:
+                x, y, z = self.position
+                frame_item_id = self.vfx_frames[target_frame_index]
+                new_serial = _send_fake_item(x, y, z, frame_item_id, self.hue)
                 
-                # Check if we've shown all frames
-                if next_frame_index < len(self.vfx_frames):
-                    # Show next frame
-                    x, y, z = self.position
-                    frame_item_id = self.vfx_frames[next_frame_index]
-                    new_serial = _send_fake_item(x, y, z, frame_item_id, self.hue)
-                    
-                    if new_serial:
-                        self.frame_trail.append((new_serial, local_time_ms))
-                    
-                    self.current_frame_index = next_frame_index
-                    self.last_frame_time = local_time_ms
-                    self.frames_shown += 1
+                if new_serial:
+                    self.frame_trail.append((new_serial, local_time_ms))
+                
+                self.current_frame_index = target_frame_index
         
         # ALWAYS check for overlap cleanup (independent of frame changes)
         if len(self.frame_trail) > 1 and local_time_ms - self.last_overlap_cleanup_time >= 10:
@@ -1095,98 +1298,6 @@ class VFXPlaybackTrack(AnimationTrack):
         for serial, spawn_time in self.frame_trail:
             _remove_fake_item(serial)
         self.frame_trail.clear()
-
-class DriftingCloudTrack(AnimationTrack):
-    """
-    Animates a cloud VFX that floats/bobs vertically on the Z-axis.
-    The cloud cycles through animation frames and randomly moves up/down.
-    """
-    
-    def __init__(self, start_time_ms, end_time_ms, vfx_frames, frame_duration_ms, 
-                 start_position, hue, drift_speed_ms=200, z_amplitude=3):
-        """
-        Args:
-            start_time_ms: When to start the cloud
-            end_time_ms: When to end the cloud
-            vfx_frames: List of item IDs for cloud animation frames
-            frame_duration_ms: Time per frame
-            start_position: (x, y, z) starting position
-            hue: Cloud hue
-            drift_speed_ms: Time between Z position updates
-            z_amplitude: Random Z offset range (+/- this value)
-        """
-        total_duration = end_time_ms - start_time_ms
-        super().__init__(start_time_ms=start_time_ms, duration_ms=total_duration)
-        self.vfx_frames = vfx_frames
-        self.frame_duration_ms = frame_duration_ms
-        self.start_position = start_position
-        self.current_position = list(start_position)  # Mutable copy
-        self.hue = hue
-        self.drift_speed_ms = drift_speed_ms
-        self.z_amplitude = z_amplitude
-        self.z_direction = random.choice([-1, 1])  # Random initial direction
-        
-        self.current_serial = None
-        self.current_frame_index = 0
-        self.last_frame_update_time = 0
-        self.last_drift_update_time = 0
-    
-    def on_start(self):
-        """Spawn initial cloud frame."""
-        x, y, z = self.current_position
-        frame_item_id = self.vfx_frames[self.current_frame_index]
-        self.current_serial = _send_fake_item(x, y, z, frame_item_id, self.hue)
-        self.last_frame_update_time = 0
-        self.last_drift_update_time = 0
-    
-    def on_update(self, local_time_ms):
-        """Update cloud animation frame and position."""
-        # Combine frame and drift updates to minimize packet operations
-        # Only do ONE remove+send per update call
-        
-        needs_update = False
-        
-        # Check if frame needs update
-        if local_time_ms - self.last_frame_update_time >= self.frame_duration_ms:
-            self.current_frame_index = (self.current_frame_index + 1) % len(self.vfx_frames)
-            self.last_frame_update_time = local_time_ms
-            needs_update = True
-        
-        # Check if Z position needs update
-        if local_time_ms - self.last_drift_update_time >= self.drift_speed_ms:
-            # Update Z position randomly within amplitude range
-            if random.random() < 0.3:  # 30% chance to change direction
-                self.z_direction *= -1
-            
-            # Move Z position
-            self.current_position[2] += self.z_direction
-            
-            # Clamp Z within amplitude range from start position
-            base_z = self.start_position[2]
-            if self.current_position[2] > base_z + self.z_amplitude:
-                self.current_position[2] = base_z + self.z_amplitude
-                self.z_direction = -1
-            elif self.current_position[2] < base_z - self.z_amplitude:
-                self.current_position[2] = base_z - self.z_amplitude
-                self.z_direction = 1
-            
-            self.last_drift_update_time = local_time_ms
-            needs_update = True
-        
-        # Only do ONE packet operation pair per update
-        if needs_update:
-            if self.current_serial:
-                _remove_fake_item(self.current_serial)
-            
-            x, y, z = self.current_position
-            frame_item_id = self.vfx_frames[self.current_frame_index]
-            self.current_serial = _send_fake_item(x, y, z, frame_item_id, self.hue)
-    
-    def on_complete(self):
-        """Remove cloud."""
-        if self.current_serial:
-            _remove_fake_item(self.current_serial)
-
 
 class AnimationTimeline:
     """Manages multiple animation tracks with scheduling and update queue."""
@@ -1260,7 +1371,7 @@ class AnimationTimeline:
                 
                 # Check if track needs update
                 elif track.is_active and not track.is_complete:
-                    if isinstance(track, (OscillatingItemTrack, DriftingCloudTrack)):
+                    if isinstance(track, OscillatingItemTrack):
                         cost = 2
                     else:
                         cost = 1
@@ -1318,14 +1429,6 @@ class AnimationTimeline:
         debug_message("Timeline: Complete", 88)
 
 # =============================================================================
-# VFX ANIMATION FUNCTIONS
-# =============================================================================
-
-def display_item_at_location(item_id, x, y, z, hue=0x0000):
-    """Display a single item at specific coordinates."""
-    return _send_fake_item(x, y, z, item_id, hue)
-
-# =============================================================================
 # MAIN RITUAL SEQUENCE
 # =============================================================================
 
@@ -1333,17 +1436,19 @@ def perform_fortune_circle_ritual():
     """
     Timeline-based Fortune Mastery ascension ritual:
     - Alchemical symbols spawn at each orb position (golden hue)
-    - Inner ring: Gold coins around each orb (golden hue)
-    - Middle ring: Gold piles around each orb (golden hue)
-    - Outer ring: Treasure items around each orb (golden hue)
-    - Fortune orbs (golden 0x08A5) float above with oscillation trail
+    - Inner ring: Candles around each orb (bright white hue)
+    - Middle ring: Ankh symbols around each orb (gold hue)
+    - Holy orbs (bright white 0x0481) float above with radiant trail
     - Center inward energy loops 3 times
-    - Cascading golden sparkles VFX around circle
+    - Cascading sparkle VFX around circle
     - Late-stage wispy energy at center
-    - Shockwave finale with golden hue
+    - Shockwave finale with brilliant white hue
     - All decorations fade out at the end
     """
     try:
+        # Initialize random seed based on current time for unique patterns each ritual
+        random.seed(int(time.time() * 1000))  # Use milliseconds for more variation
+        
         # Get player position as center
         center_x = int(Player.Position.X)
         center_y = int(Player.Position.Y)
@@ -1354,9 +1459,18 @@ def perform_fortune_circle_ritual():
         circle_cfg = cfg["circle"]
         color_cfg = cfg["color"]
         symbol_cfg = cfg["phase_symbols"]
+        
+        # Create shuffled symbol list for random symbol placement
+        # Repeat the symbol list enough times to cover all circle points, then shuffle
+        element_count = circle_cfg["element_count"]
+        shuffled_symbols = []
+        repeats_needed = (element_count // len(ALCHEMICAL_SYMBOLS)) + 1
+        for _ in range(repeats_needed):
+            shuffled_symbols.extend(ALCHEMICAL_SYMBOLS)
+        random.shuffle(shuffled_symbols)
+        shuffled_symbols = shuffled_symbols[:element_count]  # Trim to exact count needed
         orb_cfg = cfg["phase_orbs"]
         deco_cfg = cfg["phase_decorations"]
-        clouds_cfg = cfg["phase_drifting_clouds"]
         center_cfg = cfg["phase_center_energy"]
         symbol_vfx_cfg = cfg["phase_symbol_vfx"]
         center_late_cfg = cfg["phase_center_energy_late"]
@@ -1367,25 +1481,71 @@ def perform_fortune_circle_ritual():
         # More orbs = shorter trails to prevent client overload
         element_count = circle_cfg["element_count"]
         if element_count <= 8:
-            orb_cfg["trail_length"] = 2  # Full trail for 8 or fewer
+            orb_cfg["trail_length"] = 3  # Full trail for 8 or fewer
         elif element_count <= 11:
-            orb_cfg["trail_length"] = 1  # Medium trail for 9-11
+            orb_cfg["trail_length"] = 2  # Medium trail for 9-11
         else:
-            orb_cfg["trail_length"] = 1  # Minimal trail for 12+
+            orb_cfg["trail_length"] = 2  # Minimal trail for 12+
         
         debug_message("=" * 60, 88)
-        debug_message("Fortune Mastery - Ascension Ritual", 88)
+        debug_message("Fortune Mastery - Level Up Ritual", 88)
         debug_message(f"Center: ({center_x}, {center_y}, {center_z})", 68)
         debug_message(f"Elements: {circle_cfg['element_count']}, Radius: {circle_cfg['radius']}", 68)
         debug_message(f"Mastery Level {element_count}: Trail length set to {orb_cfg['trail_length']}", 68)
         debug_message(f"Color: {color_cfg['scheme']}, Fortune Hue: {hex(color_cfg['fortune_orb_hue'])}", 68)
+        debug_message(f"Random Seed: {int(time.time() * 1000)} (symbols shuffled)", 68)
+        
+        # Symbol palette debug info
+        palette_cfg = cfg.get("symbol_hue_palette", {})
+        if symbol_cfg.get("use_hue_palette", False) and palette_cfg.get("enabled", False):
+            idle_count = len(palette_cfg.get("idle_palette", []))
+            phase_count = len(palette_cfg.get("phase_out_palette", []))
+            debug_message(f"Symbol Palette: Idle cycling ({idle_count} hues @ {palette_cfg.get('idle_cycle_speed_ms', 500)}ms), Phase-out ({phase_count} hues)", 68)
+        
+        # Phase rotation debug info
+        phase_cfg = circle_cfg.get("phase_rotation", {})
+        if phase_cfg.get("enabled", False):
+            # Get phase offset (from presets or manual)
+            use_presets = phase_cfg.get("use_mastery_presets", True)
+            manual_offset = phase_cfg.get("phase_offset", 0)
+            active_phase_offset = get_phase_offset_for_mastery_level(
+                element_count, use_presets, manual_offset
+            )
+            
+            phase_rotation_deg = calculate_phase_rotation(
+                circle_cfg['element_count'],
+                active_phase_offset
+            )
+            
+            # Debug output
+            preset_info = f"preset for {element_count} elements" if use_presets else "manual"
+            debug_message(f"Phase Rotation: {phase_rotation_deg:.1f}° (subdivisions: {phase_cfg.get('subdivision_count', 16)}, offset: {active_phase_offset} [{preset_info}])", 68)
+            debug_message(f"Apply to decorations: {phase_cfg.get('apply_to_decorations', False)}", 68)
+        
         debug_message("=" * 60, 88)
         
-        # Generate circle points
-        circle_points = generate_circle_points(
-            center_x, center_y, circle_cfg["radius"], 
-            circle_cfg["element_count"], circle_cfg["rotation_degrees"]
-        )
+        # Generate circle points with phase rotation system
+        phase_cfg = circle_cfg.get("phase_rotation", {})
+        if phase_cfg.get("enabled", False):
+            # Get phase offset (from presets or manual)
+            use_presets = phase_cfg.get("use_mastery_presets", True)
+            manual_offset = phase_cfg.get("phase_offset", 0)
+            active_phase_offset = get_phase_offset_for_mastery_level(
+                element_count, use_presets, manual_offset
+            )
+            
+            circle_points = generate_circle_points_with_phase(
+                center_x, center_y, circle_cfg["radius"], 
+                circle_cfg["element_count"],
+                base_rotation=circle_cfg["rotation_degrees"],
+                use_phase_rotation=True,
+                phase_offset=active_phase_offset
+            )
+        else:
+            circle_points = generate_circle_points(
+                center_x, center_y, circle_cfg["radius"], 
+                circle_cfg["element_count"], circle_cfg["rotation_degrees"]
+            )
         
         # Create timeline with rate limiting
         timeline = AnimationTimeline(
@@ -1422,253 +1582,236 @@ def perform_fortune_circle_ritual():
         symbols_fade_start = base_fade_start + 1000  # 1000ms = decorations gone + 500ms wait + orbs gone + 500ms wait
         
         # Track 1-N: Alchemical symbols at each orb position (fade last)
-        gold_symbol_hue = color_cfg["gold_hue"] if symbol_cfg.get("use_gold_hue") else 0x0000
-        for i, (orb_x, orb_y) in enumerate(circle_points):
-            symbol_id = ALCHEMICAL_SYMBOLS[i % len(ALCHEMICAL_SYMBOLS)]
-            # Use gold hue if configured, otherwise use element hue
-            if symbol_cfg.get("use_gold_hue"):
-                hue = gold_symbol_hue
-            else:
-                hue = get_hue_for_element(i, circle_cfg["element_count"])
-            z = center_z + symbol_cfg["z_offset"]
+        if symbol_cfg.get("enabled", True):
+            palette_cfg = cfg.get("symbol_hue_palette", {})
+            use_palette = symbol_cfg.get("use_hue_palette", False) and palette_cfg.get("enabled", False)
             
-            timeline.add_track(StaticItemTrack(
-                start_time_ms=i * symbol_cfg["spawn_delay_ms"],
-                end_time_ms=symbols_fade_start,  # Symbols persist longest
-                item_id=symbol_id,
-                position=(orb_x, orb_y, z),
-                hue=hue,
-                fade_steps=fade_cfg["fade_steps"],
-                fade_duration_ms=fade_duration
-            ))
-        
-        # Track: Drifting Shadow Clouds (if enabled)
-        if clouds_cfg.get("enabled", False):
-            cloud_count = clouds_cfg["cloud_count"]
-            spawn_radius = clouds_cfg["spawn_area_radius"]
-            min_distance = clouds_cfg["min_distance"]
-            cloud_z = center_z + clouds_cfg["z_offset"]
-            
-            # Generate random cloud positions (no overlap)
-            cloud_positions = []
-            max_attempts = 100
-            
-            for _ in range(cloud_count):
-                for attempt in range(max_attempts):
-                    # Random position within spawn radius
-                    angle = random.uniform(0, 2 * math.pi)
-                    distance = random.uniform(0, spawn_radius)
-                    cloud_x = int(center_x + distance * math.cos(angle))
-                    cloud_y = int(center_y + distance * math.sin(angle))
+            for i, (orb_x, orb_y) in enumerate(circle_points):
+                symbol_id = shuffled_symbols[i]  # Use shuffled symbol list for random placement
+                z = center_z + symbol_cfg["z_offset"]
+                
+                if use_palette:
+                    # Use palette shifting track with idle cycling and custom phase-out
+                    timeline.add_track(PaletteShiftingItemTrack(
+                        start_time_ms=i * symbol_cfg["spawn_delay_ms"],
+                        end_time_ms=symbols_fade_start,
+                        item_id=symbol_id,
+                        position=(orb_x, orb_y, z),
+                        idle_palette=palette_cfg.get("idle_palette", [0x0000]),
+                        idle_cycle_speed_ms=palette_cfg.get("idle_cycle_speed_ms", 500),
+                        phase_out_palette=palette_cfg.get("phase_out_palette", [0x0000]),
+                        fade_duration_ms=fade_duration,
+                        use_phase_out_palette=palette_cfg.get("use_phase_out_palette", True)
+                    ))
+                else:
+                    # Use traditional static track with single hue and darkening
+                    gold_symbol_hue = color_cfg["gold_hue"] if symbol_cfg.get("use_gold_hue") else 0x0000
+                    if symbol_cfg.get("use_gold_hue"):
+                        hue = gold_symbol_hue
+                    else:
+                        hue = get_hue_for_element(i, circle_cfg["element_count"])
                     
-                    # Check distance from other clouds
-                    valid = True
-                    for existing_x, existing_y in cloud_positions:
-                        dist = math.sqrt((cloud_x - existing_x)**2 + (cloud_y - existing_y)**2)
-                        if dist < min_distance:
-                            valid = False
-                            break
-                    
-                    if valid:
-                        cloud_positions.append((cloud_x, cloud_y))
-                        break
-            
-            # Spawn drifting clouds
-            for i, (cloud_x, cloud_y) in enumerate(cloud_positions):
-                timeline.add_track(DriftingCloudTrack(
-                    start_time_ms=clouds_cfg["start_delay_ms"],
-                    end_time_ms=decorations_end,  # Clouds last until decorations fade
-                    vfx_frames=clouds_cfg["vfx_frames"],
-                    frame_duration_ms=clouds_cfg["frame_duration_ms"],
-                    start_position=(cloud_x, cloud_y, cloud_z),
-                    hue=clouds_cfg["hue"],
-                    drift_speed_ms=clouds_cfg["drift_speed_ms"],
-                    z_amplitude=clouds_cfg["z_amplitude"]
-                ))
-            
-            debug_message(f"Added {len(cloud_positions)} drifting shadow clouds", 68)
+                    timeline.add_track(StaticItemTrack(
+                        start_time_ms=i * symbol_cfg["spawn_delay_ms"],
+                        end_time_ms=symbols_fade_start,
+                        item_id=symbol_id,
+                        position=(orb_x, orb_y, z),
+                        hue=hue,
+                        fade_steps=fade_cfg["fade_steps"],
+                        fade_duration_ms=fade_duration
+                    ))
         
         # Track N+1 to 2N: Fortune Orbs floating above symbols
-        orb_start_offset = orb_cfg["start_offset_ms"]
-        fortune_hue = color_cfg["fortune_orb_hue"] if orb_cfg.get("use_gold_hue") else 0x0000
-        
-        if orb_cfg.get("oscillate", False):
-            # Use oscillating track for wave effect
-            for i, (orb_x, orb_y) in enumerate(circle_points):
-                z = center_z + orb_cfg["z_offset"]
-                
-                timeline.add_track(OscillatingItemTrack(
-                    start_time_ms=orb_start_offset + (i * orb_cfg["spawn_delay_ms"]),
-                    end_time_ms=orbs_end,  # Orbs vanish before symbols fade
-                    item_id=orb_cfg["item_id"],
-                    position=(orb_x, orb_y, z),
-                    hue=fortune_hue,
-                    z_amplitude=orb_cfg.get("z_amplitude", 10),
-                    update_interval_ms=orb_cfg.get("oscillate_speed_ms", 100),
-                    z_direction=1,  # All start going up
-                    trail_length=orb_cfg.get("trail_length", 3)  # Trail effect for smooth visuals
-                ))
-        else:
-            # Use static track (no oscillation)
-            for i, (orb_x, orb_y) in enumerate(circle_points):
-                z = center_z + orb_cfg["z_offset"]
-                
-                timeline.add_track(StaticItemTrack(
-                    start_time_ms=orb_start_offset + (i * orb_cfg["spawn_delay_ms"]),
-                    end_time_ms=orbs_end,  # Orbs vanish before symbols fade
-                    item_id=orb_cfg["item_id"],
-                    position=(orb_x, orb_y, z),
-                    hue=fortune_hue,
-                    fade_steps=0,
-                    fade_duration_ms=0
-                ))
-        
-        # Track 2N+1 onwards: Decoration circles around each orb
-        deco_start_base = deco_cfg["start_offset_ms"]
-        inner_ring_cfg = deco_cfg["inner_ring"]
-        middle_ring_cfg = deco_cfg["middle_ring"]
-        outer_ring_cfg = deco_cfg.get("outer_ring", None)
-        
-        current_time = deco_start_base
-        for orb_index, (orb_x, orb_y) in enumerate(circle_points):
-            orb_hue = get_hue_for_element(orb_index, circle_cfg["element_count"])
+        if orb_cfg.get("enabled", True):
+            orb_start_offset = orb_cfg["start_offset_ms"]
+            fortune_hue = color_cfg["fortune_orb_hue"] if orb_cfg.get("use_gold_hue") else 0x0000
             
-            # Inner decoration ring around this orb (Daemon Blood)
-            inner_deco_points = generate_circle_points(
-                orb_x, orb_y, inner_ring_cfg["radius"],
-                inner_ring_cfg["points"], 0
-            )
-            for point_index, (x, y) in enumerate(inner_deco_points):
-                z = center_z + inner_ring_cfg["z_offset"]
-                
-                # Get item_id - handle string keys (lookup in FORTUNE_ITEMS) or direct item_id
-                item_id_config = inner_ring_cfg["item_id"]
-                if isinstance(item_id_config, str):
-                    # Lookup in FORTUNE_ITEMS dictionary
-                    item_id = FORTUNE_ITEMS.get(item_id_config, 0x0EED)
-                else:
-                    item_id = item_id_config
-                
-                # Use random hue from scheme or custom hue based on config
-                if inner_ring_cfg.get("use_scheme_hue", True):
-                    # Randomly select from base_hues array
-                    scheme = color_cfg["scheme"]
-                    hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["gold"])
-                    inner_hue = random.choice(hue_family["base_hues"])
-                else:
-                    inner_hue = inner_ring_cfg.get("hue", 0x0000)
-                timeline.add_track(StaticItemTrack(
-                    start_time_ms=current_time + (point_index * deco_cfg["spawn_delay_per_item_ms"]),
-                    end_time_ms=decorations_end,  # Decorations vanish before orbs
-                    item_id=item_id,
-                    position=(x, y, z),
-                    hue=inner_hue,
-                    fade_steps=0,  # Instant removal, no fade
-                    fade_duration_ms=0
-                ))
-            
-            # Middle decoration ring around this orb (Organs + Intestines)
-            middle_deco_points = generate_circle_points(
-                orb_x, orb_y, middle_ring_cfg["radius"],
-                middle_ring_cfg["points"], 0
-            )
-            for point_index, (x, y) in enumerate(middle_deco_points):
-                z = center_z + middle_ring_cfg["z_offset"]
-                # Get item list - handle string keys (lookup in FORTUNE_ITEMS) or direct lists
-                item_ids_config = middle_ring_cfg["item_ids"]
-                if isinstance(item_ids_config, str):
-                    # Special case for TREASURE_ITEMS
-                    if item_ids_config == "TREASURE_ITEMS":
-                        item_list = TREASURE_ITEMS
-                    else:
-                        # Lookup in FORTUNE_ITEMS dictionary
-                        lookup_result = FORTUNE_ITEMS.get(item_ids_config, [])
-                        # Handle single int or list
-                        if isinstance(lookup_result, int):
-                            item_list = [lookup_result]
-                        else:
-                            item_list = lookup_result
-                elif isinstance(item_ids_config, int):
-                    # Single item ID
-                    item_list = [item_ids_config]
-                else:
-                    item_list = item_ids_config
-                
-                # Random selection from list
-                if item_list:
-                    item_id = random.choice(item_list) if middle_ring_cfg.get("random_selection") else item_list[0]
-                else:
-                    item_id = 0x1CED  # Fallback
-                # Use random hue from scheme or custom hue based on config
-                if middle_ring_cfg.get("use_scheme_hue", True):
-                    # Randomly select from base_hues array
-                    scheme = color_cfg["scheme"]
-                    hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["gold"])
-                    middle_hue = random.choice(hue_family["base_hues"])
-                else:
-                    middle_hue = middle_ring_cfg.get("hue", 0x0000)
-                timeline.add_track(StaticItemTrack(
-                    start_time_ms=current_time + (point_index * deco_cfg["spawn_delay_per_item_ms"]),
-                    end_time_ms=decorations_end,  # Decorations vanish before orbs
-                    item_id=item_id,
-                    position=(x, y, z),
-                    hue=middle_hue,
-                    fade_steps=0,  # Instant removal, no fade
-                    fade_duration_ms=0
-                ))
-            
-            # Outer decoration ring around this orb (Blood Splatters)
-            if outer_ring_cfg:
-                outer_deco_points = generate_circle_points(
-                    orb_x, orb_y, outer_ring_cfg["radius"],
-                    outer_ring_cfg["points"], 0
-                )
-                for point_index, (x, y) in enumerate(outer_deco_points):
-                    z = center_z + outer_ring_cfg["z_offset"]
-                    # Get item list - handle string keys (lookup in FORTUNE_ITEMS) or use TREASURE_ITEMS
-                    item_ids_config = outer_ring_cfg.get("item_ids", "TREASURE_ITEMS")
-                    if isinstance(item_ids_config, str):
-                        if item_ids_config == "TREASURE_ITEMS":
-                            item_list = TREASURE_ITEMS
-                        else:
-                            # Lookup in FORTUNE_ITEMS dictionary
-                            lookup_result = FORTUNE_ITEMS.get(item_ids_config, TREASURE_ITEMS)
-                            # Handle single int or list
-                            if isinstance(lookup_result, int):
-                                item_list = [lookup_result]
-                            else:
-                                item_list = lookup_result
-                    elif isinstance(item_ids_config, int):
-                        # Single item ID
-                        item_list = [item_ids_config]
-                    else:
-                        item_list = item_ids_config
+            if orb_cfg.get("oscillate", False):
+                # Use oscillating track for wave effect
+                for i, (orb_x, orb_y) in enumerate(circle_points):
+                    z = center_z + orb_cfg["z_offset"]
                     
-                    # Random selection from list
-                    if outer_ring_cfg.get("random_selection") and item_list:
-                        item_id = random.choice(item_list)
-                    else:
-                        item_id = item_list[0] if item_list else 0x122A
-                    # Use random hue from scheme or custom hue based on config
-                    if outer_ring_cfg.get("use_scheme_hue", True):
-                        # Randomly select from base_hues array
-                        scheme = color_cfg["scheme"]
-                        hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["gold"])
-                        outer_hue = random.choice(hue_family["base_hues"])
-                    else:
-                        outer_hue = outer_ring_cfg.get("hue", 0x0000)
+                    timeline.add_track(OscillatingItemTrack(
+                        start_time_ms=orb_start_offset + (i * orb_cfg["spawn_delay_ms"]),
+                        end_time_ms=orbs_end,  # Orbs vanish before symbols fade
+                        item_id=orb_cfg["item_id"],
+                        position=(orb_x, orb_y, z),
+                        hue=fortune_hue,
+                        z_amplitude=orb_cfg.get("z_amplitude", 10),
+                        update_interval_ms=orb_cfg.get("oscillate_speed_ms", 100),
+                        z_direction=1,  # All start going up
+                        trail_length=orb_cfg.get("trail_length", 3)  # Trail effect for radiant glow
+                    ))
+            else:
+                # Use static track (no oscillation)
+                for i, (orb_x, orb_y) in enumerate(circle_points):
+                    z = center_z + orb_cfg["z_offset"]
+                    
                     timeline.add_track(StaticItemTrack(
-                        start_time_ms=current_time + (point_index * deco_cfg["spawn_delay_per_item_ms"]),
-                        end_time_ms=decorations_end,  # Decorations vanish before orbs
-                        item_id=item_id,
-                        position=(x, y, z),
-                        hue=outer_hue,
-                        fade_steps=0,  # Instant removal, no fade
+                        start_time_ms=orb_start_offset + (i * orb_cfg["spawn_delay_ms"]),
+                        end_time_ms=orbs_end,  # Orbs vanish before symbols fade
+                        item_id=orb_cfg["item_id"],
+                        position=(orb_x, orb_y, z),
+                        hue=fortune_hue,
+                        fade_steps=0,
                         fade_duration_ms=0
                     ))
+        
+        # Track 2N+1 onwards: Decoration circles around each orb
+        if deco_cfg.get("enabled", True):
+            deco_start_base = deco_cfg["start_offset_ms"]
+            inner_ring_cfg = deco_cfg["inner_ring"]
+            middle_ring_cfg = deco_cfg["middle_ring"]
+            outer_ring_cfg = deco_cfg.get("outer_ring", None)
             
-            # Move to next orb's decoration timing
-            current_time += deco_cfg["spawn_delay_per_orb_ms"]
+            current_time = deco_start_base
+            for orb_index, (orb_x, orb_y) in enumerate(circle_points):
+                orb_hue = get_hue_for_element(orb_index, circle_cfg["element_count"])
+                
+                # Inner decoration ring around this orb
+                # Use independent rotation from config
+                if inner_ring_cfg.get("enabled", True):
+                    inner_deco_points = generate_circle_points(
+                        orb_x, orb_y, inner_ring_cfg["radius"],
+                        inner_ring_cfg["points"], 
+                        inner_ring_cfg.get("rotation_degrees", 0)
+                    )
+                    for point_index, (x, y) in enumerate(inner_deco_points):
+                        z = center_z + inner_ring_cfg["z_offset"]
+                        
+                        # Get item_id - handle string keys (lookup in HOLY_ITEMS) or direct item_id
+                        item_id_config = inner_ring_cfg["item_id"]
+                        if isinstance(item_id_config, str):
+                            # Lookup in FORTUNE_ITEMS dictionary
+                            item_id = FORTUNE_ITEMS.get(item_id_config, 0x0EEF)
+                        else:
+                            item_id = item_id_config
+                        
+                        # Use random hue from scheme or custom hue based on config
+                        if inner_ring_cfg.get("use_scheme_hue", True):
+                            # Randomly select from base_hues array
+                            scheme = color_cfg["scheme"]
+                            hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["gold"])
+                            inner_hue = random.choice(hue_family["base_hues"])
+                        else:
+                            inner_hue = inner_ring_cfg.get("hue", 0x0000)
+                        timeline.add_track(StaticItemTrack(
+                            start_time_ms=current_time + (point_index * deco_cfg["spawn_delay_per_item_ms"]),
+                            end_time_ms=decorations_end,  # Decorations vanish before orbs
+                            item_id=item_id,
+                            position=(x, y, z),
+                            hue=inner_hue,
+                            fade_steps=0,  # Instant removal, no fade
+                            fade_duration_ms=0
+                        ))
+            
+                # Middle decoration ring around this orb
+                # Use independent rotation from config
+                if middle_ring_cfg.get("enabled", True):
+                    middle_deco_points = generate_circle_points(
+                        orb_x, orb_y, middle_ring_cfg["radius"],
+                        middle_ring_cfg["points"], 
+                        middle_ring_cfg.get("rotation_degrees", 0)
+                    )
+                    for point_index, (x, y) in enumerate(middle_deco_points):
+                        z = center_z + middle_ring_cfg["z_offset"]
+                        # Get item list - handle string keys (lookup in FORTUNE_ITEMS) or direct lists
+                        item_ids_config = middle_ring_cfg["item_ids"]
+                        if isinstance(item_ids_config, str):
+                            # Special case for gold_piles
+                            if item_ids_config == "gold_piles":
+                                lookup_result = FORTUNE_ITEMS.get("gold_piles", [])
+                                item_list = lookup_result if isinstance(lookup_result, list) else [lookup_result]
+                            else:
+                                # Lookup in FORTUNE_ITEMS dictionary
+                                lookup_result = FORTUNE_ITEMS.get(item_ids_config, [])
+                                # Handle single int or list
+                                if isinstance(lookup_result, int):
+                                    item_list = [lookup_result]
+                                else:
+                                    item_list = lookup_result
+                        elif isinstance(item_ids_config, int):
+                            # Single item ID
+                            item_list = [item_ids_config]
+                        else:
+                            item_list = item_ids_config
+                        
+                        # Random selection from list
+                        if item_list:
+                            item_id = random.choice(item_list) if middle_ring_cfg.get("random_selection") else item_list[0]
+                        else:
+                            item_id = 0x0EEE  # Fallback to gold pile
+                        # Use light blue accent hue for ankhs or scheme hue based on config
+                        if middle_ring_cfg.get("light_blue_accent", False):
+                            # Use light blue accent hue for holy symbols
+                            middle_hue = color_cfg["light_blue_hue"]
+                        elif middle_ring_cfg.get("use_scheme_hue", True):
+                            # Randomly select from base_hues array
+                            scheme = color_cfg["scheme"]
+                            hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["gold"])
+                            middle_hue = random.choice(hue_family["base_hues"])
+                        else:
+                            middle_hue = middle_ring_cfg.get("hue", 0x0000)
+                        timeline.add_track(StaticItemTrack(
+                            start_time_ms=current_time + (point_index * deco_cfg["spawn_delay_per_item_ms"]),
+                            end_time_ms=decorations_end,  # Decorations vanish before orbs
+                            item_id=item_id,
+                            position=(x, y, z),
+                            hue=middle_hue,
+                            fade_steps=0,  # Instant removal, no fade
+                            fade_duration_ms=0
+                        ))
+            
+                # Outer decoration ring around this orb
+                # Use independent rotation from config
+                if outer_ring_cfg and outer_ring_cfg.get("enabled", True):
+                    outer_deco_points = generate_circle_points(
+                        orb_x, orb_y, outer_ring_cfg["radius"],
+                        outer_ring_cfg["points"], 
+                        outer_ring_cfg.get("rotation_degrees", 0)
+                    )
+                    for point_index, (x, y) in enumerate(outer_deco_points):
+                        z = center_z + outer_ring_cfg["z_offset"]
+                        # Get item list - handle string keys (lookup in FORTUNE_ITEMS) or use FORTUNE_SYMBOLS
+                        item_ids_config = outer_ring_cfg.get("item_ids", "fortune_sparkles")
+                        if isinstance(item_ids_config, str):
+                            if item_ids_config == "gold_piles":
+                                item_list = FORTUNE_ITEMS.get("gold_piles", [0x0EEE])
+                            elif item_ids_config == "treasures":
+                                item_list = TREASURE_ITEMS
+                            else:
+                                item_list = [FORTUNE_ITEMS.get(item_ids_config, 0x0EEE)]
+                        elif isinstance(item_ids_config, int):
+                            # Single item ID
+                            item_list = [item_ids_config]
+                        else:
+                            item_list = item_ids_config
+                        
+                        # Random selection from list
+                        if outer_ring_cfg.get("random_selection") and item_list:
+                            item_id = random.choice(item_list)
+                        else:
+                            item_id = item_list[0] if item_list else 0x122A
+                        # Use random hue from scheme or custom hue based on config
+                        if outer_ring_cfg.get("use_scheme_hue", True):
+                            # Randomly select from base_hues array
+                            scheme = color_cfg["scheme"]
+                            hue_family = HUE_FAMILIES.get(scheme, HUE_FAMILIES["gold"])
+                            outer_hue = random.choice(hue_family["base_hues"])
+                        else:
+                            outer_hue = outer_ring_cfg.get("hue", 0x0000)
+                        timeline.add_track(StaticItemTrack(
+                            start_time_ms=current_time + (point_index * deco_cfg["spawn_delay_per_item_ms"]),
+                            end_time_ms=decorations_end,  # Decorations vanish before orbs
+                            item_id=item_id,
+                            position=(x, y, z),
+                            hue=outer_hue,
+                            fade_steps=0,  # Instant removal, no fade
+                            fade_duration_ms=0
+                        ))
+                
+                # Move to next orb's decoration timing
+                current_time += deco_cfg["spawn_delay_per_orb_ms"]
         
         # Track: Looping inward energy at center (with camera offset)
         center_effect = VFX_EFFECTS[center_cfg["vfx_effect"]]
@@ -1695,11 +1838,11 @@ def perform_fortune_circle_ritual():
         
         # Tracks: Overlapping VFX at each symbol location
         for i, (x, y) in enumerate(circle_points):
-            # Use designated hue from config, or fall back to gold hue
+            # Use designated hue from config, or fall back to golden hue
             if "hue" in symbol_vfx_cfg:
                 hue = symbol_vfx_cfg["hue"]
             elif symbol_vfx_cfg.get("use_gold_hue"):
-                hue = color_cfg.get("gold_hue", 0x08A5)
+                hue = color_cfg.get("golden_hue", 0x0B73)
             else:
                 hue = 0x0000  # No hue
             z = center_z + symbol_vfx_cfg["z_offset"]
@@ -1718,8 +1861,7 @@ def perform_fortune_circle_ritual():
         center_late_effect = VFX_EFFECTS[center_late_cfg["vfx_effect"]]
         center_late_start = symbol_vfx_end + center_late_cfg["delay_after_symbol_vfx_ms"]
         center_late_z = center_z + center_late_cfg["z_offset"]
-        # Use the literal hue value from config (0x0000 means no hue, not "use scheme")
-        center_late_hue = center_late_cfg["hue"]
+        center_late_hue = center_late_cfg["hue"] if center_late_cfg["hue"] != 0x0000 else get_scheme_hue("middle")
         
         # Apply camera offset to position effect "in front" of player
         if center_late_cfg.get("camera_offset", False):
@@ -1755,14 +1897,16 @@ def perform_fortune_circle_ritual():
             finale_x = center_x
             finale_y = center_y
         
-        timeline.add_track(VFXPlaybackTrack(
+        # Shockwave is a single static frame - use StaticItemTrack for clean display
+        shockwave_duration_ms = shockwave_effect["frame_duration"] * finale_cfg["loop_count"]
+        timeline.add_track(StaticItemTrack(
             start_time_ms=shockwave_start,
-            vfx_frames=shockwave_effect["frames"],
-            frame_duration_ms=shockwave_effect["frame_duration"],
+            end_time_ms=shockwave_start + shockwave_duration_ms,
+            item_id=shockwave_effect["frames"][0],  # Single frame
             position=(finale_x, finale_y, center_z + finale_cfg["z_offset"]),
             hue=finale_hue,
-            loop=True,
-            loop_count=finale_cfg["loop_count"]
+            fade_steps=0,  # No fade, instant removal
+            fade_duration_ms=0
         ))
         
         # =====================================================================
@@ -1773,7 +1917,7 @@ def perform_fortune_circle_ritual():
         timeline.play()
         
         debug_message("=" * 60, 88)
-        debug_message("Blood Mastery Ascension Orb Circle Ritual - Complete", 88)
+        debug_message("Fortune Mastery Ascension Orb Circle Ritual - Complete", 88)
         debug_message("=" * 60, 88)
         
     except Exception as e:
@@ -1813,7 +1957,7 @@ def render_fortune_ascension_gump():
     Gumps.AddBackground(gd, 0, 0, GUMP_WIDTH, GUMP_HEIGHT, 30546)
     Gumps.AddAlphaRegion(gd, 0, 0, GUMP_WIDTH, GUMP_HEIGHT)
     
-    # Header - golden
+    # Header - fortune gold, properly positioned
     try:
         Gumps.AddHtml(gd, 2, 0, GUMP_WIDTH - 4, 18,
                       "<center><basefont color=#FFD700>Fortune Mastery Ascension</basefont></center>", 0, 0)
@@ -1841,7 +1985,7 @@ def render_fortune_ascension_gump():
         Gumps.AddButton(gd, button_x, button_y, BUTTON_LARGE_ART, BUTTON_LARGE_ART, BUTTON_ASCEND, 1, 0)
         # Black sliver overlay to darken button
         Gumps.AddImageTiled(gd, button_x, button_y, BUTTON_LARGE_WIDTH, BUTTON_LARGE_HEIGHT, SLIVER_OVERLAY_TILE)
-        # Golden "ASCEND" text - shifted left 5 pixels
+        # Fortune gold "ASCEND" text - shifted left 5 pixels
         add_centered_label_with_outline(gd, button_x - 5, button_y, BUTTON_LARGE_WIDTH, BUTTON_LARGE_HEIGHT, "ASCEND", 0x08A5)
     except Exception:
         pass
@@ -1869,9 +2013,9 @@ def render_fortune_ascension_gump():
             # Black sliver overlay to darken button
             Gumps.AddImageTiled(gd, btn_x, btn_y, BUTTON_SMALL_WIDTH, BUTTON_SMALL_HEIGHT, SLIVER_OVERLAY_TILE)
             
-            # Highlight current level with bright orange-yellow, others with medium gray
+            # Highlight current level with fortune gold, others with medium gray
             if level == CURRENT_MASTERY_LEVEL:
-                # Selected level - bright orange-yellow text
+                # Selected level - fortune gold text
                 add_centered_label_with_outline(gd, btn_x, btn_y, BUTTON_SMALL_WIDTH, BUTTON_SMALL_HEIGHT, str(level), 0x08A5)
             else:
                 # Unselected level - medium gray text
@@ -1905,9 +2049,6 @@ def process_gump_response():
         elif button_id == BUTTON_ASCEND:
             # Ascend button clicked - close gump and start ritual
             debug_message(f"Starting Fortune Ascension ritual with {CURRENT_MASTERY_LEVEL} orbs", 68)
-            if DEBUG_MODE:
-                Misc.SendMessage(f"Fortune Ascension: Level {CURRENT_MASTERY_LEVEL}", 0x08A5)
-            
             # Close current gump
             Gumps.CloseGump(GUMP_ID)
             
@@ -1939,7 +2080,7 @@ def process_gump_response():
             Misc.Pause(100)
 
 # =============================================================================
-# MAIN EXECUTION
+# MAIN 
 # =============================================================================
 
 def main():
