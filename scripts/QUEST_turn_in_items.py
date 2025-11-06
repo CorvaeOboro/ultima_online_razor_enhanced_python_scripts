@@ -4,11 +4,6 @@ Quest Item Turn In - a Razor Enhanced Python Script for Ultima Online
 Turn in Items to Quest NPC , Searches for quest items in inventory and gives them to specific NPC
 for example : Daemon Bones to Canute , Ancient Vases to Sasha , Strange Eggs to Wellen 
 
-NEW QUESTS:
-- Necronomicon Pages (0x7492, hue 0x0B02) - Turn in to Umbrelle the city witch at Luna (1414, 1704, 12)
-- Deadstall Island (391, 2026) - Cast Resurrection on Lost Souls (0x03CA)
-- Halloween Event - Automatically deposit Halloween Candy (0x7177) into Candy Bag (0x0E76, hue 0x08BB)
-
 TODO:
 - restore the orb , treasure map , and paragon turn in to griphook when returns
 
@@ -88,6 +83,26 @@ QUESTS_WORLD = {
         ],
         "items": [
             {"name": "Robust Harpy Feather", "id": 0x5737, "hue": 0x0B42}
+        ],
+        "turn_in_type": "direct_transfer",
+        "container_type": "npc"
+    },
+    "world_treasure_map_turnin": {
+        "name": "World: Treasure Map Turn-in",
+        "description": "Turn in basic treasure maps (hue 0) to Carlos in Britain.",
+        "category": "world",
+        "region": "britain",
+        "locations": [
+            {
+                "name": "Carlos",
+                "x": 1437,
+                "y": 1701,
+                "z": 5,
+                "npc_serial": 0x000002D0
+            }
+        ],
+        "items": [
+            {"name": "Treasure Map", "id": 0x14EC, "hue": 0x0000}
         ],
         "turn_in_type": "direct_transfer",
         "container_type": "npc"
@@ -325,6 +340,30 @@ QUESTS_HALLOWEEN = {
     }
 }
 
+QUESTS_EXILE = {
+    "exile_britain_blueprint": {
+        "name": "Exile: Britain Blueprint",
+        "description": "Turn in A Britain Blueprint to Peter in Exile.",
+        "category": "region",
+        "region": "exile",
+        "locations": [
+            {
+                "name": "Peter",
+                "x": 4231,
+                "y": 3752,
+                "z": 0,
+                "npc_serial": 0x0001076F
+            }
+        ],
+        "items": [
+            {"name": "A Britain Blueprint", "id": 0x14ED, "hue": 0x0B48},
+            {"name": "A Compromising Blueprint", "id": 0x14F1, "hue": 0x0B48}
+        ],
+        "turn_in_type": "direct_transfer",
+        "container_type": "npc"
+    }
+}
+
 # currently disabled
 QUESTS_GRIPHOOK_GENERAL_DISABLED = {
     "treasure_maps": {
@@ -418,7 +457,7 @@ QUESTS_GRIPHOOK_GENERAL_DISABLED = {
 # Combine all groups into a single QUESTS dictionary 
 # currently excluding the QUESTS_GRIPHOOK_GENERAL_DISABLED , until NPC return
 QUESTS = {}
-for group in ( QUESTS_WORLD, QUESTS_NECRONOMICON, QUESTS_DUNGEON_SANDSTORM, QUESTS_DUNGEON_SHAME, QUESTS_DUNGEON_DECEIT, QUESTS_DUNGEON_DESTARD, QUESTS_DUNGEON_WRONG, QUESTS_DEADSTALL_ISLAND, QUESTS_HALLOWEEN):
+for group in ( QUESTS_WORLD, QUESTS_NECRONOMICON, QUESTS_DUNGEON_SANDSTORM, QUESTS_DUNGEON_SHAME, QUESTS_DUNGEON_DECEIT, QUESTS_DUNGEON_DESTARD, QUESTS_DUNGEON_WRONG, QUESTS_DEADSTALL_ISLAND, QUESTS_HALLOWEEN, QUESTS_EXILE):
     QUESTS.update(group)
 
 # Lastly , if not near any item turn in we try to attack specific quest objectives 

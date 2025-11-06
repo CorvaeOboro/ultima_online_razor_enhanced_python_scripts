@@ -18,7 +18,7 @@ RANKING_BUTTONS_ENABLED = True # Ranking buttons to adjust the rarity preference
 LAUNCHER_UI_BUTTON = False # If True, show persistent launcher button. If False, skip launcher and show results immediately
 
 EXPORT_CSV_LOG = False  # Export compact CSV log of all rating actions (append mode)
-EXPORT_PYTHON_CODE = True  # Export final ratings as Python dict code (for pasting into script) 
+EXPORT_PYTHON_DICTIONARY = False  # Export final ratings as Python dict code (for pasting into script) 
 
 # Rarity category lists based on user feedback
 # Format: (name, item_id, hue)
@@ -129,7 +129,7 @@ TILE_GAP_X = 4
 TILE_GAP_Y = 6
 MAX_COLS = 10
 
-# Special rendering metrics for 'legendary' tier , wider text  for reading
+# Special rendering metrics for 'legendary' tier , wider text for reading
 LEGENDARY_TILE_WIDTH = 156
 LEGENDARY_TILE_TEXT_HEIGHT = 44
 LEGENDARY_TILE_GAP_X = 12
@@ -139,7 +139,7 @@ SECTION_HEADER_HEIGHT = 20
 SECTION_GAP = 6
 OUTER_PADDING = 8
 
-# Colors (Razor Enhanced gump hues)
+# Colors 
 COLORS = {
     'title': 68,      # blue
     'label': 1153,    # light gray
@@ -161,7 +161,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _DATA_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, '..', 'data'))
 USER_RATINGS_FILE = os.path.join(_DATA_DIR, 'loot_user_ratings.json')
 CSV_EXPORT_FILE = os.path.join(_DATA_DIR, 'loot_rating_actions.csv')
-PYTHON_CODE_EXPORT_FILE = os.path.join(_DATA_DIR, 'loot_ratings_python_code.txt')
+PYTHON_CODE_EXPORT_FILE = os.path.join(_DATA_DIR, 'loot_ratings_python_dictionary.txt')
 RANK_BUTTON_BASE_ID = 1000  # base id for per-item up/down buttons
 EXPORT_BUTTON_ID = 999  # dedicated button ID for export functionality
 _BUTTON_ACTIONS = {}
@@ -173,7 +173,7 @@ _USER_RATINGS_CACHE = None  # Dict structure: {"item_key": {"current_tier": str,
 # Timing  
 WAIT_PROPS_QUICK_MS = 400         # initial tooltip props wait
 WAIT_PROPS_CLICK_MS = 700         # longer tooltip props wait 
-SCAN_THROTTLE_MS = 40             # small per-item throttle during scans
+SEARCH_THROTTLE_MS = 40             # small per-item throttle during searchs
 LAUNCHER_LOOP_MS = 150            # idle loop delay for launcher processing
 GUMP_WAIT_MS = 300                # WaitForGump polling (increased to capture clicks reliably)
 
@@ -288,8 +288,8 @@ def debug_message(msg, hue=1153):
 
 def _format_hex4(val) -> str:
     try:
-        n = int(val) & 0xFFFF
-        return f"0x{n:04X}"
+        numeric_value = int(val) & 0xFFFF
+        return f"0x{numeric_value:04X}"
     except Exception:
         return str(val)
 
@@ -322,7 +322,7 @@ def get_item_name(item):
         pass
     return "Unknown"
 
-def get_properties(item, max_scan=16):
+def get_properties(item, max_search=16):
     """Collect a list of property strings, trying multiple methods."""
     collected = []
     try:
@@ -330,77 +330,77 @@ def get_properties(item, max_scan=16):
         # Quick
         try:
             Items.WaitForProps(serial, int(WAIT_PROPS_QUICK_MS))
-            lst = Items.GetPropStringList(serial)
-            if lst:
-                collected += [str(x) for x in lst if x]
+            properties_list = Items.GetPropStringList(serial)
+            if properties_list:
+                collected += [str(prop) for prop in properties_list if prop]
         except Exception:
             pass
         # Longer wait without clicking
         try:
             Items.WaitForProps(serial, int(WAIT_PROPS_CLICK_MS))
-            lst = Items.GetPropStringList(serial)
-            if lst:
-                for s in lst:
-                    s = str(s)
-                    if s and s not in collected:
-                        collected.append(s)
+            properties_list = Items.GetPropStringList(serial)
+            if properties_list:
+                for property_string in properties_list:
+                    property_string = str(property_string)
+                    if property_string and property_string not in collected:
+                        collected.append(property_string)
         except Exception:
             pass
         # Index
         try:
-            for idx in range(0, max_scan):
-                v = None
+            for idx in range(0, max_search):
+                property_value = None
                 try:
-                    v = Items.GetPropValue(serial, idx)
+                    property_value = Items.GetPropValue(serial, idx)
                 except Exception:
-                    v = None
-                if not v:
+                    property_value = None
+                if not property_value:
                     break
-                s = str(v)
-                if s and s not in collected:
-                    collected.append(s)
+                property_string = str(property_value)
+                if property_string and property_string not in collected:
+                    collected.append(property_string)
         except Exception:
             pass
     except Exception:
         pass
     return collected
 
-def _normalize_name(s: str) -> str:
+def _normalize_name(name_string: str) -> str:
     try:
-        return (s or '').strip().lower()
+        return (name_string or '').strip().lower()
     except Exception:
-        return str(s).strip().lower()
+        return str(name_string).strip().lower()
 
 def _standardize_tier(tier: str) -> str:
     """Map external tier names into our internal RARITY_ORDER values."""
-    t = (tier or '').strip().lower()
-    if t == 'common':
-        t = 'uncommon'
-    if t in RARITY_ORDER:
-        return t
+    tier_normalized = (tier or '').strip().lower()
+    if tier_normalized == 'common':
+        tier_normalized = 'uncommon'
+    if tier_normalized in RARITY_ORDER:
+        return tier_normalized
     return 'uncommon'
 
 def build_specific_items_index() -> dict:
     """Build a lookup dict: (name_norm, item_id, hue) -> tier."""
-    idx = {}
-    for tup in SPECIFIC_ITEMS:
+    index_dict = {}
+    for item_tuple in SPECIFIC_ITEMS:
         try:
             # name, item_id, hue, rarity
-            nm, iid, hue, tier = tup
-            key = (_normalize_name(nm), int(iid), int(hue))
-            idx[key] = _standardize_tier(tier)
+            item_name, item_id, item_hue, item_tier = item_tuple
+            key = (_normalize_name(item_name), int(item_id), int(item_hue))
+            index_dict[key] = _standardize_tier(item_tier)
         except Exception:
             continue
-    debug_message(f"SPECIFIC_ITEMS index built: {len(idx)} entries")
-    return idx
+    debug_message(f"SPECIFIC_ITEMS index built: {len(index_dict)} entries")
+    return index_dict
 
 def _ensure_ratings_file():
     """Ensure the ratings JSON file and directory exist."""
     try:
-        d = os.path.dirname(USER_RATINGS_FILE)
-        if d and not os.path.isdir(d):
-            os.makedirs(d, exist_ok=True)
-            debug_message(f"Created ratings dir: {d}")
+        directory_path = os.path.dirname(USER_RATINGS_FILE)
+        if directory_path and not os.path.isdir(directory_path):
+            os.makedirs(directory_path, exist_ok=True)
+            debug_message(f"Created ratings dir: {directory_path}")
         if not os.path.exists(USER_RATINGS_FILE):
             # Create empty ratings structure
             initial_data = {
@@ -411,29 +411,29 @@ def _ensure_ratings_file():
                 },
                 "ratings": {}
             }
-            with open(USER_RATINGS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(initial_data, f, indent=2)
+            with open(USER_RATINGS_FILE, 'w', encoding='utf-8') as ratings_file:
+                json.dump(initial_data, ratings_file, indent=2)
             debug_message(f"Created ratings file: {USER_RATINGS_FILE}")
-    except Exception as e:
+    except Exception as init_error:
         try:
-            Misc.SendMessage(f"Ratings file init failed: {e}", 33)
+            Misc.SendMessage(f"Ratings file init failed: {init_error}", 33)
         except Exception:
             pass
 
 def _make_item_key(name: str, item_id: int, hue: int) -> str:
     """Create a unique key for an item based on normalized name, item_id, and hue."""
-    name_norm = _normalize_name(name)
-    return f"{name_norm}|{item_id}|{hue}"
+    name_normalized = _normalize_name(name)
+    return f"{name_normalized}|{item_id}|{hue}"
 
 def _load_user_ratings() -> dict:
     """Load user ratings from JSON file. Returns the ratings dict."""
     try:
         _ensure_ratings_file()
-        with open(USER_RATINGS_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        with open(USER_RATINGS_FILE, 'r', encoding='utf-8') as ratings_file:
+            data = json.load(ratings_file)
         return data.get('ratings', {})
-    except Exception as e:
-        debug_message(f"Failed to load user ratings: {e}", 33)
+    except Exception as load_error:
+        debug_message(f"Failed to load user ratings: {load_error}", 33)
         return {}
 
 def _save_user_ratings(ratings: dict):
@@ -442,8 +442,8 @@ def _save_user_ratings(ratings: dict):
         _ensure_ratings_file()
         # Load existing data to preserve metadata
         try:
-            with open(USER_RATINGS_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            with open(USER_RATINGS_FILE, 'r', encoding='utf-8') as ratings_file:
+                data = json.load(ratings_file)
         except Exception:
             data = {}
         
@@ -456,8 +456,8 @@ def _save_user_ratings(ratings: dict):
         
         # Write atomically using temp file
         temp_file = USER_RATINGS_FILE + '.tmp'
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
+        with open(temp_file, 'w', encoding='utf-8') as temp_ratings_file:
+            json.dump(data, temp_ratings_file, indent=2)
         
         # Replace original file
         if os.path.exists(USER_RATINGS_FILE):
@@ -465,9 +465,9 @@ def _save_user_ratings(ratings: dict):
         os.rename(temp_file, USER_RATINGS_FILE)
         
         debug_message(f"Saved user ratings: {len(ratings)} items")
-    except Exception as e:
+    except Exception as save_error:
         try:
-            Misc.SendMessage(f"Failed to save ratings: {e}", 33)
+            Misc.SendMessage(f"Failed to save ratings: {save_error}", 33)
         except Exception:
             pass
 
@@ -498,28 +498,28 @@ def _export_csv_action(name: str, item_id: int, hue: int, action: str, from_tier
         return
     try:
         # Ensure directory exists
-        d = os.path.dirname(CSV_EXPORT_FILE)
-        if d and not os.path.isdir(d):
-            os.makedirs(d, exist_ok=True)
+        directory_path = os.path.dirname(CSV_EXPORT_FILE)
+        if directory_path and not os.path.isdir(directory_path):
+            os.makedirs(directory_path, exist_ok=True)
         
         # Create header if file doesn't exist
         if not os.path.exists(CSV_EXPORT_FILE):
-            with open(CSV_EXPORT_FILE, 'w', encoding='utf-8') as f:
-                f.write('timestamp,name,item_id,hue,action,from_tier,to_tier\n')
+            with open(CSV_EXPORT_FILE, 'w', encoding='utf-8') as csv_file:
+                csv_file.write('timestamp,name,item_id,hue,action,from_tier,to_tier\n')
         
         # Append action
         timestamp = time.time()
-        name_clean = str(name).replace('\n', ' ').replace(',', ';')
-        with open(CSV_EXPORT_FILE, 'a', encoding='utf-8') as f:
-            f.write(f'{timestamp},{name_clean},{item_id},{hue},{action},{from_tier},{to_tier}\n')
+        name_sanitized = str(name).replace('\n', ' ').replace(',', ';')
+        with open(CSV_EXPORT_FILE, 'a', encoding='utf-8') as csv_file:
+            csv_file.write(f'{timestamp},{name_sanitized},{item_id},{hue},{action},{from_tier},{to_tier}\n')
         
-        debug_message(f"CSV export: {name_clean} {action} {from_tier}->{to_tier}")
-    except Exception as e:
-        debug_message(f"CSV export failed: {e}", 33)
+        debug_message(f"CSV export: {name_sanitized} {action} {from_tier}->{to_tier}")
+    except Exception as export_error:
+        debug_message(f"CSV export failed: {export_error}", 33)
 
-def _export_python_code():
+def _export_python_dictionary():
     """Export all current ratings as Python dict code for pasting into script."""
-    if not EXPORT_PYTHON_CODE:
+    if not EXPORT_PYTHON_DICTIONARY:
         return
     try:
         global _USER_RATINGS_CACHE
@@ -541,10 +541,10 @@ def _export_python_code():
             if tier in by_tier:
                 by_tier[tier].append((name, item_id, hue))
         
-        # Generate Python code
+        # Generate Python dictionary
         lines = []
         lines.append('# Generated from user ratings on ' + str(time.time()))
-        lines.append('# Copy and paste these into your script to preserve ratings\n')
+        lines.append('# Copy and paste these into your script to set default ratings for updated base script\n')
         
         for tier in ['legendary', 'epic', 'rare', 'uncommon', 'common']:
             items = by_tier[tier]
@@ -565,12 +565,12 @@ def _export_python_code():
             lines.append(']\n')
         
         # Write to file
-        d = os.path.dirname(PYTHON_CODE_EXPORT_FILE)
-        if d and not os.path.isdir(d):
-            os.makedirs(d, exist_ok=True)
+        directory_path = os.path.dirname(PYTHON_CODE_EXPORT_FILE)
+        if directory_path and not os.path.isdir(directory_path):
+            os.makedirs(directory_path, exist_ok=True)
         
-        with open(PYTHON_CODE_EXPORT_FILE, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(lines))
+        with open(PYTHON_CODE_EXPORT_FILE, 'w', encoding='utf-8') as python_file:
+            python_file.write('\n'.join(lines))
         
         try:
             Misc.SendMessage(f"Python code exported to: {os.path.basename(PYTHON_CODE_EXPORT_FILE)}", 68)
@@ -579,9 +579,9 @@ def _export_python_code():
         
         debug_message(f"Python code export complete: {len(_USER_RATINGS_CACHE)} items")
         
-    except Exception as e:
+    except Exception as export_error:
         try:
-            Misc.SendMessage(f"Python export failed: {e}", 33)
+            Misc.SendMessage(f"Python export failed: {export_error}", 33)
         except Exception:
             pass
 
@@ -589,7 +589,7 @@ def _export_loot_to_json(tiers_map: dict):
     """Export current loot summary to JSON file."""
     try:
         # Ensure directory exists
-        d = os.path.dirname(_DATA_DIR)
+        parent_directory = os.path.dirname(_DATA_DIR)
         if not os.path.isdir(_DATA_DIR):
             os.makedirs(_DATA_DIR, exist_ok=True)
         
@@ -599,7 +599,7 @@ def _export_loot_to_json(tiers_map: dict):
                 "script": "UI_loot_item_summary.py",
                 "version": "20251015",
                 "timestamp": time.time(),
-                "player_name": Player.Name if hasattr(Player, 'Name') else "Unknown"
+                "player_name": Player.Name
             },
             "loot_summary": {}
         }
@@ -625,7 +625,7 @@ def _export_loot_to_json(tiers_map: dict):
         
         # Generate filename with timestamp
         timestamp_str = str(int(time.time()))
-        player_name = Player.Name if hasattr(Player, 'Name') else "player"
+        player_name = Player.Name
         # Sanitize player name for filename
         safe_name = "".join(c for c in player_name if c.isalnum() or c in (' ', '_', '-')).strip()
         safe_name = safe_name.replace(' ', '_')
@@ -634,8 +634,8 @@ def _export_loot_to_json(tiers_map: dict):
         filepath = os.path.join(_DATA_DIR, filename)
         
         # Write to file
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(export_data, f, indent=2)
+        with open(filepath, 'w', encoding='utf-8') as json_file:
+            json.dump(export_data, json_file, indent=2)
         
         # User feedback
         try:
@@ -645,15 +645,15 @@ def _export_loot_to_json(tiers_map: dict):
         
         debug_message(f"Loot export complete: {filepath}")
         
-    except Exception as e:
+    except Exception as export_error:
         try:
-            Misc.SendMessage(f"Loot export failed: {e}", 33)
+            Misc.SendMessage(f"Loot export failed: {export_error}", 33)
         except Exception:
             pass
-        debug_message(f"Loot export error: {e}", 33)
+        debug_message(f"Loot export error: {export_error}", 33)
 
 def _record_user_rating(entry: dict):
-    """Record a user rating action with full history tracking."""
+    """Record a user rating action with history"""
     global _USER_RATINGS_CACHE
     try:
         name = str(entry.get('name', ''))
@@ -702,7 +702,7 @@ def _record_user_rating(entry: dict):
         _export_csv_action(name, item_id, hue, action, old_tier, new_tier)
         
         # Export Python code if enabled
-        _export_python_code()
+        _export_python_dictionary()
         
         # User feedback
         try:
@@ -722,15 +722,15 @@ def ensure_specific_items_index():
     global _SPECIFIC_ITEMS_INDEX, _SPECIFIC_FP
     # Fingerprint current SPECIFIC_ITEMS so edits during runtime trigger rebuild
     try:
-        fp = hash(repr(SPECIFIC_ITEMS))
+        fingerprint = hash(repr(SPECIFIC_ITEMS))
     except Exception:
-        fp = None
-    if _SPECIFIC_ITEMS_INDEX is None or (_SPECIFIC_FP is not None and fp is not None and fp != _SPECIFIC_FP):
+        fingerprint = None
+    if _SPECIFIC_ITEMS_INDEX is None or (_SPECIFIC_FP is not None and fingerprint is not None and fingerprint != _SPECIFIC_FP):
         try:
             _SPECIFIC_ITEMS_INDEX = build_specific_items_index()
-            _SPECIFIC_FP = fp
-        except Exception as e:
-            debug_message(f"Failed building SPECIFIC_ITEMS index: {e}", 33)
+            _SPECIFIC_FP = fingerprint
+        except Exception as index_error:
+            debug_message(f"Failed building SPECIFIC_ITEMS index: {index_error}", 33)
 
 def get_specific_override_tier(name: str, item_id: int, hue: int) -> str:
     """Return the override tier if this item triple is in SPECIFIC_ITEMS, else ''."""
@@ -758,8 +758,8 @@ def get_user_rating_tier(name: str, item_id: int, hue: int) -> str:
             return tier
         
         return ''
-    except Exception as e:
-        debug_message(f"Failed to get user rating: {e}", 33)
+    except Exception as rating_error:
+        debug_message(f"Failed to get user rating: {rating_error}", 33)
         return ''
 
 #//========================================================================
@@ -773,39 +773,39 @@ class ClassResult(object):
         self.matched_mods = matched_mods or []
 
 def _contains_any(text: str, words: list) -> str:
-    low = (text or '').lower()
-    for w in words:
-        if w in low:
-            return w
+    text_lowercase = (text or '').lower()
+    for word in words:
+        if word in text_lowercase:
+            return word
     return ""
 
 def _collect_matches(text: str, words: list) -> list:
-    low = (text or '').lower()
-    found = []
-    for w in words:
-        if w in low:
-            found.append(w)
-    return found
+    text_lowercase = (text or '').lower()
+    found_matches = []
+    for word in words:
+        if word in text_lowercase:
+            found_matches.append(word)
+    return found_matches
 
 def _is_excluded(item_id: int, hue: int) -> bool:
     try:
-        iid = int(item_id)
-        h = int(hue)
+        item_id_int = int(item_id)
+        hue_int = int(hue)
     except Exception:
         return False
-    hues = EXCLUDE_ITEMS_BY_HUE.get(iid)
-    if not hues:
+    excluded_hues = EXCLUDE_ITEMS_BY_HUE.get(item_id_int)
+    if not excluded_hues:
         return False
-    return h in hues
+    return hue_int in excluded_hues
 
 def _is_common_item(name: str, item_id: int, hue: int) -> bool:
     """Check if an item is in COMMON_ITEMS and should be excluded from display."""
     try:
-        name_norm = _normalize_name(name)
-        iid = int(item_id)
-        h = int(hue)
+        name_normalized = _normalize_name(name)
+        item_id_int = int(item_id)
+        hue_int = int(hue)
         for common_name, common_id, common_hue in COMMON_ITEMS:
-            if name_norm == _normalize_name(common_name) and iid == int(common_id) and h == int(common_hue):
+            if name_normalized == _normalize_name(common_name) and item_id_int == int(common_id) and hue_int == int(common_hue):
                 return True
     except Exception:
         pass
@@ -842,38 +842,38 @@ def classify_item(item, name: str, props: list) -> ClassResult:
     dmg_matches = _collect_matches(combined, GOOD_MODIFIERS['weapon']['damage'])
     slayer_matches = _collect_matches(combined, GOOD_MODIFIERS['slayer'])
     if dmg_matches and slayer_matches:
-        return ClassResult('legendary', 'Vanquishing + Slayer', '', matched_mods=list(set([m.title() for m in dmg_matches + slayer_matches])))
+        return ClassResult('legendary', 'Vanquishing + Slayer', '', matched_mods=list(set([match.title() for match in dmg_matches + slayer_matches])))
 
     # 2) Epic: Enhancement Scrolls, strong slayer weapons or strong armor mods
     if int(item_id) == ENHANCEMENT_SCROLL_ITEMID:
         # Include the actual enhancement lines from properties so users can see what it does
-        enh_lines = []
+        enhancement_lines = []
         try:
-            for p in (props or []):
-                s = str(p).strip()
-                sl = s.lower()
-                if not s:
+            for property_item in (props or []):
+                property_string = str(property_item).strip()
+                property_lowercase = property_string.lower()
+                if not property_string:
                     continue
                 # Heuristics to include meaningful enhancement info and avoid generic name lines
-                if 'enhanc' in sl or 'by +' in sl or '%'+'' in s or 'protection' in sl or 'summon' in sl or 'damage' in sl or 'chance' in sl:
-                    enh_lines.append(s)
+                if 'enhanc' in property_lowercase or 'by +' in property_lowercase or '%'+'' in property_string or 'protection' in property_lowercase or 'summon' in property_lowercase or 'damage' in property_lowercase or 'chance' in property_lowercase:
+                    enhancement_lines.append(property_string)
         except Exception:
             pass
-        return ClassResult('epic', 'Enhancement Scroll', '', matched_mods=enh_lines)
+        return ClassResult('epic', 'Enhancement Scroll', '', matched_mods=enhancement_lines)
     if slayer_matches:
-        return ClassResult('epic', 'Slayer', '', matched_mods=[m.title() for m in slayer_matches])
+        return ClassResult('epic', 'Slayer', '', matched_mods=[match.title() for match in slayer_matches])
     armor_matches = _collect_matches(combined, GOOD_MODIFIERS['armor'])
     if armor_matches:
         # show the exact matched armor tier(s), do not substitute with a different tier
-        return ClassResult('epic', 'Armor', '', matched_mods=[m.title() for m in armor_matches])
+        return ClassResult('epic', 'Armor', '', matched_mods=[match.title() for match in armor_matches])
 
     # 3) Rare: top weapon mods or rare materials
     if dmg_matches:
-        return ClassResult('rare', 'Weapon Damage', '', matched_mods=[m.title() for m in dmg_matches])
+        return ClassResult('rare', 'Weapon Damage', '', matched_mods=[match.title() for match in dmg_matches])
     # Accuracy tier as rare if desired
     acc_matches = _collect_matches(combined, GOOD_MODIFIERS['weapon']['accuracy'])
     if acc_matches:
-        return ClassResult('rare', 'Accuracy', '', matched_mods=[m.title() for m in acc_matches])
+        return ClassResult('rare', 'Accuracy', '', matched_mods=[match.title() for match in acc_matches])
     if int(item_id) in ENCHANTING_MATERIAL_IDS:
         return ClassResult('rare', 'Rare Material', 'Material')
     # Treasure Maps
@@ -895,7 +895,7 @@ def classify_item(item, name: str, props: list) -> ClassResult:
 #//=============== Collect backpack items and filter
 
 def collect_good_items_from_backpack(max_items_per_tier=100):
-    """Scan backpack, classify items, and return dict tier -> list of dicts for UI."""
+    """Search backpack, classify items, and return dict tier -> list of dicts for UI."""
     if not Player.Backpack:
         Misc.SendMessage("No backpack found!", 33)
         return {}
@@ -903,87 +903,87 @@ def collect_good_items_from_backpack(max_items_per_tier=100):
     items = Items.FindBySerial(Player.Backpack.Serial).Contains
     items = list(items) if items else []
 
-    tiers = {k: [] for k in RARITY_ORDER}
+    tiers = {tier_key: [] for tier_key in RARITY_ORDER}
 
-    def _format_detail_from_classresult(cls: ClassResult) -> str:
+    def _format_detail_from_classresult(class_result: ClassResult) -> str:
         # Prefer the actual matched modifiers exactly as found
-        if cls and getattr(cls, 'matched_mods', None):
+        if class_result and getattr(class_result, 'matched_mods', None):
             try:
                 # Join and keep original capitalization already applied
-                return ", ".join([str(m) for m in cls.matched_mods if m])
+                return ", ".join([str(modifier) for modifier in class_result.matched_mods if modifier])
             except Exception:
                 pass
         # Otherwise show explicit detail if provided, else the reason label
-        if cls and cls.detail:
-            return str(cls.detail)
-        if cls and cls.reason:
-            return str(cls.reason)
+        if class_result and class_result.detail:
+            return str(class_result.detail)
+        if class_result and class_result.reason:
+            return str(class_result.reason)
         return ""
 
-    for it in items:
+    for item in items:
         try:
-            nm = get_item_name(it)
-            props = get_properties(it)
-            cls = classify_item(it, nm, props)
-            if not cls:
+            item_name = get_item_name(item)
+            item_properties = get_properties(item)
+            classification = classify_item(item, item_name, item_properties)
+            if not classification:
                 continue
             # Apply SPECIFIC_ITEMS override if present
             try:
-                cur_hue = int(getattr(it, 'Hue', 0))
-                cur_item_id = int(it.ItemID)
+                current_hue = int(getattr(item, 'Hue', 0))
+                current_item_id = int(item.ItemID)
                 
                 # CRITICAL: Exclude items explicitly marked as COMMON
-                if _is_common_item(nm, cur_item_id, cur_hue):
-                    debug_message(f"Excluding COMMON item: '{nm}' id={hex(cur_item_id)} hue={hex(cur_hue)}")
+                if _is_common_item(item_name, current_item_id, current_hue):
+                    debug_message(f"Excluding COMMON item: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
                     continue
                 
                 # Priority 1: User ratings (highest priority - user's explicit choices)
-                user_tier = get_user_rating_tier(nm, cur_item_id, cur_hue)
+                user_tier = get_user_rating_tier(item_name, current_item_id, current_hue)
                 if user_tier:
                     # If user rated as 'common', exclude the item entirely
                     if user_tier == 'common':
-                        debug_message(f"Excluding item with 'common' user rating: '{nm}' id={hex(cur_item_id)} hue={hex(cur_hue)}")
+                        debug_message(f"Excluding item with 'common' user rating: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
                         continue
                     # Apply user rating if it's a valid display tier
-                    if user_tier in RARITY_ORDER and user_tier != cls.tier:
-                        debug_message(f"User rating applied: '{nm}' id={hex(cur_item_id)} hue={hex(cur_hue)} {cls.tier} -> {user_tier}")
-                        cls.tier = user_tier
+                    if user_tier in RARITY_ORDER and user_tier != classification.tier:
+                        debug_message(f"User rating applied: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)} {classification.tier} -> {user_tier}")
+                        classification.tier = user_tier
                 # Priority 2: SPECIFIC_ITEMS override (script-defined overrides)
                 elif True:  # Use elif to ensure user ratings take precedence
-                    ov = get_specific_override_tier(nm, cur_item_id, cur_hue)
-                    if ov:
+                    override_tier = get_specific_override_tier(item_name, current_item_id, current_hue)
+                    if override_tier:
                         # If override tier is 'common', exclude the item entirely
-                        if ov == 'common':
-                            debug_message(f"Excluding item with 'common' override: '{nm}' id={hex(cur_item_id)} hue={hex(cur_hue)}")
+                        if override_tier == 'common':
+                            debug_message(f"Excluding item with 'common' override: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
                             continue
                         # Otherwise apply the override if it's a valid display tier
-                        if ov in RARITY_ORDER and ov != cls.tier:
-                            debug_message(f"Override tier: '{nm}' id={hex(cur_item_id)} hue={hex(cur_hue)} {cls.tier} -> {ov}")
-                            cls.tier = ov
-                    elif _normalize_name(nm) in _SPECIFIC_NAMES:
+                        if override_tier in RARITY_ORDER and override_tier != classification.tier:
+                            debug_message(f"Override tier: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)} {classification.tier} -> {override_tier}")
+                            classification.tier = override_tier
+                    elif _normalize_name(item_name) in _SPECIFIC_NAMES:
                         # Helpful diagnostic: we expected an override name but the (id,hue) didn't match
-                        debug_message(f"No SPECIFIC_ITEMS match for '{nm}' with id={hex(cur_item_id)} hue={hex(cur_hue)}")
+                        debug_message(f"No SPECIFIC_ITEMS match for '{item_name}' with id={hex(current_item_id)} hue={hex(current_hue)}")
             except Exception:
                 pass
             tile = {
-                'serial': int(it.Serial),
-                'item_id': int(it.ItemID),
-                'hue': int(getattr(it, 'Hue', 0)),
-                'name': nm,
-                'detail': _format_detail_from_classresult(cls),
+                'serial': int(item.Serial),
+                'item_id': int(item.ItemID),
+                'hue': int(getattr(item, 'Hue', 0)),
+                'name': item_name,
+                'detail': _format_detail_from_classresult(classification),
             }
-            arr = tiers.get(cls.tier)
-            if arr is not None and len(arr) < max_items_per_tier:
-                arr.append(tile)
+            tier_items_list = tiers.get(classification.tier)
+            if tier_items_list is not None and len(tier_items_list) < max_items_per_tier:
+                tier_items_list.append(tile)
         except Exception:
             continue
         # throttle a little to avoid spam
         try:
-            Misc.Pause(int(SCAN_THROTTLE_MS))
+            Misc.Pause(int(SEARCH_THROTTLE_MS))
         except Exception:
-            time.sleep(SCAN_THROTTLE_MS / 1000.0)
+            time.sleep(SEARCH_THROTTLE_MS / 1000.0)
 
-    return {k: v for k, v in tiers.items() if v}
+    return {tier_key: tier_items for tier_key, tier_items in tiers.items() if tier_items}
 
 #//=============== UI Rendering
 
@@ -1225,17 +1225,17 @@ def show_and_interact_summary(tiers_map: dict):
     while True:
         try:
             Gumps.WaitForGump(GUMP_ID_RESULTS, int(GUMP_WAIT_MS))
-            gd = Gumps.GetGumpData(GUMP_ID_RESULTS)
+            gump_data = Gumps.GetGumpData(GUMP_ID_RESULTS)
         except Exception:
-            gd = None
-        if not gd:
+            gump_data = None
+        if not gump_data:
             debug_message("Summary gump closed or not found; exiting interaction loop.")
             break
-        bid = getattr(gd, 'buttonid', 0)
-        debug_message(f"Gump interaction: buttonid={bid}")
+        button_id = getattr(gump_data, 'buttonid', 0)
+        debug_message(f"Gump interaction: buttonid={button_id}")
         
         # Check for close button (buttonid=0)
-        if bid == 0:
+        if button_id == 0:
             debug_message("Close button pressed; exiting interaction loop.")
             try:
                 Gumps.CloseGump(GUMP_ID_RESULTS)
@@ -1243,25 +1243,25 @@ def show_and_interact_summary(tiers_map: dict):
                 pass
             break
         
-        entry = None
-        if bid and bid > 0:
+        button_action_entry = None
+        if button_id and button_id > 0:
             # Check for export button
-            if bid == EXPORT_BUTTON_ID:
+            if button_id == EXPORT_BUTTON_ID:
                 debug_message("Export button pressed")
                 _export_loot_to_json(tiers_map)
                 # Re-render to keep gump open
                 render_summary_gump(tiers_map)
             else:
-                entry = _BUTTON_ACTIONS.get(int(bid))
-                if entry:
-                    debug_message(f"Button match: {bid} -> action={entry.get('action')} item={entry.get('name')} id={hex(int(entry.get('item_id',0)))}")
-                    _record_user_rating(entry)
+                button_action_entry = _BUTTON_ACTIONS.get(int(button_id))
+                if button_action_entry:
+                    debug_message(f"Button match: {button_id} -> action={button_action_entry.get('action')} item={button_action_entry.get('name')} id={hex(int(button_action_entry.get('item_id',0)))}")
+                    _record_user_rating(button_action_entry)
                 # Re-render to reset button state and keep interaction going
                 render_summary_gump(tiers_map)
         else:
             debug_message("No button pressed; waiting...")
-        if bid and bid > 0 and not entry:
-            debug_message(f"Button {bid} not mapped. Mappings={len(_BUTTON_ACTIONS)} sample={(list(_BUTTON_ACTIONS.keys())[:4])}")
+        if button_id and button_id > 0 and not button_action_entry:
+            debug_message(f"Button {button_id} not mapped. Mappings={len(_BUTTON_ACTIONS)} sample={(list(_BUTTON_ACTIONS.keys())[:4])}")
         try:
             Misc.Pause(int(GUMP_WAIT_MS))
         except Exception:
@@ -1270,41 +1270,40 @@ def show_and_interact_summary(tiers_map: dict):
 #//=============== Launcher gump (persistent button)
 
 def send_launcher_gump():
-    gd = Gumps.CreateGump(movable=True)
-    Gumps.AddPage(gd, 0)
+    gump_definition = Gumps.CreateGump(movable=True)
+    Gumps.AddPage(gump_definition, 0)
     width, height = 75, 55
-    Gumps.AddBackground(gd, 0, 0, width, height, 30546)
-    Gumps.AddAlphaRegion(gd, 0, 0, width, height)
+    Gumps.AddBackground(gump_definition, 0, 0, width, height, 30546)
+    Gumps.AddAlphaRegion(gump_definition, 0, 0, width, height)
     try:
-        Gumps.AddHtml(gd, 3, 0, 68, 16, "<center><basefont color=#3FA9FF>LOOT</basefont></center>", 0, 0)
+        Gumps.AddHtml(gump_definition, 3, 0, 68, 16, "<center><basefont color=#3FA9FF>LOOT</basefont></center>", 0, 0)
     except Exception:
         pass
     try:
-        Gumps.AddItem(gd, 32, 26, 0xBCA4)  # treasure chest icon
+        Gumps.AddItem(gump_definition, 32, 26, 0xBCA4)  # treasure chest icon
     except Exception:
         pass
-    Gumps.AddButton(gd, 5, 18, 9815, 9815, 1, 1, 0)
-    Gumps.AddTooltip(gd, "Show Good Loot Summary")
-    Gumps.SendGump(GUMP_ID_LAUNCHER, Player.Serial, GUMP_LAUNCHER_X, GUMP_LAUNCHER_Y, gd.gumpDefinition, gd.gumpStrings)
+    Gumps.AddButton(gump_definition, 5, 18, 9815, 9815, 1, 1, 0)
+    Gumps.AddTooltip(gump_definition, "Show Good Loot Summary")
+    Gumps.SendGump(GUMP_ID_LAUNCHER, Player.Serial, GUMP_LAUNCHER_X, GUMP_LAUNCHER_Y, gump_definition.gumpDefinition, gump_definition.gumpStrings)
 
 def process_launcher_input():
     """Wait for launcher button click and trigger summary. Recreates gump if closed."""
     try:
         Gumps.WaitForGump(GUMP_ID_LAUNCHER, int(GUMP_WAIT_MS))
-        gd = Gumps.GetGumpData(GUMP_ID_LAUNCHER)
+        launcher_gump_data = Gumps.GetGumpData(GUMP_ID_LAUNCHER)
     except Exception:
-        gd = None
+        launcher_gump_data = None
     
-    if not gd:
+    if not launcher_gump_data:
         # Launcher gump was closed, recreate it
         send_launcher_gump()
         return
     
-    if gd.buttonid > 0:
-        # Trigger scan and show results
+    if launcher_gump_data.buttonid > 0:
+        # Trigger search and show results
         tiers_map = collect_good_items_from_backpack()
         show_and_interact_summary(tiers_map)
-        # DO NOT close the launcher gump - keep it persistent and static
         # The gump remains open so user can press the button again later
 
 #//=============== Entrypoint

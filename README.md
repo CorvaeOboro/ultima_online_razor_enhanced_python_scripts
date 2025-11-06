@@ -1,5 +1,5 @@
 # Ultima Online Classic Razor Enhanced Python Scripts 
-[ultima online classic](https://github.com/ClassicUO/ClassicUO) [razor enhanced](https://github.com/razorenhanced/razorenhanced) python scripts focused on UI customization and ritual magic
+[ultima online classic](https://github.com/ClassicUO/ClassicUO) [razor enhanced](https://github.com/razorenhanced/razorenhanced) python scripts focused on UI customization and rituals
 
 <center>
 
@@ -28,9 +28,7 @@ user interface custom gumps
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/UI_experience_progress_tracker.png?raw=true"/>
 - [UI_boss_healthbar.py](scripts/UI_boss_healthbar.py) – large boss health bar appears at top of screen when nearby known bosses
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_boss_health_bar.png?raw=true"/>
-- [UI_walia_item_inspect.py](scripts/UI_walia_item_inspect.py) – WALIA (What Am I Looking At) in-game item inspection to display detailed properties, crafting info, and custom descriptions
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info.png?raw=true"/>
-- <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info_20250903.png?raw=true"/>
+- [UI_walia_item_inspect.py](scripts/UI_walia_item_inspect.py) – WAILA (What Am I Looking At) in-game item inspection to display detailed properties, crafting info, and custom descriptions
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_walia_item_info_20250910.png?raw=true"/>
 - [UI_journal_filtered.py](scripts/UI_journal_filtered.py) – minimal journal filtered and focused on local chat and events
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ui_journal_filtered.png?raw=true"/>
@@ -38,6 +36,8 @@ user interface custom gumps
 - <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_UI_action_buttons.png?raw=true"/>
 - [UI_item_drop.py](scripts/UI_item_drop.py) – select and place items on the ground , creating a trail , or in circles
 - <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_ui_item_drop.png?raw=true"/>
+- [UI_loot_item_summary.py](scripts/UI_loot_item_summary.py) – display a summary of items in backpack , filtered based on rarity and modifiers 
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_UI_loot_item_summary.gif?raw=true"/>
 - [UI_gump_layout_preset.py](scripts/UI_gump_layout_preset.py) – move gumps to specified positions
 - [UI_ascii_display.py](scripts/UI_ascii_display.py) – ASCII art display system
 - [UI_commands_gump.py](scripts/UI_commands_gump.py) – Command shortcuts gump
@@ -45,7 +45,7 @@ user interface custom gumps
 - [UI_spell_hotbar_hotkeys.py](scripts/UI_spell_hotbar_hotkeys.py) – Spell hotbar with hotkeys
 
 ## RITUAL
-ritual magic 
+a ritual is a series of actions performed according to a prescribed order .
 | <a href="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_rejuvenation_01.jpg?raw=true"> <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_rejuvenation_01.jpg?raw=true" width="170" height="170" /> </a>| <a href="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_andaria_gate_01.jpg?raw=true"> <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_andaria_gate_01.jpg?raw=true" width="170" height="170" /> </a> | <a href="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_compassion_01.jpg?raw=true"> <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_compassion_01.jpg?raw=true" width="170" height="170" /> </a>  | <a href="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_luna_01.jpg?raw=true"> <img src="https://raw.githubusercontent.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/refs/heads/main/docs/ultima_ritual_of_luna_01.jpg?raw=true" width="170" height="170" /> </a>  |
 | :---: | :---: | :---: | :---: |
 
@@ -112,7 +112,9 @@ ritual magic
 ## QUEST
 - [QUEST_accept_all_daily.py](scripts/QUEST_accept_all_daily.py) – Accepts all daily quests with specific rewards
 - [QUEST_daily_progress.py](scripts/QUEST_daily_progress.py) – Daily quest progress display
-- [QUEST_global_events.py](scripts/QUEST_global_events.py) – Global event quests combined display
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_quest_daily_progress.png?raw=true"/>
+- [QUEST_global_events.py](scripts/QUEST_global_events.py) – display combined information about global events , event points , danger , haven , and challenge combined .
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_quest_global_events.png?raw=true"/>
 - [QUEST_turn_in_items.py](scripts/QUEST_turn_in_items.py) – Quest turn-in items
 - [QUEST_turn_in_orbs.py](scripts/QUEST_turn_in_orbs.py) – Quest turn-in orbs ( currently disabled NPC )
 
@@ -149,7 +151,7 @@ ritual magic
 - [DEV_gump_debugger.py](scripts/DEV_gump_debugger.py) – Analyze ingame gumps outputs JSON 
 - [DEV_item_inspector.py](scripts/DEV_item_inspector.py) – Backpack items and equipment info to JSON
 - [DEV_item_to_list.py](scripts/DEV_item_to_list.py) –  Inspected item exported to categorized JSON 
-- [DEV_font_color_gump.py](scripts/DEV_font_color_gump.py) – UO font hue hex codes in a custom Gump
+- [DEV_font_color_gump.py](scripts/DEV_font_color_gump.py) – UO font hue id comparison with closest html color Gump
 - [DEV_api_CUO.py](scripts/DEV_api_CUO.py) – ClassicUO API documentation
 - [DEV_api_PacketLogger.py](scripts/DEV_api_PacketLogger.py) – Packet logger API
 - [DEV_api_gumps.py](scripts/DEV_api_gumps.py) – Gumps API documentation
