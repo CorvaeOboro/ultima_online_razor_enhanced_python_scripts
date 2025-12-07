@@ -2,10 +2,10 @@
 TRAIN Magery and Spiritspeak - a Razor Enhanced Python Script for Ultima Online
 
 Training Magery and Spiritspeak skills by casting spells and meditating.
-Mana Drain > Invisibility > Mana Vampire 
+Mana Drain > Invisibility > Mana Vampire > Summon Water Elemental
 includes reagent checks, and includes mana regen like food management, and mana potions.
 
-VERSION::20250925
+VERSION::20251206
 """
 from collections import namedtuple
 
@@ -15,6 +15,8 @@ ADDITIONAL_SHARD_COOLDOWN = 500  # Extra delay
 REAGENT_CHECK_COOLDOWN = 30000  # Check reagents every 30 seconds
 FOOD_CHECK_COOLDOWN = 60000  # Check food every 60 seconds
 MANA_POTION_COOLDOWN = 100000  # Check mana potions every 100 seconds
+FOLLOWER_CHECK_DELAY = 2000  # Wait 2 seconds after summon to check followers
+CONTEXT_TIMEOUT_MS = 1000  # Context menu timeout
 
 DEBUG_MODE = True
 
@@ -25,14 +27,16 @@ Spell = namedtuple('Spell', ['name', 'mana_cost', 'delay_ms', 'reagents'])
 SPELLS = {
     'Mana Drain': Spell('Mana Drain', 6, 1500, ['Black Pearl', 'Mandrake Root', 'Spider Silk']),
     'Invisibility': Spell('Invisibility', 20, 1500, ['Bloodmoss', 'Nightshade']),
-    'Mana Vampire': Spell('Mana Vampire', 40, 1750, ['Bloodmoss', 'Mandrake Root', 'Spider Silk'])
+    'Mana Vampire': Spell('Mana Vampire', 40, 1750, ['Bloodmoss', 'Mandrake Root', 'Spider Silk']),
+    'Summon Water Elemental': Spell('Summon Water Elemental', 50, 2000, ['Bloodmoss', 'Mandrake Root', 'Spider Silk'])
 }
 
 # Spell selection based on magery skill level
 SKILL_SPELLS = {
-    (0, 50.8): SPELLS['Mana Drain'],
-    (50.8, 74.5): SPELLS['Invisibility'],
-    (74.5, 120): SPELLS['Mana Vampire']
+    (0, 50.7): SPELLS['Mana Drain'],
+    (50.8, 74.4): SPELLS['Invisibility'],
+    (74.5, 89.9): SPELLS['Mana Vampire'],
+    (90, 120): SPELLS['Summon Water Elemental']
 }
 
 ITEM_IDS = {
@@ -170,12 +174,96 @@ def meditate_to_full(target_mana):
             Timer.Create('meditation', MEDITATION_COOLDOWN)
         Misc.Pause(100)
 
+def clean_name(name):
+    """Clean mobile name for comparison"""
+    try:
+        s = (name or "").lower().strip()
+        if s.startswith("a "):
+            s = s[2:]
+        return s
+    except Exception:
+        return str(name or "")
+
+def is_water_elemental(mobile):
+    """Check if a mobile is a water elemental"""
+    try:
+        if mobile is None:
+            return False
+        nm = str(getattr(mobile, 'Name', '') or '').lower()
+        if "(summoned)" in nm and "water elemental" in nm:
+            return True
+        # Check properties
+        if getattr(mobile, 'PropsUpdated', False):
+            for prop in getattr(mobile, 'Properties', []) or []:
+                p = str(prop).lower()
+                if "(summoned)" in p or "summoned creature" in p:
+                    # Check if it's a water elemental
+                    if "water elemental" in clean_name(nm):
+                        return True
+        # Base name fallback
+        return "water elemental" in clean_name(nm)
+    except Exception:
+        return False
+
+def find_water_elemental():
+    """Find summoned water elemental in range"""
+    try:
+        f = Mobiles.Filter()
+        f.Enabled = True
+        f.RangeMax = 30
+        f.CheckLineOfSight = False
+        f.Notorieties.Add(2)  # green/friendly
+        mobs = Mobiles.ApplyFilter(f)
+        if not mobs:
+            return None
+        for m in mobs:
+            if m and is_water_elemental(m):
+                return m
+        return None
+    except Exception as e:
+        debug_message(f"Error finding water elemental: {e}", Colors.RED)
+        return None
+
+def release_water_elemental(elemental):
+    """Release a water elemental using context menu"""
+    try:
+        name = getattr(elemental, 'Name', 'water elemental')
+        # Try "Release" context menu option
+        release_labels = ["Release", "release"]
+        for label in release_labels:
+            try:
+                Misc.UseContextMenu(int(elemental.Serial), str(label), int(CONTEXT_TIMEOUT_MS))
+                debug_message(f"Released {name}", Colors.GREEN)
+                return True
+            except Exception:
+                continue
+        debug_message(f"Failed to release {name}", Colors.YELLOW)
+        return False
+    except Exception as e:
+        debug_message(f"Error releasing water elemental: {e}", Colors.RED)
+        return False
+
 def cast_spell(spell):
     """Cast a spell and handle targeting"""
     Spells.CastMagery(spell.name)
     Timer.Create('magery', spell.delay_ms + ADDITIONAL_SHARD_COOLDOWN)
-    Target.WaitForTarget(2000, True)
-    Target.TargetExecute(Player.Serial) # target self
+    
+    # Special handling for Summon Water Elemental
+    if spell.name == 'Summon Water Elemental':
+        # No targeting needed for summon spells
+        Misc.Pause(FOLLOWER_CHECK_DELAY)  # Wait for summon to appear
+        
+        # Check if we have followers and release the water elemental
+        if Player.Followers > 0:
+            elemental = find_water_elemental()
+            if elemental:
+                debug_message(f"Water elemental summoned, releasing...", Colors.YELLOW)
+                release_water_elemental(elemental)
+                Misc.Pause(500)  # Brief pause after release
+    else:
+        # Normal spell targeting (self)
+        Target.WaitForTarget(2000, True)
+        Target.TargetExecute(Player.Serial) # target self
 
 def train_skills():
     """Main training loop for both Magery and Spirit Speak"""

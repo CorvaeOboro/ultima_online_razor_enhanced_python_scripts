@@ -4,6 +4,11 @@ COMBAT Cancel Casting - a Razor Enhanced Python Script for Ultima Online
 Interrupt current spell cast 
 Razor Enhanced API: Spells.Interrupt() - Interrupts the casting of a spell by performing an equip/unequip.
 
+CHANGELOG:: initially this script was trying to do the equip / unequip manually 
+targeting a specific "least important" item layer , such that it didnt have stats ,
+and whose visual change would be minimal ( apron , shoes , depending on the outfit ) 
+however the api function is much cleaner and faster 
+
 HOTKEY:: ESC
 VERSION:: 20251014
 """

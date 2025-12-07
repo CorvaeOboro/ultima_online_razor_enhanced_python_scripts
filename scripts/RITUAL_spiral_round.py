@@ -35,14 +35,14 @@ ITEM_NAME_LOOKUP.update(BLACK_PEARL_ITEM_IDS)
 ITEM_NAME_LOOKUP.update(ARCANE_DUST_ITEM_IDS)
 
 # Spiral generation parameters
-SPIRAL_RADIUS = 15  # Maximum radius of spiral (increased for larger scale)
+SPIRAL_RADIUS = 7  # Maximum radius of spiral (increased for larger scale)
 SPIRAL_SPACING = 4   # Distance between spiral arms (tiles) - wider for thicker appearance
 SPIRAL_TURNS = 4.0  # Number of full turns the spiral makes (extended for longer spiral)
 
 # Thickness and stacking parameters
 SPIRAL_THICKNESS = 2  # Number of parallel lines to create thickness
 RANDOM_STACKING_ENABLED = True  # Enable random stacking towards center
-MAX_STACK_HEIGHT = 5  # Maximum items to stack at one location
+MAX_STACK_HEIGHT = 1  # Maximum items to stack at one location
 CENTER_STACK_BIAS = 0.7  # Higher values = more stacking towards center (0.0-1.0)
 
 # Global stacking control parameters

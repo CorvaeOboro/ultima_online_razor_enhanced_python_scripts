@@ -2,20 +2,13 @@
 Quest Item Turn In - a Razor Enhanced Python Script for Ultima Online
 
 Turn in Items to Quest NPC , Searches for quest items in inventory and gives them to specific NPC
-for example : Daemon Bones to Canute , Ancient Vases to Sasha , Strange Eggs to Wellen 
+for example : Daemon Bones to Aristo , Ancient Vases to Sasha , Strange Eggs to Wellen 
 
 TODO:
 - restore the orb , treasure map , and paragon turn in to griphook when returns
 
-620 2195 = chaos island blood quest 
-the remains of a blood elemental 
-578 2259
-
-diseased blood 0x0E24 , hue 0x09a7 ,  turn into canute
-gather diseased blood , around chaos island 499 2183 , a bloody corpse , the remains of a blood elemental
-
 HOTKEY:: K ( Kwuest )
-VERSION:: 20251018
+VERSION:: 20251206
 """
 import System
 import System.Collections.Generic
@@ -26,16 +19,16 @@ DEBUG_MODE = False
 QUESTS_WORLD = {
       "daily_hiddenvalley_lizardman_scales": {
         "name": "Daily: Collect Lizardman Scales",
-        "description": "Gather Lizardman Scales in Hidden Valley and turn in to Canute the Daily Quest Master.",
+        "description": "Gather Lizardman Scales in Hidden Valley and turn in to Aristo the Daily Quest Master.",
         "category": "daily",
         "region": "hiddenvalley",
         "locations": [
             {
-                "name": "Canute The Daily Quest Master",
-                "x": 1433,
-                "y": 1710,
+                "name": " Aristo The Daily Quest Master",
+                "x": 1434,
+                "y": 1712,
                 "z": 31,
-                "npc_serial": 0x000000D4,
+                "npc_serial": 0x00000176,
                 "mobile_id": 0x0190
             }
         ],
@@ -47,16 +40,16 @@ QUESTS_WORLD = {
     },
     "daily_cyclops_head": {
         "name": "Daily: Collect Cyclops Head",
-        "description": "Gather Cyclops Head and turn in to Canute the Daily Quest Master.",
+        "description": "Gather Cyclops Head and turn in to Aristo the Daily Quest Master.",
         "category": "daily",
         "region": "world",
         "locations": [
             {
-                "name": "Canute The Daily Quest Master",
-                "x": 1433,
-                "y": 1710,
+                "name": " Aristo The Daily Quest Master",
+                "x": 1434,
+                "y": 1712,
                 "z": 31,
-                "npc_serial": 0x000000D4,
+                "npc_serial": 0x00000176,
                 "mobile_id": 0x0190
             }
         ],
@@ -68,16 +61,16 @@ QUESTS_WORLD = {
     },
     "daily_robust_harpy_feathers": {
         "name": "Daily: Collect Robust Harpy Feathers",
-        "description": "Gather Robust Harpy Feathers and turn in to Canute the Daily Quest Master.",
+        "description": "Gather Robust Harpy Feathers and turn in to Aristo the Daily Quest Master.",
         "category": "daily",
         "region": "world",
         "locations": [
             {
-                "name": "Canute The Daily Quest Master",
-                "x": 1433,
-                "y": 1710,
+                "name": " Aristo The Daily Quest Master",
+                "x": 1434,
+                "y": 1712,
                 "z": 31,
-                "npc_serial": 0x000000D4,
+                "npc_serial": 0x00000176,
                 "mobile_id": 0x0190
             }
         ],
@@ -183,18 +176,18 @@ QUESTS_DUNGEON_SHAME = {
     },
     "daily_shame_vermin_blood": {
         "name": "Daily: Collect Vermin Blood",
-        "description": "Use Blood Vial Kit on nearby corpses of vermin, bugs, spiders, bees; turn in blood to Canute (Daily Quest Giver).",
+        "description": "Use Blood Vial Kit on nearby corpses of vermin, bugs, spiders, bees; turn in blood to Aristo (Daily Quest Giver).",
         "category": "daily",
         "region": "shame",
         "tool": {"name": "Blood Vial Kit", "id": 0xBB33},
         "targets": ["vermin corpse", "bug corpse", "spider corpse", "bee corpse"],
         "locations": [
             {
-                "name": "Canute the Daily Quest Giver",
-                "x": 1433,
-                "y": 1710,
+                "name": " Aristo the Daily Quest Giver",
+                "x": 1434,
+                "y": 1712,
                 "z": 31,
-                "npc_serial": 0x000000D4
+                "npc_serial": 0x00000176
             }
         ],
         "items": [
@@ -205,16 +198,16 @@ QUESTS_DUNGEON_SHAME = {
     },
     "daily_diseased_blood": {
         "name": "Daily: Collect Diseased Blood",
-        "description": "Collect Diseased Blood and turn in to Canute the Daily Quest Master.",
+        "description": "Collect Diseased Blood and turn in to Aristo the Daily Quest Master.",
         "category": "daily",
         "region": "shame",
         "locations": [
             {
-                "name": "Canute the Daily Quest Giver",
-                "x": 1433,
-                "y": 1710,
+                "name": " Aristo the Daily Quest Giver",
+                "x": 1434,
+                "y": 1712,
                 "z": 31,
-                "npc_serial": 0x000000D4
+                "npc_serial": 0x00000176
             }
         ],
         "items": [
@@ -228,16 +221,16 @@ QUESTS_DUNGEON_SHAME = {
 QUESTS_DUNGEON_DECEIT = {
     "daily_deceit_daemon_bone": {
         "name": "Daily: Collect Daemon Bone",
-        "description": "Gather Daemon Bone in Deceit and turn in to Canute the Daily Quest Master.",
+        "description": "Gather Daemon Bone in Deceit and turn in to Aristo the Daily Quest Master.",
         "category": "daily",
         "region": "deceit",
         "locations": [
             {
-                "name": "Canute The Daily Quest Master",
-                "x": 1433,
-                "y": 1710,
+                "name": " Aristo The Daily Quest Master",
+                "x": 1434,
+                "y": 1712,
                 "z": 31,
-                "npc_serial": 0x000000D4,
+                "npc_serial": 0x00000176,
                 "mobile_id": 0x0190
             }
         ],
@@ -257,11 +250,11 @@ QUESTS_DUNGEON_DESTARD = {
         "region": "destard",
         "locations": [
             {
-                "name": "Canute",
-                "x": 1433,
-                "y": 1710,
+                "name": " Aristo",
+                "x": 1434,
+                "y": 1712,
                 "z": 31,
-                "npc_serial": 0x000000D4
+                "npc_serial": 0x00000176
             }
         ],
         "items": [
@@ -275,16 +268,16 @@ QUESTS_DUNGEON_DESTARD = {
 QUESTS_DUNGEON_WRONG = {
     "daily_wrong_elfic_artifact": {
         "name": "Daily: Collect Elfic Artifact",
-        "description": "Collect Elfic Artifact in Wrong and turn in to Canute the Daily Quest Master.",
+        "description": "Collect Elfic Artifact in Wrong and turn in to Aristo the Daily Quest Master.",
         "category": "daily",
         "region": "wrong",
         "locations": [
             {
-                "name": "Canute the Daily Quest Giver",
-                "x": 1433,
-                "y": 1710,
+                "name": " Aristo the Daily Quest Giver",
+                "x": 1434,
+                "y": 1712,
                 "z": 31,
-                "npc_serial": 0x000000D4
+                "npc_serial": 0x00000176
             }
         ],
         "items": [
@@ -463,9 +456,12 @@ for group in ( QUESTS_WORLD, QUESTS_NECRONOMICON, QUESTS_DUNGEON_SANDSTORM, QUES
 # Lastly , if not near any item turn in we try to attack specific quest objectives 
 # Cocoon (0x9F83), Daemonic Totem (0xB829) - Similar to Poisonous Thorns, attack these quest objects
 # imprisoned eclipse (0x6E19) - LUNA quest
-QUEST_STATICS_TO_ATTACK = ["A Cocoon", "Daemonic Totem", "a bonfire crystal", "Demonic Portal", "Poisonous Thorns", "imprisoned eclipse"]
+# A Sealed Bonfire Wisp (0x5454) - Bonfire quest
+QUEST_STATICS_TO_ATTACK = ["A Cocoon", "Daemonic Totem", "Daemonic Toten", "a bonfire crystal", "Demonic Portal", "Poisonous Thorns", "imprisoned eclipse", "A Sealed Bonfire Wisp"]
+QUEST_ITEMIDS_TO_ATTACK = [0x9F83, 0xB829, 0xB82A, 0x6E19, 0x5454]  # ItemIDs to attack: Cocoon, Daemonic Totem (0xB829, 0xB82A), imprisoned eclipse, Sealed Bonfire Wisp
 INTERACT_ONLY_STATICS = True  # When true, only interact with statics items  and do NOT attack mobiles
-USE_ALL_ATTACK = True  # When true, say "All Attack" and target the quest entity to command pets/party
+USE_CONTEXT_MENU_KILL = False  # When true, use context menu "Command: Kill" on follower (experimental - may not work reliably)
+USE_ALL_ATTACK = True  # When true, say "All Attack" and target the quest entity to command pets/party (DEFAULT - works reliably)
 
 #//======================================================================
 
@@ -739,7 +735,7 @@ def handle_spell_cast(quest_config, location):
     target_info = quest_config["target_mobile"]
     max_range = target_info.get("max_range", 8)
     
-    Misc.SendMessage(f"[QUEST] Searching for {target_info['name']} (0x{target_info['id']:04X}) within {max_range} tiles...", 68)
+    debug_message(f"Searching for {target_info['name']} (0x{target_info['id']:04X}) within {max_range} tiles...", 68)
     
     # Search for target mobile
     mobile_filter = Mobiles.Filter()
@@ -759,10 +755,10 @@ def handle_spell_cast(quest_config, location):
     
     mobiles = Mobiles.ApplyFilter(mobile_filter)
     
-    Misc.SendMessage(f"[QUEST] Found {len(mobiles) if mobiles else 0} matching mobiles", 68)
+    debug_message(f"Found {len(mobiles) if mobiles else 0} matching mobiles", 68)
     
     if not mobiles or len(mobiles) == 0:
-        Misc.SendMessage(f"[QUEST] No {target_info['name']} found within {max_range} tiles!", 33)
+        debug_message(f"No {target_info['name']} found within {max_range} tiles!", 33)
         return False
     
     # Find nearest target
@@ -848,27 +844,113 @@ def handle_quest_mobiles_fallback():
                 item_filter.OnGround = True
                 item_filter.RangeMax = SEARCH_RANGE_TILES
                 nearby_items = Items.ApplyFilter(item_filter)
+                debug_message(f"Scanning {len(nearby_items) if nearby_items else 0} ground items within {SEARCH_RANGE_TILES} tiles", 68)
             else:
                 nearby_items = []
-        except Exception:
+                debug_message(f"Items.Filter not available", 33)
+        except Exception as e:
             nearby_items = []
+            debug_message(f"Error scanning items: {e}", 33)
 
         targets_lc = [t.lower() for t in QUEST_STATICS_TO_ATTACK]
+        debug_message(f"Looking for targets: {QUEST_STATICS_TO_ATTACK}", 67)
+        debug_message(f"Looking for ItemIDs: {[hex(x) for x in QUEST_ITEMIDS_TO_ATTACK]}", 67)
+        
+        scanned_count = 0
         for itm in nearby_items:
             try:
                 iname = str(getattr(itm, 'Name', '')).strip()
-                if not iname:
-                    continue
-                if any(t in iname.lower() or iname.lower() in t for t in targets_lc):
-                    debug_message(f"Interacting with quest object: {iname} (0x{itm.Serial:X}) within {SEARCH_RANGE_TILES} tiles", 68)
-                    # If USE_ALL_ATTACK is enabled, command pets/party to attack the static object
-                    if USE_ALL_ATTACK:
+                item_id = getattr(itm, 'ItemID', 0)
+                
+                # Debug: Show first 10 items scanned
+                if scanned_count < 10:
+                    debug_message(f"Scanned: '{iname}' (ItemID: 0x{item_id:04X})", 67)
+                    scanned_count += 1
+                
+                # Check if item matches by name OR by ItemID
+                name_match = iname and any(t in iname.lower() or iname.lower() in t for t in targets_lc)
+                itemid_match = item_id in QUEST_ITEMIDS_TO_ATTACK
+                
+                if name_match or itemid_match:
+                    match_type = "ItemID" if itemid_match else "Name"
+                    debug_message(f"Found quest target: {iname} (ItemID: 0x{item_id:04X}, Serial: 0x{itm.Serial:X}) - matched by {match_type}", 68)
+                    
+                    # Command follower to attack using context menu or All Attack
+                    if USE_CONTEXT_MENU_KILL:
+                        # Find follower (look for your summoned pet)
+                        follower_filter = Mobiles.Filter()
+                        follower_filter.Enabled = True
+                        follower_filter.RangeMax = 12
+                        follower_filter.CheckLineOfSight = False
+                        follower_filter.Notorieties.Add(2)  # Green/friendly
+                        followers = Mobiles.ApplyFilter(follower_filter)
+                        
+                        follower_found = False
+                        if followers:
+                            for follower in followers:
+                                if not follower:
+                                    continue
+                                try:
+                                    fname = getattr(follower, 'Name', 'follower')
+                                    debug_message(f"Commanding {fname} to attack {iname}", 68)
+                                    
+                                    # Try context menu variants
+                                    menu_opened = False
+                                    for label in ["Command Kill", "command kill", "Kill"]:
+                                        try:
+                                            Misc.UseContextMenu(follower.Serial, label, 1000)
+                                            menu_opened = True
+                                            break
+                                        except Exception:
+                                            continue
+                                    
+                                    if not menu_opened:
+                                        debug_message(f"Failed to open context menu on {fname}", 33)
+                                        continue
+                                    
+                                    # Give context menu time to fully open and process
+                                    Misc.Pause(800)
+                                    
+                                    # Wait for target cursor (context menu opens targeting mode)
+                                    Target.WaitForTarget(5000, False)
+                                    if not Target.HasTarget():
+                                        debug_message(f"No target cursor after Command Kill on {fname}", 33)
+                                        continue
+                                    
+                                    # Execute target on the quest object
+                                    try:
+                                        Target.TargetExecute(itm)
+                                        debug_message(f"{fname} commanded to kill {iname}!", 68)
+                                        follower_found = True
+                                        # Don't break - continue commanding other followers
+                                    except Exception as e:
+                                        debug_message(f"Targeting error on {fname}: {e}", 33)
+                                        if Target.HasTarget():
+                                            Target.Cancel()
+                                        continue
+                                    
+                                    # Pause between commanding each follower
+                                    Misc.Pause(150)
+                                    
+                                except Exception as e:
+                                    debug_message(f"Error commanding follower: {e}", 33)
+                                    continue
+                        
+                        if not follower_found:
+                            debug_message(f"No follower found, trying All Attack instead", 33)
+                            Player.ChatSay(0, "All Attack")
+                            Misc.Pause(200)
+                            Target.WaitForTarget(2000, False)
+                            Target.TargetExecute(itm)
+                            Misc.Pause(300)
+                    elif USE_ALL_ATTACK:
                         Player.ChatSay(0, "All Attack")
                         Misc.Pause(200)
                         Target.WaitForTarget(2000, False)
                         Target.TargetExecute(itm)
                         Misc.Pause(300)
                         debug_message(f"Commanded All Attack on {iname}", 68)
+                    
                     # Try a DoubleClick/use interaction for statics
                     try:
                         Items.DoubleClick(itm)
@@ -971,9 +1053,10 @@ def main():
                 else:
                     debug_message(f"Failed to complete {quest_config['name']}!", 33)
     
-    if not quests_available:
-        debug_message("No quest items found in backpack! Searching for quest mobiles to attack...", 33)
-        handle_quest_mobiles_fallback()
+    # Always check for quest targets to attack (Daemonic Totem, Cocoons, etc.)
+    # This runs regardless of whether we had quest items to turn in
+    debug_message("Searching for quest targets to attack...", 68)
+    handle_quest_mobiles_fallback()
 
 if __name__ == '__main__':
     main()

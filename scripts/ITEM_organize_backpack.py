@@ -1,5 +1,4 @@
-"""
-ITEM Organize Backpack - a Razor Enhanced Python Script for Ultima Online
+"""ITEM Organize Backpack - a Razor Enhanced Python Script for Ultima Online
 
 Organizes items in the backpack with specific positioning and directional spacing control:
 - Reagents: Lower left, left-to-right sorting, combines reagents
@@ -13,14 +12,11 @@ Organizes items in the backpack with specific positioning and directional spacin
 These positions are tuned for a "150" container size without scaling items sizes 
 the default is "100" container size so you may want to adjust the x and y values for your settings
 
-adjust timing as per shard , in razor's settings "object delay" we set to 200, with autoqueing
-recommended delay is 600 milliseconds , lower delays until issues 
-setting a too low a value can cause "You must wait to perform another action" errors and desync
-
-TODO: replace delay with getlabel 
+Uses server sync method for reliable timing with fallback delays.
+Re-fetches items after moves to verify success and prevent errors.
 
 HOTKEY:: U
-VERSION::20250824
+VERSION::20251024
 """
 ORGANIZE_UNKNOWN_ITEMS = True
 ORGANIZE_REAGENTS = True
@@ -33,7 +29,11 @@ DEBUG_MODE = False  # Set to True to enable debug/info messages
 SPACING_OFFSET = 7  # Pixels to offset spacing
 MAX_STACK_SIZE = 999  # Maximum items to stack in one location
 
-# DELAYS (milliseconds)=============================
+# Server sync configuration
+USE_SERVER_SYNC = True  # Use server sync method for delays (recommended)
+FALLBACK_DELAY = 600  # Fallback delay if server sync fails (in milliseconds)
+
+# DELAYS (milliseconds) - used when server sync is disabled
 PAUSE_SPELLBOOK_MOVE = 200 # Spellbook placement
 PAUSE_SPELLBOOK_ROW_SETTLE = 50
 PAUSE_UNKNOWN_ITEM_MOVE = 200 # Unknown items placement grid
@@ -160,6 +160,22 @@ def debug_message(message, color=68):
     if DEBUG_MODE:
         Misc.SendMessage(f"[BackpackOrg] {message}", color)
 
+def server_sync_delay():
+    """Synchronize with server using backpack label check.
+    This provides a natural server-synced delay that matches server response time.
+    More reliable than arbitrary Misc.Pause() delays.
+    Falls back to FALLBACK_DELAY if GetLabel fails.
+    """
+    try:
+        # GetLabel forces client to wait for server response
+        # This naturally syncs with server tick rate
+        Items.GetLabel(Player.Backpack.Serial)
+        debug_message("Server sync successful", 68)
+    except Exception as e:
+        # Fallback to configured delay if GetLabel fails
+        debug_message(f"Server sync failed ({e}), using fallback delay: {FALLBACK_DELAY}ms", 53)
+        Misc.Pause(FALLBACK_DELAY)
+
 def find_items_by_id(item_id, sort_by_hue=False):
     """Find all items with matching ID in backpack."""
     items = []
@@ -208,11 +224,24 @@ def move_spellbooks(items, base_x, base_y):
 
             # Use amount 0 (all) for non-stackables; keep target as backpack at specific coords
             Items.Move(fresh.Serial, Player.Backpack.Serial, 0, x, y)
-            Misc.Pause(PAUSE_SPELLBOOK_MOVE)
+            
+            # Use server sync or fallback delay
+            if USE_SERVER_SYNC:
+                server_sync_delay()
+            else:
+                Misc.Pause(PAUSE_SPELLBOOK_MOVE)
+            
+            # Verify item was moved successfully
+            moved_item = Items.FindBySerial(fresh.Serial)
+            if moved_item and moved_item.Container != Player.Backpack.Serial:
+                debug_message(f"Warning: Spellbook {hex(fresh.Serial)} may not have moved correctly", 33)
 
             # Small extra pause after finishing each row to let container settle
             if col == columns - 1:
-                Misc.Pause(PAUSE_SPELLBOOK_ROW_SETTLE)
+                if USE_SERVER_SYNC:
+                    server_sync_delay()
+                else:
+                    Misc.Pause(PAUSE_SPELLBOOK_ROW_SETTLE)
         except Exception as e:
             debug_message(f"Error placing spellbook idx={idx} serial={hex(book.Serial)}: {e}", 33)
     debug_message(f"Placed {len(sorted_items)} spellbooks in grid {columns} per row.", 65)
@@ -231,10 +260,16 @@ def move_items(items, target_x, target_y, group_config):
         # First move reagents to character
         for item in items:
             Items.Move(item.Serial, Player.Serial, item.Amount, 0, 0)
-            Misc.Pause(PAUSE_REAGENTS_MOVE_TO_CHAR)
+            if USE_SERVER_SYNC:
+                server_sync_delay()
+            else:
+                Misc.Pause(PAUSE_REAGENTS_MOVE_TO_CHAR)
         
         # Then move them to their designated spot in backpack
-        Misc.Pause(PAUSE_REAGENTS_SETTLE_AFTER_CHAR)  # Extra pause 
+        if USE_SERVER_SYNC:
+            server_sync_delay()
+        else:
+            Misc.Pause(PAUSE_REAGENTS_SETTLE_AFTER_CHAR)  # Extra pause 
         items_on_char = find_items_by_id(items[0].ItemID)
         if items_on_char:
             stack_count = 0
@@ -243,7 +278,10 @@ def move_items(items, target_x, target_y, group_config):
             
             for item in items_on_char:
                 Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, current_x, current_y)
-                Misc.Pause(PAUSE_REAGENTS_MOVE_TO_BACKPACK)
+                if USE_SERVER_SYNC:
+                    server_sync_delay()
+                else:
+                    Misc.Pause(PAUSE_REAGENTS_MOVE_TO_BACKPACK)
 
 def get_known_item_ids():
     """Return a set of all known item IDs from ITEM_GROUPS."""
@@ -286,8 +324,22 @@ def move_unknown_items_to_center_box():
         col = idx % best_cols
         x = center_x + col * (box_width // max(1, best_cols - 1)) if best_cols > 1 else center_x
         y = center_y + row * (box_height // max(1, best_rows - 1)) if best_rows > 1 else center_y
-        Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, x, y)
-        Misc.Pause(PAUSE_UNKNOWN_ITEM_MOVE)
+        
+        try:
+            # Re-fetch item to ensure it still exists
+            item_obj = Items.FindBySerial(item.Serial)
+            if not item_obj:
+                continue
+                
+            Items.Move(item_obj.Serial, Player.Backpack.Serial, item_obj.Amount, x, y)
+            
+            # Use server sync or fallback delay
+            if USE_SERVER_SYNC:
+                server_sync_delay()
+            else:
+                Misc.Pause(PAUSE_UNKNOWN_ITEM_MOVE)
+        except Exception as e:
+            debug_message(f"Error moving unknown item {item.Serial:X}: {e}", 33)
     debug_message(f"Finished moving unknown items to center box.", 65)
 
 def organize_backpack():
@@ -335,8 +387,29 @@ def organize_backpack():
                     current_x = item_def["x"]
                     current_y = item_def["y"]
                     for item in items:
-                        Items.Move(item.Serial, Player.Backpack.Serial, item.Amount, current_x, current_y)
-                        Misc.Pause(PAUSE_GROUP_ITEM_MOVE)
+                        try:
+                            # Re-fetch item to ensure it still exists
+                            item_obj = Items.FindBySerial(item.Serial)
+                            if not item_obj:
+                                debug_message(f"Item {item.Serial:X} not found, skipping", 33)
+                                continue
+                                
+                            Items.Move(item_obj.Serial, Player.Backpack.Serial, item_obj.Amount, current_x, current_y)
+                            
+                            # Use server sync or fallback delay
+                            if USE_SERVER_SYNC:
+                                server_sync_delay()
+                            else:
+                                Misc.Pause(PAUSE_GROUP_ITEM_MOVE)
+                            
+                            # Verify item was moved
+                            moved_item = Items.FindBySerial(item_obj.Serial)
+                            if moved_item and moved_item.Container != Player.Backpack.Serial:
+                                debug_message(f"Warning: Item {item_obj.Serial:X} may not have moved correctly", 33)
+                                
+                        except Exception as e:
+                            debug_message(f"Error moving item {item.Serial:X}: {e}", 33)
+                            
                         stack_count += 1
                         if stack_count >= MAX_STACK_SIZE:
                             current_x += SPACING_OFFSET * MAX_STACK_SIZE

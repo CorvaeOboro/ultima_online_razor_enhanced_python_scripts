@@ -4,8 +4,9 @@ SPELL PureMage Selection - a Razor Enhanced Python Script for Ultima Online
 Cast spells at enemy based on currently empowered spell from PureMage system.
 Reads the current "empowered" spell from gump image IDs and casts it
 
+STATUS::working
 HOTKEY:: Q 
-VERSION::20251015
+VERSION::20251206
 """
 
 from System.Collections.Generic import List
@@ -33,7 +34,7 @@ DEFAULT_SPELL = "Lightning" # Default spell to cast when no spell is selected or
 # List of spells to ignore from PureMage recommendations (will cast DEFAULT_SPELL instead)
 # TODO: add override for GREEN empowered summon effect , we will cast any spells if they have it 
 EXCLUDED_SPELLS = [
-    "Flamestrike",  # Too slow
+    #"Flamestrike",  # Too slow , however new system we cant skip
 ]
 
 # SPELL DATABASE - Single source of truth for all spell IDs
