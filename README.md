@@ -80,7 +80,7 @@ a ritual is a series of actions performed according to a prescribed order .
 - [VFX_mastery_ascension_blood_orb_circle.py](scripts/VFX_mastery_ascension_blood_orb_circle.py) – Blood Mastery Ascension , a ritual of effects with client side items 
 - <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_vfx_mastery_ascension_blood.webp?raw=true"/>
 - [VFX_mastery_ascension_nature_orb_circle.py](scripts/VFX_mastery_ascension_nature_orb_circle.py) – Nature Mastery , a ritual of effects with client side items 
-- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_vfx_mastery_ascension_nature.webp?raw=true"/>
+- <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/_ultima_vfx_mastery_ascension_nature_gump.webp?raw=true"/>
 - [VFX_mastery_ascension_shadow_orb_circle.py](scripts/VFX_mastery_ascension_shadow_orb_circle.py) – Shadow Mastery , a ritual of effects with client side items 
 - <img src="https://github.com/CorvaeOboro/ultima_online_razor_enhanced_python_scripts/blob/main/docs/ultima_vfx_mastery_ascension_shadow.webp?raw=true"/>
 - [VFX_mastery_ascension_fortune_orb_circle.py](scripts/VFX_mastery_ascension_fortune_orb_circle.py) – Fortune Mastery , a ritual of effects with client side items 
