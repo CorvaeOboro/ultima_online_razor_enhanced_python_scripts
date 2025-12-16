@@ -49,6 +49,7 @@ DROP_RAW_RESOURCES = True  # Set to True to drop raw resources (ores, leather, e
 DROP_CRAFTED_RESOURCES = True  # Set to True to drop crafted resources (boards, ingots, etc.)
 DROP_FOOD_ITEMS = True  # Set to True to drop food items
 DROP_MISCELLANEOUS_ITEMS = True  # Set to True to drop miscellaneous items
+DROP_LESSER_WANDS = True  # Set to True to drop wands except Greater Heal wand
 
 # Item Exclusions - Items that should never be dropped even if they match disposable categories
 EXCLUDED_ITEMS = [
@@ -276,6 +277,21 @@ MISCELLANEOUS_ITEMS = [
     {"name": "Water Pitcher", "id": 0x1F9D, "hue": None},
 ]
 
+LESSER_WANDS = {
+    0x0DF2: "WandA",
+    0x0DF5: "WandD",
+    0x5010: "WandFireball",
+    0x0DF3: "WandHarm",
+    0x0DF4: "WandHeal",
+    0x5011: "WandLightning",
+    0x500E: "WandManaDrain",
+}
+
+LESSER_WAND_ITEMS = [
+    {"name": name, "id": item_id, "hue": None}
+    for item_id, name in sorted(LESSER_WANDS.items())
+]
+
 # Items to always drop regardless of category toggles
 ALWAYS_TRASH_ITEMS = [
     {"name": "5 ore", "id": 0x19B7, "hue": 0x0000},
@@ -318,6 +334,10 @@ def get_enabled_disposable_items():
     if DROP_MISCELLANEOUS_ITEMS:
         enabled_items.extend(MISCELLANEOUS_ITEMS)
         debug_message(f"Added {len(MISCELLANEOUS_ITEMS)} miscellaneous items to disposable list", 67)
+
+    if DROP_LESSER_WANDS:
+        enabled_items.extend(LESSER_WAND_ITEMS)
+        debug_message(f"Added {len(LESSER_WAND_ITEMS)} lesser wands to disposable list", 67)
     
     # Always-trash items are unconditionally added
     enabled_items.extend(ALWAYS_TRASH_ITEMS)

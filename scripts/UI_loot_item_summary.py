@@ -6,6 +6,13 @@ use arrows to tune the rankings , useful after a boss fight or dungeon run
 
 launchs a persistent gump with button , or set LAUNCHER_UI_BUTTON to False to show results immediately for hotkey
 
+TODO: 
+- move the image items to the left 4 more pixels 
+- center the rarity title labels , currently they are left aligned
+- more material types for resources 
+- more material types for runics 
+
+STATUS:: wip , needs update to the hardcoded defaults now that we expanded unknowns to uncommon
 VERSION: 20251028
 """
 
@@ -37,6 +44,8 @@ RARE_ITEMS = [
     ("Shadow Orb",                           0x573E, 0x2074),  # 22334, 2074
     ("Doom Orb",                             0x573E, 0x2983),  # 22334, 2983
     ("Death Orb",                            0x573E, 0x2874),  # 22334, 2874
+    ("Earth Orb",                            0x573E, 0x0B54),  # 22334, 2900
+    ("Special Dye",                          0x0E25, 0x0000),  # 3621, any hue (will match all via inheritance)
     ("a paralyze arcane scroll",             0x0EF3, 0x06FC),  # 3827, 1788
     ("a spell hue deed",                     0x14F0, 0x0A1F),  # 5360, 2591
     ("Helga Steelbeard's Lost Contract",    0xA614, 0x0A4B),  # 42516, 2635
@@ -164,6 +173,7 @@ CSV_EXPORT_FILE = os.path.join(_DATA_DIR, 'loot_rating_actions.csv')
 PYTHON_CODE_EXPORT_FILE = os.path.join(_DATA_DIR, 'loot_ratings_python_dictionary.txt')
 RANK_BUTTON_BASE_ID = 1000  # base id for per-item up/down buttons
 EXPORT_BUTTON_ID = 999  # dedicated button ID for export functionality
+ADD_ITEM_BUTTON_ID = 998  # dedicated button ID for add item functionality
 _BUTTON_ACTIONS = {}
 _NEXT_BUTTON_ID = RANK_BUTTON_BASE_ID
 
@@ -293,13 +303,84 @@ def _format_hex4(val) -> str:
     except Exception:
         return str(val)
 
+def clean_item_name(name):
+    """Remove amount prefix from item name if present.
+    
+    Examples:
+        "3 Blue Diamond" -> "Blue Diamond"
+        "10 Gold Coin" -> "Gold Coin"
+        "Sword of Power" -> "Sword of Power" (unchanged)
+    """
+    if not name:
+        return name
+    
+    name_str = str(name).strip()
+    
+    # Check if name starts with a number followed by a space
+    parts = name_str.split(' ', 1)
+    if len(parts) >= 2:
+        first_part = parts[0]
+        # Check if first part is a number
+        if first_part.isdigit():
+            # Return everything after the number and space
+            return parts[1]
+    
+    return name_str
+
+def get_material_type_from_properties(properties):
+    """Extract material type from item properties.
+    
+    Looks for properties like "Material: Bronze", "Material: Valorite", etc.
+    Returns the material name or None if not found.
+    """
+    if not properties:
+        return None
+    
+    for prop in properties:
+        prop_str = str(prop).strip()
+        # Look for "Material: <type>" pattern
+        if prop_str.startswith("Material:"):
+            # Extract the material type after "Material: "
+            material = prop_str.split(":", 1)[1].strip()
+            return material
+    
+    return None
+
+def enhance_ingot_name(base_name, item_id, properties):
+    """Enhance ingot names with their material type.
+    
+    Examples:
+        "ingots" + Material: Bronze -> "Bronze Ingots"
+        "ingots" + Material: Valorite -> "Valorite Ingots"
+    """
+    # Ingot ItemID
+    INGOT_ITEMID = 0x1BF2
+    
+    if int(item_id) != INGOT_ITEMID:
+        return base_name
+    
+    # Get material type from properties
+    material = get_material_type_from_properties(properties)
+    
+    if material:
+        # Capitalize the base name if it's lowercase "ingots"
+        if base_name.lower() == "ingots":
+            return f"{material} Ingots"
+        else:
+            # If it already has a prefix, replace it
+            return f"{material} {base_name}"
+    
+    return base_name
+
 def get_item_name(item):
-    """Best-effort item name using fast paths, then props as fallback."""
+    """Best-effort item name using fast paths, then props as fallback.
+    Automatically removes amount prefix (e.g., "3 Blue Diamond" -> "Blue Diamond").
+    """
     try:
         item_name_attribute = getattr(item, 'Name', None)
         if item_name_attribute:
             item_name_string = str(item_name_attribute)
-            return item_name_string
+            return clean_item_name(item_name_string)
     except Exception:
         pass
     try:
@@ -307,17 +388,17 @@ def get_item_name(item):
         properties_list_quick = Items.GetPropStringList(item.Serial)
         if properties_list_quick and len(properties_list_quick) > 0:
             item_name_from_quick_properties = str(properties_list_quick[0])
-            return item_name_from_quick_properties
+            return clean_item_name(item_name_from_quick_properties)
         # Try a longer properties wait without clicking
         Items.WaitForProps(item.Serial, int(WAIT_PROPS_CLICK_MS))
         properties_list_extended = Items.GetPropStringList(item.Serial)
         if properties_list_extended and len(properties_list_extended) > 0:
             item_name_from_extended_properties = str(properties_list_extended[0])
-            return item_name_from_extended_properties
+            return clean_item_name(item_name_from_extended_properties)
         item_name_from_property_index_zero = Items.GetPropValue(item.Serial, 0)
         if item_name_from_property_index_zero:
             item_name_string_from_index = str(item_name_from_property_index_zero)
-            return item_name_string_from_index
+            return clean_item_name(item_name_string_from_index)
     except Exception:
         pass
     return "Unknown"
@@ -426,12 +507,38 @@ def _make_item_key(name: str, item_id: int, hue: int) -> str:
     return f"{name_normalized}|{item_id}|{hue}"
 
 def _load_user_ratings() -> dict:
-    """Load user ratings from JSON file. Returns the ratings dict."""
+    """Load user ratings from JSON file. Returns the ratings dict.
+    Cleans item names by removing amount prefixes during load.
+    """
     try:
         _ensure_ratings_file()
         with open(USER_RATINGS_FILE, 'r', encoding='utf-8') as ratings_file:
             data = json.load(ratings_file)
-        return data.get('ratings', {})
+        
+        raw_ratings = data.get('ratings', {})
+        
+        # Clean names in the ratings dictionary
+        cleaned_ratings = {}
+        for key, value in raw_ratings.items():
+            # Parse the key: "name|itemID|hue"
+            parts = key.split('|')
+            if len(parts) == 3:
+                name, item_id, hue = parts
+                # Clean the name
+                cleaned_name = clean_item_name(name)
+                # Rebuild the key with cleaned name
+                cleaned_key = f"{cleaned_name}|{item_id}|{hue}"
+                
+                # Also clean the name in the value dict if present
+                if isinstance(value, dict) and 'name' in value:
+                    value['name'] = cleaned_name
+                
+                cleaned_ratings[cleaned_key] = value
+            else:
+                # Keep malformed keys as-is
+                cleaned_ratings[key] = value
+        
+        return cleaned_ratings
     except Exception as load_error:
         debug_message(f"Failed to load user ratings: {load_error}", 33)
         return {}
@@ -585,6 +692,94 @@ def _export_python_dictionary():
         except Exception:
             pass
 
+def _add_item_from_target():
+    """Allow user to target an item and add it to uncommon tier.
+    
+    This helps recover items that are hidden due to being classified as common
+    or having no classification. Adding an item sets it to uncommon, which
+    overrides any common classification.
+    """
+    try:
+        # Cancel any existing target and pause
+        try:
+            Target.Cancel()
+        except Exception:
+            pass
+        Misc.Pause(100)
+        
+        # Prompt user to target an item
+        target_serial = Target.PromptTarget("Select an item to add to UNCOMMON tier")
+        
+        if target_serial <= -1:
+            Misc.SendMessage("Target cancelled or invalid.", 33)
+            return
+        
+        # Get the targeted item
+        targeted_item = Items.FindBySerial(target_serial)
+        if not targeted_item:
+            Misc.SendMessage("Invalid target - item not found.", 33)
+            return
+        
+        # Get item details
+        item_name = get_item_name(targeted_item)
+        item_id = int(targeted_item.ItemID)
+        hue = int(getattr(targeted_item, 'Hue', 0))
+        
+        # Check if it's already rated
+        global _USER_RATINGS_CACHE
+        if _USER_RATINGS_CACHE is None:
+            _USER_RATINGS_CACHE = _load_user_ratings()
+        
+        item_key = _make_item_key(item_name, item_id, hue)
+        existing_rating = _USER_RATINGS_CACHE.get(item_key)
+        
+        if existing_rating:
+            old_tier = existing_rating.get('current_tier', 'unknown')
+            if old_tier == 'uncommon':
+                Misc.SendMessage(f"'{item_name}' is already UNCOMMON.", 53)
+                return
+            
+            # Update from common to uncommon (or any other tier to uncommon)
+            existing_rating['current_tier'] = 'uncommon'
+            existing_rating['history'].append({
+                "timestamp": time.time(),
+                "action": "add_item",
+                "from_tier": old_tier,
+                "to_tier": "uncommon"
+            })
+            
+            _save_user_ratings(_USER_RATINGS_CACHE)
+            _export_csv_action(item_name, item_id, hue, "add_item", old_tier, "uncommon")
+            _export_python_dictionary()
+            
+            Misc.SendMessage(f"Updated: '{item_name}' {old_tier} → UNCOMMON", 68)
+            debug_message(f"Item updated via ADD ITEM: '{item_name}' (0x{item_id:04X}, 0x{hue:04X}) {old_tier} → uncommon")
+        else:
+            # Create new rating as uncommon
+            _USER_RATINGS_CACHE[item_key] = {
+                "name": item_name,
+                "item_id": item_id,
+                "hue": hue,
+                "current_tier": "uncommon",
+                "history": [{
+                    "timestamp": time.time(),
+                    "action": "add_item",
+                    "from_tier": "none",
+                    "to_tier": "uncommon"
+                }]
+            }
+            
+            _save_user_ratings(_USER_RATINGS_CACHE)
+            _export_csv_action(item_name, item_id, hue, "add_item", "none", "uncommon")
+            _export_python_dictionary()
+            
+            Misc.SendMessage(f"Added: '{item_name}' as UNCOMMON", 68)
+            debug_message(f"Item added via ADD ITEM: '{item_name}' (0x{item_id:04X}, 0x{hue:04X}) → uncommon")
+        
+    except Exception as add_error:
+        Misc.SendMessage(f"Add item failed: {add_error}", 33)
+        debug_message(f"Add item error: {add_error}", 33)
+
 def _export_loot_to_json(tiers_map: dict):
     """Export current loot summary to JSON file."""
     try:
@@ -732,13 +927,97 @@ def ensure_specific_items_index():
         except Exception as index_error:
             debug_message(f"Failed building SPECIFIC_ITEMS index: {index_error}", 33)
 
-def get_specific_override_tier(name: str, item_id: int, hue: int) -> str:
-    """Return the override tier if this item triple is in SPECIFIC_ITEMS, else ''."""
+def get_inherited_tier_by_itemid(item_id: int) -> str:
+    """Get the best (highest) tier for an ItemID based on existing entries.
+    
+    If multiple items with the same ItemID exist in SPECIFIC_ITEMS, return the
+    highest tier among them. This allows unlisted variants to inherit the tier
+    of their "cousins".
+    
+    Example: If 3 scrolls with ItemID 0x0EF3 are Epic and 1 is Legendary,
+    an unlisted 0x0EF3 scroll will inherit Legendary tier.
+    """
     try:
         ensure_specific_items_index()
-        key = (_normalize_name(name), int(item_id), int(hue))
-        return _SPECIFIC_ITEMS_INDEX.get(key, '')
-    except Exception:
+        item_id_int = int(item_id)
+        
+        # Find all tiers for this ItemID
+        tiers_found = []
+        for (n, i, h), tier in _SPECIFIC_ITEMS_INDEX.items():
+            if i == item_id_int:
+                tiers_found.append(tier)
+        
+        if not tiers_found:
+            return ''
+        
+        # Return the highest tier (lowest index in RARITY_ORDER)
+        tier_priority = {'legendary': 0, 'epic': 1, 'rare': 2, 'uncommon': 3, 'common': 4}
+        best_tier = min(tiers_found, key=lambda t: tier_priority.get(t, 999))
+        
+        debug_message(f"ItemID 0x{item_id_int:04X} inherited tier: {best_tier} (from {len(tiers_found)} entries)")
+        return best_tier
+    except Exception as e:
+        debug_message(f"Error in get_inherited_tier_by_itemid: {e}", 33)
+        return ''
+
+def get_specific_override_tier(name: str, item_id: int, hue: int) -> str:
+    """Return the override tier using smart matching logic.
+    
+    Matching priority:
+    1. Exact match (name + item_id + hue) - highest priority
+    2. ItemID + Hue match (if only one entry for this combo, ignore name)
+    3. ItemID only match (if only one entry for this ItemID across all hues)
+    
+    This allows:
+    - Specific color orbs to match (Earth Orb 0x573E + 0x0B54)
+    - Generic ItemID matches when no conflicts (0x0EF3 matches any hue)
+    - Name differentiation only when needed (multiple items with same ID+hue)
+    """
+    try:
+        ensure_specific_items_index()
+        name_norm = _normalize_name(name)
+        item_id_int = int(item_id)
+        hue_int = int(hue)
+        
+        # Priority 1: Exact match (name + item_id + hue)
+        exact_key = (name_norm, item_id_int, hue_int)
+        if exact_key in _SPECIFIC_ITEMS_INDEX:
+            return _SPECIFIC_ITEMS_INDEX[exact_key]
+        
+        # Priority 2: Find all entries with matching ItemID + Hue (ignore name)
+        id_hue_matches = []
+        for (n, i, h), tier in _SPECIFIC_ITEMS_INDEX.items():
+            if i == item_id_int and h == hue_int:
+                id_hue_matches.append((n, tier))
+        
+        # If only one match for this ItemID + Hue combo, use it regardless of name
+        if len(id_hue_matches) == 1:
+            debug_message(f"ItemID+Hue match: '{name}' (0x{item_id_int:04X}, 0x{hue_int:04X}) -> {id_hue_matches[0][1]}")
+            return id_hue_matches[0][1]
+        
+        # Priority 3: Find all entries with matching ItemID (any hue)
+        id_only_matches = []
+        for (n, i, h), tier in _SPECIFIC_ITEMS_INDEX.items():
+            if i == item_id_int:
+                id_only_matches.append((n, h, tier))
+        
+        # If only one match for this ItemID across all hues, use it
+        if len(id_only_matches) == 1:
+            debug_message(f"ItemID-only match: '{name}' (0x{item_id_int:04X}) -> {id_only_matches[0][2]}")
+            return id_only_matches[0][2]
+        
+        # Priority 4: Inherit tier from other items with same ItemID (round up to best tier)
+        # This handles cases like arcane scrolls where some variants are listed but others aren't
+        if len(id_only_matches) > 1:
+            inherited_tier = get_inherited_tier_by_itemid(item_id_int)
+            if inherited_tier:
+                debug_message(f"ItemID inheritance: '{name}' (0x{item_id_int:04X}) -> {inherited_tier} (from {len(id_only_matches)} cousins)")
+                return inherited_tier
+        
+        # No match found
+        return ''
+    except Exception as e:
+        debug_message(f"Error in get_specific_override_tier: {e}", 33)
         return ''
 
 def get_user_rating_tier(name: str, item_id: int, hue: int) -> str:
@@ -799,13 +1078,23 @@ def _is_excluded(item_id: int, hue: int) -> bool:
     return hue_int in excluded_hues
 
 def _is_common_item(name: str, item_id: int, hue: int) -> bool:
-    """Check if an item is in COMMON_ITEMS and should be excluded from display."""
+    """Check if an item is in COMMON_ITEMS and should be excluded from display.
+    
+    IMPORTANT: Only exclude if it's an EXACT match (name + item_id + hue).
+    This prevents colored variants (like colored orbs) from being excluded
+    when only the default hue (0x0000) version is in COMMON_ITEMS.
+    """
     try:
         name_normalized = _normalize_name(name)
         item_id_int = int(item_id)
         hue_int = int(hue)
+        
         for common_name, common_id, common_hue in COMMON_ITEMS:
-            if name_normalized == _normalize_name(common_name) and item_id_int == int(common_id) and hue_int == int(common_hue):
+            # EXACT match only - all three must match
+            if (name_normalized == _normalize_name(common_name) and 
+                item_id_int == int(common_id) and 
+                hue_int == int(common_hue)):
+                debug_message(f"COMMON exclusion (exact match): '{name}' (0x{item_id_int:04X}, 0x{hue_int:04X})")
                 return True
     except Exception:
         pass
@@ -924,47 +1213,49 @@ def collect_good_items_from_backpack(max_items_per_tier=100):
         try:
             item_name = get_item_name(item)
             item_properties = get_properties(item)
-            classification = classify_item(item, item_name, item_properties)
-            if not classification:
+            current_hue = int(getattr(item, 'Hue', 0))
+            current_item_id = int(item.ItemID)
+            
+            # Special handling: Enhance ingot names with material type
+            item_name = enhance_ingot_name(item_name, current_item_id, item_properties)
+            
+            # CRITICAL: Check exclusions FIRST before any classification
+            if _is_common_item(item_name, current_item_id, current_hue):
+                debug_message(f"Excluding COMMON item: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
                 continue
-            # Apply SPECIFIC_ITEMS override if present
-            try:
-                current_hue = int(getattr(item, 'Hue', 0))
-                current_item_id = int(item.ItemID)
-                
-                # CRITICAL: Exclude items explicitly marked as COMMON
-                if _is_common_item(item_name, current_item_id, current_hue):
-                    debug_message(f"Excluding COMMON item: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
+            
+            # Priority 1: User ratings (highest priority - checked BEFORE automatic classification)
+            user_tier = get_user_rating_tier(item_name, current_item_id, current_hue)
+            if user_tier:
+                # If user rated as 'common', exclude the item entirely
+                if user_tier == 'common':
+                    debug_message(f"Excluding item with 'common' user rating: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
                     continue
-                
-                # Priority 1: User ratings (highest priority - user's explicit choices)
-                user_tier = get_user_rating_tier(item_name, current_item_id, current_hue)
-                if user_tier:
-                    # If user rated as 'common', exclude the item entirely
-                    if user_tier == 'common':
-                        debug_message(f"Excluding item with 'common' user rating: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
+                # User rating found - create classification with user's tier (no reason/detail text)
+                classification = ClassResult(user_tier, '', '', matched_mods=[])
+                debug_message(f"User rating applied: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)} -> {user_tier}")
+            # Priority 2: SPECIFIC_ITEMS override (checked BEFORE automatic classification)
+            else:
+                override_tier = get_specific_override_tier(item_name, current_item_id, current_hue)
+                if override_tier:
+                    # If override tier is 'common', exclude the item entirely
+                    if override_tier == 'common':
+                        debug_message(f"Excluding item with 'common' override: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
                         continue
-                    # Apply user rating if it's a valid display tier
-                    if user_tier in RARITY_ORDER and user_tier != classification.tier:
-                        debug_message(f"User rating applied: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)} {classification.tier} -> {user_tier}")
-                        classification.tier = user_tier
-                # Priority 2: SPECIFIC_ITEMS override (script-defined overrides)
-                elif True:  # Use elif to ensure user ratings take precedence
-                    override_tier = get_specific_override_tier(item_name, current_item_id, current_hue)
-                    if override_tier:
-                        # If override tier is 'common', exclude the item entirely
-                        if override_tier == 'common':
-                            debug_message(f"Excluding item with 'common' override: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
-                            continue
-                        # Otherwise apply the override if it's a valid display tier
-                        if override_tier in RARITY_ORDER and override_tier != classification.tier:
-                            debug_message(f"Override tier: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)} {classification.tier} -> {override_tier}")
-                            classification.tier = override_tier
-                    elif _normalize_name(item_name) in _SPECIFIC_NAMES:
-                        # Helpful diagnostic: we expected an override name but the (id,hue) didn't match
-                        debug_message(f"No SPECIFIC_ITEMS match for '{item_name}' with id={hex(current_item_id)} hue={hex(current_hue)}")
-            except Exception:
-                pass
+                    # SPECIFIC_ITEMS match found - create classification with override tier (no reason/detail text)
+                    classification = ClassResult(override_tier, '', '', matched_mods=[])
+                    debug_message(f"Override tier: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)} -> {override_tier}")
+                # Priority 3: Automatic classification (lowest priority)
+                else:
+                    classification = classify_item(item, item_name, item_properties)
+                    if not classification:
+                        # No automatic classification and no overrides - default to UNCOMMON
+                        # This ensures all items are shown with adaptive rating
+                        classification = ClassResult('uncommon', '', '', matched_mods=[])
+                        debug_message(f"Default uncommon: '{item_name}' id={hex(current_item_id)} hue={hex(current_hue)}")
+            
+            # At this point we have a valid classification from one of the three sources
+            # Create the tile data for display
             tile = {
                 'serial': int(item.Serial),
                 'item_id': int(item.ItemID),
@@ -1166,28 +1457,49 @@ def render_summary_gump(tiers_map: dict):
 
         current_vertical_position += section_data['height'] + SECTION_GAP
 
-    # Export button at bottom 
-    export_button_y = current_vertical_position + EXPORT_BUTTON_MARGIN - 15
-    export_button_width = 80
-    export_button_height = 40
-    export_button_x = (gump_total_width - export_button_width) // 2
+    # Bottom buttons (ADD ITEM and EXPORT)
+    button_y = current_vertical_position + EXPORT_BUTTON_MARGIN - 15
+    button_width = 90
+    button_height = 40
+    button_gap = 12
     
-    # Button
-    Gumps.AddButton(gump_definition, export_button_x, export_button_y, 1, 1, EXPORT_BUTTON_ID, 1, 0)
+    # Calculate positions for two buttons centered together
+    total_buttons_width = button_width * 2 + button_gap
+    buttons_start_x = (gump_total_width - total_buttons_width) // 2
     
-    # Overlay
+    add_item_button_x = buttons_start_x
+    export_button_x = buttons_start_x + button_width + button_gap
+    
+    # ADD ITEM button (left)
+    Gumps.AddButton(gump_definition, add_item_button_x, button_y, 1, 1, ADD_ITEM_BUTTON_ID, 1, 0)
     if EXPORT_BUTTON_SLIVER_OVERLAY:
-        Gumps.AddImageTiled(gump_definition, export_button_x, export_button_y, export_button_width, export_button_height, 2624)
+        Gumps.AddImageTiled(gump_definition, add_item_button_x, button_y, button_width, button_height, 2624)
     
-    # Label - 
-    label_text = "EXPORT"
-    label_hue = 0x0385
+    # ADD ITEM label
+    label_text = "ADD ITEM"
+    label_hue = 0x0385  # Green hue for add action 0x0044
     approx_char_px = 6
-    text_x = export_button_x + (export_button_width // 2) - max(0, len(label_text)) * approx_char_px // 2
-    text_y = export_button_y + (export_button_height // 2) - 7
+    text_x = add_item_button_x + (button_width // 2) - max(0, len(label_text)) * approx_char_px // 2
+    text_y = button_y + (button_height // 2) - 7
     outline_color = 0
     offsets_r1 = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, -1), (-1, 1), (1, 1)]
     offsets_r2 = [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -1), (-2, 1), (2, -1), (2, 1), (-1, -2), (1, -2), (-1, 2), (1, 2)]
+    for dx, dy in offsets_r2:
+        Gumps.AddLabel(gump_definition, text_x + dx, text_y + dy, outline_color, label_text)
+    for dx, dy in offsets_r1:
+        Gumps.AddLabel(gump_definition, text_x + dx, text_y + dy, outline_color, label_text)
+    Gumps.AddLabel(gump_definition, text_x, text_y, label_hue, label_text)
+    
+    # EXPORT button (right)
+    Gumps.AddButton(gump_definition, export_button_x, button_y, 1, 1, EXPORT_BUTTON_ID, 1, 0)
+    if EXPORT_BUTTON_SLIVER_OVERLAY:
+        Gumps.AddImageTiled(gump_definition, export_button_x, button_y, button_width, button_height, 2624)
+    
+    # EXPORT label
+    label_text = "SAVE"
+    label_hue = 0x0385  # Blue hue
+    text_x = export_button_x + (button_width // 2) - max(0, len(label_text)) * approx_char_px // 2
+    text_y = button_y + (button_height // 2) - 7
     for dx, dy in offsets_r2:
         Gumps.AddLabel(gump_definition, text_x + dx, text_y + dy, outline_color, label_text)
     for dx, dy in offsets_r1:
@@ -1249,6 +1561,12 @@ def show_and_interact_summary(tiers_map: dict):
             if button_id == EXPORT_BUTTON_ID:
                 debug_message("Export button pressed")
                 _export_loot_to_json(tiers_map)
+                # Re-render to keep gump open
+                render_summary_gump(tiers_map)
+            # Check for add item button
+            elif button_id == ADD_ITEM_BUTTON_ID:
+                debug_message("Add Item button pressed")
+                _add_item_from_target()
                 # Re-render to keep gump open
                 render_summary_gump(tiers_map)
             else:

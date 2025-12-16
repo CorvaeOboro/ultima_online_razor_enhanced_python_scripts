@@ -20,6 +20,7 @@ VERSION::20251017
 DEBUG_ON = False
 
 ONLY_GREATER_SUMMONS = True # When True: ignores lesser summons like blade spirits
+INCLUDE_LESSER_SUMMONS = False  # When False: ignores blade spirits
 FOLLOW_LABELS = ["Command: Follow"] # Context menu label variants to try 
 COMMAND_KILL_LABELS = ["Command: Kill"]
 
@@ -55,6 +56,15 @@ def clean_name(name):
         return s
     except Exception:
         return str(name or "")
+
+def is_blade_spirit_name(name):
+    try:
+        s = str(name or "").lower().strip()
+        s = s.replace("(summoned)", "").strip()
+        cname = clean_name(s)
+        return cname in ("blade spirit", "blade spirits")
+    except Exception:
+        return False
 
 def is_summon(mobile):
     """Detect summoned creatures ."""
@@ -151,6 +161,10 @@ def get_summons_from_player_pets():
                         actual_name = str(props[0]).strip()
                 except Exception:
                     pass
+
+                if not INCLUDE_LESSER_SUMMONS and is_blade_spirit_name(actual_name):
+                    debug(f"Skipping lesser summon: {actual_name}", MSG_DEBUG)
+                    continue
                 
                 result.append({
                     'mobile': mobile,

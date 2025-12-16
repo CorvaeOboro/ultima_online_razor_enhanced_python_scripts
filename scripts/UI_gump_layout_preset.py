@@ -18,9 +18,11 @@ TODO:
 - use check gump open so that we dont need to delay between gump moves if the gump is not open
 Check Gump Open = Syntax	Gumps.HasGump( )
 - converter function for the hexidecimal , we want to make sure not overlapping existing ids , inspected gumps are hexidecimal 
+- use serversync getlabelbackpack technique instead of delay 
 
+STATUS::working
 HOTKEY:: P
-VERSION:: 20250924
+VERSION:: 20251206
 """
 
 DEBUG_MODE = False
@@ -38,14 +40,15 @@ GUMP_LAYOUT = {
     0xdbae5952: {"name": "nature mastery forms", "x": 400, "y": 645},
     0xbf26ed43: {"name": "death mastery rage", "x": 400, "y": 645},
     0xb8108206: {"name": "summoner ritual dark lantern", "x": 400, "y": 645},
+    0xf2dcaabb: {"name": "archer quiver trigger meter", "x": 400, "y": 645},
     # custom UI gumps 
     0xc671ea51: {"name": "Progress Tracker", "x": 0, "y": 755},
     3411114321: {"name": "Health Bar", "x": 465, "y": 715},
     3229191321: {"name": "Summon Monitor", "x": 790, "y": 720},
     0xc0798c99: {"name": "Summon Monitor", "x": 790, "y": 720},
     0x7a11a12: {"name": "Item Info WAILA", "x": 350, "y": 760},
-    3135545776: {"name": "Local Chat", "x": 1600, "y": -20},
-    4191917191: {"name": "Action Buttons", "x": 1520, "y": 90},
+    3135545776: {"name": "Local Chat", "x": 1650, "y": -20},
+    4191917191: {"name": "Action Buttons", "x": 1545, "y": 18},
     0x75A11E6: {"name": "Loot", "x": 350, "y": 810},
     3636346736: {"name": "Durability", "x": 465, "y": 715},
     4191917201: {"name": "Command", "x": 465, "y": 715},

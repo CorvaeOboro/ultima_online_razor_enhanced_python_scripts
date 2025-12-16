@@ -228,6 +228,16 @@ COMMAND_DELAY = 50  # Legacy delay
 RECOVERY_TIMEOUT = 3  # Max recovery attempts before giving up
 MAX_EVENT_READ_RETRIES = 2  # Number of times to retry reading an event page before marking as error
 
+TEXT_COMMAND_MIN_GAP_MS = 800
+TEXT_COMMAND_JOURNAL_WAIT_MS = 450
+TEXT_COMMAND_WARNING_PATTERNS = [
+    'too many',
+    'too quickly',
+    'too fast',
+    'must wait',
+    'you have to wait',
+]
+
 DELAY_BEFORE_EVENT_COMMAND = 100  # Wait before using [event command to avoid "too many commands" warning
 DELAY_AFTER_DETAIL_GUMP_OPEN = 20  # Wait after clicking event button for detail gump
 DELAY_AFTER_BACK_BUTTON = 15  # Wait after pressing back button to return to events list
@@ -298,6 +308,76 @@ def server_sync_delay():
         # Fallback to minimal pause if GetLabel fails
         Misc.Pause(50)
 
+_LAST_TEXT_COMMAND_MS = 0
+
+def _now_ms():
+    try:
+        return int(time.time() * 1000)
+    except Exception:
+        return 0
+
+def _notify_throttle_warning(msg):
+    try:
+        Misc.SendMessage(msg, COLORS['warn'])
+    except Exception:
+        print(msg)
+
+def send_text_command(command_text, min_gap_ms=None, journal_wait_ms=None):
+    global _LAST_TEXT_COMMAND_MS
+
+    if min_gap_ms is None:
+        min_gap_ms = TEXT_COMMAND_MIN_GAP_MS
+    if journal_wait_ms is None:
+        journal_wait_ms = TEXT_COMMAND_JOURNAL_WAIT_MS
+
+    gap_waited = 0
+    now_ms = _now_ms()
+    if _LAST_TEXT_COMMAND_MS and now_ms:
+        elapsed = now_ms - _LAST_TEXT_COMMAND_MS
+        if elapsed < min_gap_ms:
+            gap_waited = min_gap_ms - elapsed
+            Misc.Pause(int(gap_waited))
+
+    after_ts = time.time()
+    try:
+        Player.ChatSay(0, command_text)
+    except Exception as e:
+        debug_message(f"ChatSay failed for '{command_text}': {e}", COLORS['bad'])
+        return False
+
+    Misc.Pause(int(journal_wait_ms))
+    _LAST_TEXT_COMMAND_MS = _now_ms()
+
+    warning_line = None
+    try:
+        entries = Journal.GetJournalEntry(after_ts)
+        for ent in entries or []:
+            txt = str(getattr(ent, 'Text', ent))
+            low = txt.lower()
+            for pat in TEXT_COMMAND_WARNING_PATTERNS:
+                if pat in low:
+                    warning_line = txt
+                    break
+            if warning_line:
+                break
+    except Exception:
+        warning_line = None
+
+    if warning_line:
+        _notify_throttle_warning(
+            f"[GlobalEvents] Command warning after '{command_text}' "
+            f"(min_gap_ms={int(min_gap_ms)}, waited_ms={int(gap_waited)}, journal_wait_ms={int(journal_wait_ms)}): {warning_line}"
+        )
+        return False
+
+    if DEBUG_MODE:
+        debug_message(
+            f"Sent command '{command_text}' (min_gap_ms={int(min_gap_ms)}, waited_ms={int(gap_waited)}, journal_wait_ms={int(journal_wait_ms)})",
+            COLORS['info']
+        )
+
+    return True
+
 def wait_for_gump(gump_id, timeout_ms=WAIT_GUMP_MS):
     """Wait for a specific gump ID to appear."""
     try:
@@ -316,6 +396,75 @@ def clean_html_tags(text):
         return ''
     cleaned = re.sub(r'<[^>]+>', '', text)
     return cleaned.strip()
+
+def _quick_get_gump_lines(gump_id):
+    try:
+        lines = Gumps.GetLineList(gump_id, True)
+        if not lines:
+            return []
+        return [str(ln).strip() for ln in lines]
+    except Exception:
+        return []
+
+def _extract_event_points_from_lines(lines):
+    try:
+        for line in lines or []:
+            cleaned = clean_html_tags(line)
+            m = re.search(r'Your\s+(.+?)\s+event\s+points\s*:\s*(\d+)', cleaned, re.IGNORECASE)
+            if m:
+                return (m.group(1).strip(), int(m.group(2)))
+    except Exception:
+        return (None, None)
+    return (None, None)
+
+def _is_event_detail_gump(gump_id):
+    lines = _quick_get_gump_lines(gump_id)
+    name, _pts = _extract_event_points_from_lines(lines)
+    return bool(name)
+
+def _wait_for_event_detail_gump(before_gumps, expected_gump_id=None, timeout_ms=WAIT_GUMP_MS):
+    start_ms = _now_ms()
+    while True:
+        now_ms = _now_ms()
+        if start_ms and now_ms and (now_ms - start_ms) > int(timeout_ms):
+            return None
+
+        try:
+            current = set(Gumps.AllGumpIDs() or [])
+        except Exception:
+            current = set()
+
+        if expected_gump_id and expected_gump_id in current:
+            if _is_event_detail_gump(expected_gump_id):
+                return expected_gump_id
+
+        new_gumps = [gid for gid in current if gid not in before_gumps and gid != EVENTS_LIST_GUMP_ID]
+        for gid in new_gumps:
+            if gid in KNOWN_EVENT_DETAIL_GUMPS and _is_event_detail_gump(gid):
+                return gid
+            if _is_event_detail_gump(gid):
+                return gid
+
+        Misc.Pause(50)
+
+def _close_open_event_detail_gumps():
+    """Only press BACK on verified event-detail gumps; never touch unrelated gumps."""
+    try:
+        all_gumps = Gumps.AllGumpIDs() or []
+    except Exception:
+        all_gumps = []
+
+    for gump_id in all_gumps:
+        if gump_id == EVENTS_LIST_GUMP_ID:
+            continue
+
+        # Safe close conditions only
+        if gump_id in KNOWN_EVENT_DETAIL_GUMPS or _is_event_detail_gump(gump_id):
+            try:
+                Gumps.SendAction(gump_id, BUTTON_BACK)
+                Misc.Pause(100)
+            except Exception:
+                pass
 
 def snap_text_lines(gump_id, event_name="Unknown"):
     """Capture text lines from a gump with detailed output.
@@ -387,8 +536,8 @@ def open_events_list_gump():
         
         server_sync_delay()
         
-        Player.ChatSay(0, "[event")
-        
+        send_text_command("[event", min_gap_ms=max(TEXT_COMMAND_MIN_GAP_MS, DELAY_BEFORE_EVENT_COMMAND))
+         
         # Wait for gump but don't fail if WaitForGump is unreliable
         wait_for_gump(EVENTS_LIST_GUMP_ID, WAIT_GUMP_MS)
         
@@ -524,7 +673,6 @@ def read_events_list_gump(skip_read=False):
     except Exception as e:
         debug_message(f"Error reading events list gump: {e}", COLORS['bad'])
         return []
-
 
 def open_event_detail(event_name, button_id, detail_gump_id):
     """Open detail gump for a specific event."""
@@ -803,8 +951,8 @@ def read_danger_zones_gump():
                 Misc.Pause(1000)
             
             # Open danger zones gump
-            Player.ChatSay(0, "[rotation")
-            
+            send_text_command("[rotation")
+             
             if wait_for_gump(DANGER_ZONES_GUMP_ID, WAIT_GUMP_MS):
                 server_sync_delay()
                 break
@@ -865,8 +1013,8 @@ def read_haven_areas_gump():
                 Misc.Pause(1000)
             
             # Open haven areas gump
-            Player.ChatSay(0, "[HavenAreas")
-            
+            send_text_command("[HavenAreas")
+             
             if wait_for_gump(HAVEN_AREAS_GUMP_ID, WAIT_GUMP_MS):
                 server_sync_delay()
                 break
@@ -927,8 +1075,8 @@ def read_challenge_gump():
                 Misc.Pause(1000)
             
             # Open challenge gump
-            Player.ChatSay(0, "[challenge")
-            
+            send_text_command("[challenge")
+             
             if wait_for_gump(CHALLENGE_GUMP_ID, WAIT_GUMP_MS):
                 server_sync_delay()
                 break
@@ -1007,6 +1155,11 @@ def process_event_page(button_id, all_events_data, raw_gump_data, page_number, t
         server_sync_delay()
         
         try:
+            before_gumps = set(Gumps.AllGumpIDs() or [])
+        except Exception:
+            before_gumps = set()
+
+        try:
             Gumps.SendAction(EVENTS_LIST_GUMP_ID, button_id)
         except Exception as e:
             debug_message(f"    [ERROR] Failed to click button {button_id}: {e}", COLORS['bad'])
@@ -1030,41 +1183,32 @@ def process_event_page(button_id, all_events_data, raw_gump_data, page_number, t
                 expected_gump_id = gump_serial
                 break
         
-        # Get all open gumps
-        all_gumps = Gumps.AllGumpIDs()
-        
-        # First priority: Look for the expected known gump serial
-        if expected_gump_id and expected_gump_id in all_gumps:
+        # First priority: the expected known gump serial
+        try:
+            all_gumps = Gumps.AllGumpIDs() or []
+        except Exception:
+            all_gumps = []
+
+        if expected_gump_id and expected_gump_id in all_gumps and _is_event_detail_gump(expected_gump_id):
             detail_gump_id = expected_gump_id
-            debug_message(f"    [MATCHED] Found expected gump serial {hex(expected_gump_id)} for {event_name}", COLORS['ok'])
+            debug_message(f"    [MATCHED] Found expected event detail gump serial {hex(expected_gump_id)} for {event_name}", COLORS['ok'])
         else:
-            # Fallback: Look for any known event gump that's open
-            for gump_id in all_gumps:
-                if gump_id in KNOWN_EVENT_DETAIL_GUMPS and gump_id != EVENTS_LIST_GUMP_ID:
-                    detail_gump_id = gump_id
-                    matched_name = KNOWN_EVENT_DETAIL_GUMPS[gump_id]
-                    debug_message(f"    [FALLBACK] Found known gump {hex(gump_id)} ({matched_name}) instead of expected for {event_name}", COLORS['warn'])
-                    break
-            
-            # Last resort: Any gump that's not the events list or main menu
-            if not detail_gump_id:
-                for gump_id in all_gumps:
-                    if gump_id != EVENTS_LIST_GUMP_ID:
-                        detail_gump_id = gump_id
-                        debug_message(f"    [UNKNOWN] Using unknown gump serial {hex(gump_id)} for {event_name}", COLORS['warn'])
-                        break
+            # Strict: only accept gumps that actually look like an event detail page
+            detail_gump_id = _wait_for_event_detail_gump(before_gumps, expected_gump_id, WAIT_GUMP_MS)
+            if detail_gump_id:
+                if expected_gump_id and detail_gump_id != expected_gump_id:
+                    debug_message(f"    [WARN] Event detail gump serial mismatch for {event_name}: expected {hex(expected_gump_id)} but found {hex(detail_gump_id)}", COLORS['warn'])
+                else:
+                    debug_message(f"    Found event detail gump serial {hex(detail_gump_id)} for {event_name}", COLORS['ok'])
         
         if not detail_gump_id:
-            debug_message(f"    [ERROR] No detail gump found for button {button_id}", COLORS['bad'])
+            debug_message(f"    [ERROR] No event detail gump found for button {button_id} (refusing to read unrelated gumps)", COLORS['bad'])
             return 'no_gump'
-        
-        # Check if this is a known gump serial
-        known_gump_name = KNOWN_EVENT_DETAIL_GUMPS.get(detail_gump_id, None)
-        if known_gump_name:
-            debug_message(f"    Detail gump opened: {hex(detail_gump_id)} ({event_name}) [KNOWN: {known_gump_name}]", COLORS['ok'])
-        else:
-            debug_message(f"    Detail gump opened: {hex(detail_gump_id)} ({event_name}) [UNKNOWN SERIAL]", COLORS['warn'])
-            debug_message(f"    [INFO] Consider adding this serial to KNOWN_EVENT_GUMPS dictionary", COLORS['info'])
+
+        # Defensive: ensure we never parse an unrelated gump
+        if not _is_event_detail_gump(detail_gump_id):
+            debug_message(f"    [ERROR] Selected gump {hex(detail_gump_id)} does not look like an event detail page; aborting read", COLORS['bad'])
+            return 'invalid_data'
         
         # CRITICAL: Read event data using the specific detail_gump_id serial
         # This ensures we're reading from the correct gump and not a different one
@@ -1118,13 +1262,7 @@ def process_event_page(button_id, all_events_data, raw_gump_data, page_number, t
             debug_message(f"    [ERROR] Failed to read any lines for button {button_id}", COLORS['bad'])
             return 'no_lines'  # Return error code
         
-        # Try to close any stuck detail gump using back button
-        if detail_gump_id:
-            try:
-                Gumps.SendAction(detail_gump_id, BUTTON_BACK)
-                Misc.Pause(100)
-            except Exception:
-                pass
+        _close_open_event_detail_gumps()
         
         return 'read_failed'
         
@@ -1213,19 +1351,9 @@ def collect_all_events_data():
                     
                     debug_message(f"    [RECOVERY] Menu reset complete, retrying button {button_id}...", COLORS['ok'])
                 else:
-                    # Normal retry: Just close stuck detail gumps using back button
-                    try:
-                        all_gumps = Gumps.AllGumpIDs()
-                        for gump_id in all_gumps:
-                            if gump_id != EVENTS_LIST_GUMP_ID:
-                                try:
-                                    Gumps.SendAction(gump_id, BUTTON_BACK)  # Use back button
-                                    Misc.Pause(100)
-                                except Exception:
-                                    pass
-                        server_sync_delay()
-                    except Exception:
-                        pass
+                    # Normal retry: ONLY close verified event detail gumps
+                    _close_open_event_detail_gumps()
+                    server_sync_delay()
                 
                 # Brief pause before retry
                 Misc.Pause(200)
@@ -1262,19 +1390,7 @@ def collect_all_events_data():
                     "error": error_msg
                 }
         
-        # After processing (success or failure), close any remaining detail gumps with back button
-        # This keeps the events list gump open
-        try:
-            all_gumps = Gumps.AllGumpIDs()
-            for gump_id in all_gumps:
-                if gump_id != EVENTS_LIST_GUMP_ID and gump_id != MAIN_MENU_GUMP_ID:
-                    try:
-                        Gumps.SendAction(gump_id, BUTTON_BACK)  # Use back button
-                        Misc.Pause(100)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        _close_open_event_detail_gumps()
         
         # Brief pause before next event
         Misc.Pause(100)
