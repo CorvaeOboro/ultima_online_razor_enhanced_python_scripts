@@ -432,6 +432,16 @@ def process_land_tiles(image_dir, log_callback=None):
         import glob
         image_files.extend(glob.glob(os.path.join(image_dir, ext)))
         image_files.extend(glob.glob(os.path.join(image_dir, ext.upper())))
+
+    unique_image_files = []
+    seen = set()
+    for p in image_files:
+        key = os.path.normcase(os.path.abspath(p))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_image_files.append(p)
+    image_files = unique_image_files
     
     if not image_files:
         if log_callback:
@@ -513,6 +523,16 @@ def process_static_items(image_dir, log_callback=None):
         import glob
         image_files.extend(glob.glob(os.path.join(image_dir, ext)))
         image_files.extend(glob.glob(os.path.join(image_dir, ext.upper())))
+
+    unique_image_files = []
+    seen = set()
+    for p in image_files:
+        key = os.path.normcase(os.path.abspath(p))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_image_files.append(p)
+    image_files = unique_image_files
     
     if not image_files:
         if log_callback:
