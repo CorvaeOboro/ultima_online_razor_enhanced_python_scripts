@@ -31,7 +31,7 @@ EXPORT_DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 # Display settings
 ENABLE_GUMP_UPDATES = True  # Toggle to enable/disable gump display updates
 DISPLAY_RADIUS = 50  # Tiles around player to display
-UPDATE_DELAY_MS = 500  # Update every 500ms / the search and display takes longer like 1.5 seconds
+UPDATE_DELAY_MS = 50  # Update every 500ms / the search and display takes longer like 1.5 seconds
 GUMP_WIDTH = 810
 GUMP_HEIGHT = 620
 GUMP_X = 0
